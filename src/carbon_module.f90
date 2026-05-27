@@ -1,6 +1,9 @@
       module carbon_module 
       
       implicit none
+
+      logical :: cbn_diagnostics = .false.   !        |This controls what is printed out in soil_nutcarb_write.f90. 
+                                             !        |If .false. only hru_cbn_lyr(.txt, .csv) and hru_seq_lyr(.txt, .csv) will be printed out
       
       type carbon_terrestrial_inputs
         real :: er_POC_para = 1.5       !           |POC enrichment ratio ! 0-10 ! 0.0-5.0  MOST SENSITIVE  
@@ -63,9 +66,16 @@
       type (carbon_inputs), dimension(2) :: carbdb 
       type (carbon_inputs) :: carbz  
       logical :: carbon_coef_file = .false. !           !set to true if carbon_coef.cbn file exits.
+
+      type manure_coef
+          real :: rtof = 0.5            !none          |weighting factor used to partition the 
+                                        !              |organic N & P concentration of septic effluent
+                                        !              |between the fresh organic and the stable organic pools
+          real :: man_to_c = 0.42       !              |conversion of manure solids to carbon
+      end type manure_coef
+      type (manure_coef) :: man_coef
       
       type organic_allocations
-          real :: abco2 = 0.      !               |Fraction of decomposed microbial biomass allocated to CO2
           ! real :: abl = 0.        !               |Fraction of microbial biomass loss due to leaching
           real :: abp = 0.        !               |Fraction of decomposed microbial biomass allocated to passive humus
           real :: asp = 0.        !               |Fraction of decomposed slow humus allocated to passive
@@ -75,6 +85,7 @@
           real :: a1co2 =  0.     !               |Fraction of decomposed metabolic and passive pools to CO2
           real :: asco2 = 0.      !               |Fraction of decomposed slow humus allocated to CO2
           real :: apco2 = 0.      !               |Fraction of decomposed  passive humus allocated to CO2
+          real :: abco2 = 0.      !               |Fraction of decomposed microbial biomass allocated to CO2
       end type organic_allocations
       type (organic_allocations), dimension(2) :: org_allo 
       type (organic_allocations) :: org_alloz
@@ -91,9 +102,14 @@
           real :: resp               !                 |co2 respiration
           ! real :: xbmt = 0.          !               |control on transformation of microbial biomass by soil texture and structure
           ! real :: xlslf = 0.         !               |control on potential transformation of structural litter by lignin fraction
+          ! The following three parameters resolve the shape of the temperature effect equation:  
+          real :: tn = -5.           ! celsius         |minimum temperature bound
+          real :: top = 30.          ! celsius         |peak (optimum) temperature 
+          real :: tx = 50.           ! celsius         |maximum temperature bound
+          integer :: tmpf = 2        !                 |temperature factor approach used in cbn_zhang2 
+          integer :: watf = 1        !                 |water factor approach used in cbn_zhang2 
       end type organic_controls
       type (organic_controls) :: org_con
-      type (organic_controls) :: org_con_zero
         
       type organic_fractions
           real :: lmf = 0.      !frac               |fraction of the litter that is metabolic
@@ -101,6 +117,12 @@
           real :: lsf = 0.      !frac               |fraction of the litter that is structural
           real :: lslf = 0.     !kg kg-1            |fraction of structural litter that is lignin 
           real :: lsnf = 0.     !kg kg-1            |fraction of structural litter that is N      
+          real :: frac_seq = .95             !      |fraction of total carbon the is sequestered carbon when initializing sequestered pools
+          real :: frac_not_seq = .05         !      |fraction of total carbon the is NOT sequestered carbon when initializing non-sequestered pools
+          real :: frac_hum_microb = 0.02     !      !fraction of carbon that is microbrial pool when initializing microbrial pools
+          real :: frac_hum_slow = 0.54       !      !fraction of carbon that is humas slow pool  when initializing humus slow pools
+          real :: frac_hum_passive = 0.44    !      |fraction of carbon that is humas passive pool when initializing humas passive pools
+          logical :: mathers_method = .false. !     !logical indicating whether to use the mathers_method to initialize humus slow pools
       end type organic_fractions
       type (organic_fractions) :: org_frac                    
       
@@ -113,6 +135,12 @@
       type (organic_ratio) :: org_ratio                   
       type (organic_ratio) :: org_ratio_zero                   
       
+      type carbon_water_coef
+          real :: prmt_21 = 1000.   !   |KOC FOR CARBON LOSS IN WATER AND SEDIMENT(500._1500.) KD = KOC * C          
+          real :: prmt_44 = 0.5     !   |RATIO OF SOLUBLE C CONCENTRATION IN RUNOFF TO PERCOLATE(0.1_1.)
+      end type carbon_water_coef
+      type (carbon_water_coef) :: cb_wtr_coef                  
+
       type organic_transformations
           real :: bmctp = 0.       !kg ha-1 day-1        |potential transformation of C in microbial biomass
           real :: bmntp = 0.       !kg ha-1 day-1        |potential transformation of N in microbial biomass
@@ -170,7 +198,7 @@
           real :: co2fs3 = 0.            !(kg C ha-1 day-1) |CO2 production resulting from S3 (Passive Humus) transformations  
       end type organic_flux
       type (organic_flux) :: org_flux
-	    type (organic_flux) :: org_flux_zero
+      type (organic_flux) :: org_flux_zero
       
       type carbon_soil_transformations
           real :: meta_micr = 0.        !(kg C ha-1 day-1) |C transformed from Metabolic Litter to S1 (Microbial Biomass) 

@@ -15,6 +15,8 @@
       use landuse_data_module
       
       implicit none
+      
+      external :: chg_par, cal_parm_select
            
       character(len=25) :: chg_parm = ""                      !                |               
       character(len=16) :: chg_typ = ""                       !variable        |type of change (absval, abschg, pctchg)
@@ -42,9 +44,9 @@
       integer :: cal_lyr1 = 0
       integer :: cal_lyr2 = 0
       integer :: iplant = 0
-      integer :: icom = 0
          
       do ichg_par = 1, db_mx%cal_upd
+
         do ispu = 1, cal_upd(ichg_par)%num_elem
           ielem = cal_upd(ichg_par)%num(ispu)
           chg_parm = cal_upd(ichg_par)%name
@@ -97,7 +99,7 @@
             case ("cal_group")     !for hru    
               if (cal_upd(ichg_par)%cond(ic)%targc /= hru(ielem)%cal_group) then 
                 cond_met = "n"
-                exit
+                !exit
               end if
             end select
           end do    ! ic - conditions

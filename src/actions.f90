@@ -4,7 +4,7 @@
       use time_module
       use aquifer_module
       use hru_module, only : hru, cn2, fertno3, fertnh3, fertorgn, fertorgp, fertsolp,   &
-        ihru, ipl, isol,  phubase, sol_sumno3, sol_sumsolp, qtile
+        ihru, ipl, isol,  phubase, sol_sumno3, sol_sumsolp, qtile, snodb
       use soil_module
       use plant_module
       use plant_data_module
@@ -31,6 +31,12 @@
       use water_allocation_module
 
       implicit none
+      
+      external :: cn2_init, cs_fert, curno, hru_fr_change, hru_lum_init, mgt_harvbiomass, mgt_harvgrain, &
+                  mgt_harvresidue, mgt_harvtuber, mgt_killop, mgt_newtillmix, mgt_newtillmix_wet, &
+                  mgt_transplant, pest_apply, pl_burnop, pl_fert, pl_fert_wet, pl_graze, pl_manure, &
+                  plant_init, salt_fert, structure_set_parms, wet_initial, chg_par, mgt_newtillmix_cswat1, &
+                  mgt_newtillmix_cswat0
 
       integer, intent (in)  :: ob_cur      !none     |sequential number of individual objects
       integer, intent (in)  :: ob_num      !none     |sequential number for all objects
@@ -53,10 +59,6 @@
       integer :: idp = 0                   !         |
       integer :: istr = 0                  !         |
       integer :: istr1 = 0                 !         |
-      integer :: iob_out = 0
-      integer :: inhyd = 0                 !         |
-      integer :: ihyd_in = 0               !         |
-      integer :: icon = 0                  !         |
       integer :: iplt_bsn = 0
       integer :: irrop = 0                 !         |
       integer :: igr = 0
@@ -69,8 +71,7 @@
       integer :: ires = 0
       integer :: idb = 0
       integer :: imallo = 0
-      integer :: idmd = 0
-      integer :: irec = 0
+      integer :: itrn = 0
       integer :: iplt = 0
       integer :: num_plts_cur = 0
       integer :: hru_rcv
@@ -79,7 +80,6 @@
       real :: frt_kg = 0.
       real :: harveff = 0.
       real :: wur = 0.                     !         |
-      real :: frac = 0.                    !         |
       real :: rto = 0.                     !         |
       real :: rto1 = 0.                    !         |
       real :: pest_kg = 0.                 !kg/ha    |amount of pesticide applied 
@@ -92,6 +92,7 @@
       real :: stor_m3 = 0.
       character(len=1) :: action = ""      !         |
       character(len=40) :: lu_prev = ""    !         |
+      character(len=40) :: snow_prev = ""  !         |
 
       do iac = 1, d_tbl%acts
         action = "n"
@@ -108,15 +109,15 @@
           !manure demand - for manure allocation
           case ("manure_demand")
             j = ob_cur
-            idmd = ob_num
+            itrn = ob_num
             imallo = 1      !if mallo objects > 1, need to input
             
-            mallo(imallo)%dmd(idmd)%manure_amt = manure_amtz
+            mallo(imallo)%trn(itrn)%manure_amt = manure_amtz
             if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
-              mallo(imallo)%dmd(idmd)%manure_amt%mallo_obj = 1                      !assume 1 manure allocation object - could use file_pointer to xwalk
-              mallo(imallo)%dmd(idmd)%manure_amt%src_obj = d_tbl%act(iac)%ob_num    !amount applied - t/ha
-              mallo(imallo)%dmd(idmd)%manure_amt%app_t_ha = d_tbl%act(iac)%const    !manure source object number
-              mallo(imallo)%dmd(idmd)%manure_amt%app_method = d_tbl%act_app(iac)    !manure application method
+              mallo(imallo)%trn(itrn)%manure_amt%mallo_obj = 1                      !assume 1 manure allocation object - could use file_pointer to xwalk
+              mallo(imallo)%trn(itrn)%manure_amt%src_obj = d_tbl%act(iac)%ob_num    !amount applied - t/ha
+              mallo(imallo)%trn(itrn)%manure_amt%app_t_ha = d_tbl%act(iac)%const    !manure source object number
+              mallo(imallo)%trn(itrn)%manure_amt%app_method = d_tbl%act_app(iac)    !manure application method
             end if
 
           !irrigation demand - hru action
@@ -141,28 +142,55 @@
                 irrop = d_tbl%act_typ(iac)      ! irrigation application type in irr.ops
                 irrig(j)%demand = d_tbl%act(iac)%const * hru(j)%area_ha * 10.       ! m3 = mm * ha * 10.
             
-            !! if unlimited source, set irrigation applied directly to hru
-            if (d_tbl%act(iac)%file_pointer == "unlim") then
-              irrig(j)%applied = irrop_db(irrop)%amt_mm * irrop_db(irrop)%eff * (1. - irrop_db(irrop)%surq)
-              irrig(j)%runoff = irrop_db(irrop)%amt_mm * irrop_db(irrop)%eff * irrop_db(irrop)%surq
-            end if  
+                !! if unlimited source, set irrigation applied directly to hru
+                if (d_tbl%act(iac)%file_pointer == "unlim") then
+                  irrig(j)%applied = irrop_db(irrop)%amt_mm * irrop_db(irrop)%eff * (1. - irrop_db(irrop)%surq)
+                  irrig(j)%runoff = irrop_db(irrop)%amt_mm * irrop_db(irrop)%eff * irrop_db(irrop)%surq
+                end if  
               
                 !set organics and constituents from irr.ops ! irrig(j)%water =  cs_irr(j) = 
                 if (pco%mgtout == "y") then
                   write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIGATE", phubase(j),  &
-                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m, &
+                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m, &
                       sol_sumno3(j), sol_sumsolp(j), irrig(j)%applied
                 end if
               else
                 !! set demand for irrigation from channel, reservoir or aquifer
                 if (pco%mgtout == "y") then
-                  write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIG_DMD", phubase(j), &
-                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m, &
+                  write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIG_trn", phubase(j), &
+                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m, &
                       sol_sumno3(j), sol_sumsolp(j), irrop_db(irrop)%amt_mm
                 end if
               end if
             endif
 
+          ! Jose 2025 - add for recording reservoir irrigation demand (future plan is to fully integrate in water allocation module)
+          case ("res_irr_dmd")
+            ipl = 1
+            j = ob_cur                      ! hru number
+
+            !select object type
+            iob = d_tbl%act(iac)%ob_num
+
+            irrig(j)%demand         = d_tbl%act(iac)%const * hru(j)%area_ha * 10.       ! m3 = mm * ha * 10.
+            res_ob(iob)%irrig_track = res_ob(iob)%irrig_track + 1                       ! Tracker to update irrigation demand
+            res_ob(iob)%d_irrig_day = irrig(j)%demand
+
+          !irrigate demand - water allocation action - only irrigates if adequate water is available
+          case ("irr_wallo")
+            ipl = 1
+            j = ob_cur                      ! hru number
+            
+            irrop = d_tbl%act_typ(iac)      ! irrigation application type in irr.ops
+
+            if (d_tbl%act(iac)%name=='ponding') then !paddy irrigation
+              hru(j)%irr_hmax = d_tbl%act(iac)%const !mm
+              hru(j)%irr_hmin = d_tbl%act(iac)%const2 !mm
+              irrig(j)%demand = max(0.,d_tbl%act(iac)%const-wet_ob(j)%depth*1000.) * hru(j)%area_ha * 10.       ! m3 = mm * ha * 10.
+            else
+              irrig(j)%demand = d_tbl%act(iac)%const * hru(j)%area_ha * 10.       ! m3 = mm * ha * 10.
+            end if
+                
           !irrigate - hru action
           case ("irrigate")
             ipl = 1
@@ -204,8 +232,10 @@
               rto1 = (1. - rto)
               irrig(j)%water%flo = rto * aqu_d(iob)%stor                ! organics in irrigation water
               aqu_d(iob)%stor = rto1 * aqu_d(iob)%stor                  ! remainder stays in aquifer
-              cs_irr(iob) = rto * cs_aqu(iob)                           ! constituents in irrigation water
-              cs_aqu(iob) = rto1 * cs_aqu(iob)                          ! remainder stays in aquifer
+              if (cs_db%num_cs > 0) then
+                cs_irr(iob) = rto * cs_aqu(iob)                           ! constituents in irrigation water
+                cs_aqu(iob) = rto1 * cs_aqu(iob)                          ! remainder stays in aquifer
+              end if
               
             case ("cha", "sdc")
               if (ch_stor(iob)%flo > irrig(j)%demand) then
@@ -243,11 +273,20 @@
               
             end select
                   
-            if (pco%mgtout == "y") then
-              write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIGATE", phubase(j),  &
-                  pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m, &
-                  sol_sumno3(j), sol_sumsolp(j), irrig(j)%demand
-            end if
+            ! add irrigation to yearly sum for dtbl conditioning jga 6-25
+            hru(j)%irr_yr = hru(j)%irr_yr + irrig(j)%applied
+            
+            if (d_tbl%act(iac)%name=='ponding') then !paddy irrigation
+              if (pco%mgtout == "y") then
+                write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "PADDY IRRIGATION", irrig(j)%applied
+              end if
+            else
+              if (pco%mgtout == "y") then
+                write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIGATE", phubase(j),  &
+                    pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot, &
+                    sol_sumno3(j), sol_sumsolp(j), irrig(j)%applied
+              end if
+            endif
             
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1                     !reset days since last action
@@ -271,7 +310,7 @@
                 if (pco%mgtout == "y") then
                   write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, " FERT-WET", &
                     phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
-                    soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
+                    pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
                     fertorgn, fertsolp, fertorgp
                 endif
               else
@@ -279,9 +318,34 @@
                 if (pco%mgtout == "y") then
                   write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, "    FERT ", &
                     phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
-                    soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
+                    pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
                     fertorgn, fertsolp, fertorgp
                 endif
+              endif
+              pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
+              pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since last action
+              if (iac > 1) pcom(j)%dtbl(idtbl)%days_act(iac-1) =  0     !reset previous action day counter
+            end if
+
+          !manure application
+          case ("manure")
+            j = d_tbl%act(iac)%ob_num
+            if (j == 0) j = ob_cur
+            
+            if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
+              ipl = 1
+              ifrt = d_tbl%act_typ(iac)               !fertilizer type from fert data base
+              frt_kg = d_tbl%act(iac)%const           !amount applied in kg/ha
+              ifertop = d_tbl%act_app(iac)            !surface application fraction from chem app data base
+
+              call pl_manure (ifrt, frt_kg, ifertop)
+              call salt_fert(j,ifrt,frt_kg,ifertop) !rtb salt 
+              call cs_fert(j,ifrt,frt_kg,ifertop) !rtb cs
+              if (pco%mgtout == "y") then
+                write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, " MANURE ", &
+                  phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
+                  pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
+                  fertorgn, fertsolp, fertorgp
               endif
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since last action
@@ -302,12 +366,16 @@
             if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
               idtill = d_tbl%act_typ(iac)
               ipl = 1
-              call mgt_newtillmix(j, 0., idtill)
+              if (bsn_cc%cswat == 1) then
+                call mgt_newtillmix_cswat1(j, 0., idtill)
+              else
+                call mgt_newtillmix_cswat0(j, 0., idtill)
+              endif
             
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, tilldb(idtill)%tillnm, "    TILLAGE",    &
                     phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,        &
-                    soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), tilldb(idtill)%effmix
+                    pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), tilldb(idtill)%effmix
               end if
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since this action
@@ -318,8 +386,6 @@
           case ("plant")
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
-            
-            if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
                 
             icom = pcom(j)%pcomdb
             pcom(j)%days_plant = 1       !reset days since last planting
@@ -343,19 +409,26 @@
                     pcom(j)%plcur(ipl)%idorm = "n"
                     if (d_tbl%act_app(iac) > 0) then
                       call mgt_transplant (d_tbl%act_app(iac))
-                    end if
-                    if (pco%mgtout == "y") then
-                    write (2612, *) j, time%yrc, time%mo, time%day_mo, pldb(idp)%plantnm, "    PLANT",   &
-                      phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(ihru)%sw,                     &
-                      pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m, sol_sumno3(j),                  &
-                      sol_sumsolp(j), pcom(j)%plg(ipl)%lai, pcom(j)%plcur(ipl)%lai_pot
+                      if (pco%mgtout == "y") then
+                        write (2612, *) j, time%yrc, time%mo, time%day_mo, pldb(idp)%plantnm, "TRANSPLANT",   &
+                          phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(ihru)%sw,                     &
+                          pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m, sol_sumno3(j),                  &
+                          sol_sumsolp(j), pcom(j)%plg(ipl)%lai, pcom(j)%plcur(ipl)%lai_pot
+                      end if
+                    else
+                      if (pco%mgtout == "y") then
+                        write (2612, *) j, time%yrc, time%mo, time%day_mo, pldb(idp)%plantnm, "    PLANT",   &
+                          phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(ihru)%sw,                     &
+                          pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m, sol_sumno3(j),                  &
+                          sol_sumsolp(j), pcom(j)%plg(ipl)%lai, pcom(j)%plcur(ipl)%lai_pot
+                      end if
                     end if
                   else
                     !! don't plant if the crop is already growing
                     if (pco%mgtout ==  "y") then
                       write (2612, *) j, time%yrc, time%mo, time%day_mo, pldb(idp)%plantnm,         &
                         "    PLANT_ALREADY_GROWING", phubase(j), pcom(j)%plcur(ipl)%phuacc,       &
-                        soil(j)%sw, pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m, sol_sumno3(j),      &
+                        soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m, sol_sumno3(j),      &
                         sol_sumsolp(j),pcom(j)%plg(ipl)%lai, pcom(j)%plcur(ipl)%lai_pot
                     end if
                   end if
@@ -365,7 +438,6 @@
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since last action
               if (iac > 1) pcom(j)%dtbl(idtbl)%days_act(iac-1) =  0     !reset previous action day counter
-            end if
             
           !harvest only
           case ("harvest")
@@ -400,7 +472,7 @@
                   call mgt_harvgrain (j, ipl, iharvop)
                 case ("residue")
                   harveff = d_tbl%act(iac)%const
-                  call mgt_harvresidue (j, harveff)
+                  call mgt_harvresidue (j, harveff, iharvop)
                 case ("tree")
                   call mgt_harvbiomass (j, ipl, iharvop)
                 case ("tuber")
@@ -439,13 +511,13 @@
                   idp = pcom(j)%plcur(ipl)%idplt
                   if (pco%mgtout == "y") then
                     write (2612, *) j, time%yrc, time%mo, time%day_mo,  pldb(idp)%plantnm, "    HARVEST",      &
-                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, soil1(j)%rsd(1)%m, &
+                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, pl_mass(j)%rsd_tot%m, &
                         sol_sumno3(j), sol_sumsolp(j), pl_yield%m, pcom(j)%plstr(ipl)%sum_n, &
                         pcom(j)%plstr(ipl)%sum_p, pcom(j)%plstr(ipl)%sum_tmp, pcom(j)%plstr(ipl)%sum_w, &
                         pcom(j)%plstr(ipl)%sum_a
                   end if 
                 end if
-                pcom(j)%plcur(ipl)%phuacc = 0.
+                !pcom(j)%plcur(ipl)%phuacc = 0.
               end do
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since last action
@@ -469,7 +541,7 @@
                   idp = pcom(j)%plcur(ipl)%idplt
                   if (pco%mgtout == "y") then
                     write (2612, *) j, time%yrc, time%mo, time%day_mo,  pldb(idp)%plantnm, "         KILL",     &
-                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, soil1(j)%rsd(1)%m,  &
+                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, pl_mass(j)%rsd_tot%m,  &
                         sol_sumno3(j), sol_sumsolp(j), yield, pcom(j)%plstr(ipl)%sum_n,                  &
                         pcom(j)%plstr(ipl)%sum_p, pcom(j)%plstr(ipl)%sum_tmp, pcom(j)%plstr(ipl)%sum_w,  &
                         pcom(j)%plstr(ipl)%sum_a
@@ -516,7 +588,7 @@
                   call mgt_harvgrain (j, ipl, iharvop)
                 case ("residue")
                   harveff = d_tbl%act(iac)%const
-                  call mgt_harvresidue (j, harveff)
+                  call mgt_harvresidue (j, harveff, iharvop)
                 case ("tree")
                 case ("tuber")
                   call mgt_harvtuber (j, ipl, iharvop)
@@ -557,7 +629,7 @@
                   idp = pcom(j)%plcur(ipl)%idplt
                   if (pco%mgtout == "y") then
                     write (2612, *) j, time%yrc, time%mo, time%day_mo,  pldb(idp)%plantnm, "    HARV/KILL",        &
-                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, soil1(j)%rsd(1)%m,     &
+                        phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, biomass, pl_mass(j)%rsd_tot%m,     &
                         sol_sumno3(j), sol_sumsolp(j), pl_yield%m, pcom(j)%plstr(ipl)%sum_n,   &
                         pcom(j)%plstr(ipl)%sum_p, pcom(j)%plstr(ipl)%sum_tmp, pcom(j)%plstr(ipl)%sum_w,     &
                         pcom(j)%plstr(ipl)%sum_a
@@ -620,7 +692,7 @@
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%option, "    PEST ",        &
                  phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m,           &
-                 soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), pest_kg
+                 pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), pest_kg
               endif
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               !dtbl_lum(idtbl)%hru_lu_cur = dtbl_lum(idtbl)%hru_lu_cur + 1
@@ -638,7 +710,7 @@
               !if (pco%mgtout == "y") then
               !  write (2612, *) j, time%yrc, time%mo, time%day_mo, "         ", "    GRAZE",         &
               !    phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m,        &
-              !    soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), grazeop_db(igr)%eat, grazeop_db(igr)%manure
+              !    pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), grazeop_db(igr)%eat, grazeop_db(igr)%manure
               !end if
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
 
@@ -682,25 +754,49 @@
               hlt(j)%hufh = 0.
               hlt(j)%aet = 0.
               hlt(j)%pet = 0.
-
-          !! drainage water management
-          case ("tiledep_control") !! set drain depth for drainage water management
+      
+          !! set the amount of water to be diverted from channel in water allocation
+          case ("divert") 
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
             
-            if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
-              istr = hru(j)%tiledrain
-              hru(j)%lumv%sdr_dep = d_tbl%act(iac)%const
-              pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
+            ! option to set tile flow directed toward the saturated buffer hru
+            select case (d_tbl%act(iac)%option)
+                
+            case ("flo_cms")    !! set water diverted - can't be more than actual flow/volume
+              trn_m3 = Min (ht2%flo, d_tbl%act(iac)%const * 86400.)
+
+            case ("min_cms")    !! divert at least the minimum flow rate
+              trn_m3 = Max (ht2%flo, d_tbl%act(iac)%const * 86400.)
               
-              if (pco%mgtout == "y") then
-                write (2612, *) j, time%yrc, time%mo, time%day_mo, tilldb(idtill)%tillnm, "  DRAIN_CONTROL",    &
-                    phubase(j), pcom(j)%plcur(1)%phuacc, soil(j)%sw, pl_mass(j)%tot(1)%m,        &
-                    soil1(j)%rsd(1)%m, sol_sumno3(j), sol_sumsolp(j), hru(j)%lumv%sdr_dep
-              end if
-            end if
-                                   
-          ! set the amount of water to be diverted
+            case ("max_cms")    !! divert the maximum flow rate - can't be more than actual flow
+              trn_m3 = Min (ht2%flo, d_tbl%act(iac)%const * 86400.)
+              
+            case ("all_flo")    !! all flow diverted
+              trn_m3 = ht2%flo
+
+            case ("zero_flo")   !! no flow diverted
+              trn_m3 = 0.
+
+            case ("frac")   !! constant fraction 
+              trn_m3 = d_tbl%act(iac)%const * ht2%flo
+                
+            end select
+                   
+          !! set the amount of water to be transferred in water allocation
+          case ("transfer") 
+            j = d_tbl%act(iac)%ob_num
+            if (j == 0) j = ob_cur
+            
+            ! option to set tile flow directed toward the saturated buffer hru
+            select case (d_tbl%act(iac)%option)
+                
+            case ("flo_cms")    !! set water to be transferred
+              trn_m3 = d_tbl%act(iac)%const * 86400.   !! m3/s to m3
+              
+            end select
+                 
+          ! set the amount of water to be diverted from tile
           case ("tileflo_contol") 
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
@@ -723,13 +819,30 @@
             case ("all_flo")    !! all flow diverted
               hru(hru_rcv)%sb%inflo = qtile
 
-            case ("zero_flo")    !! all flow diverted
+            case ("zero_flo")    !! no flow diverted
               hru(hru_rcv)%sb%inflo = 0.
 
             case ("frac")   !! minimum - constant fraction 
               hru(hru_rcv)%sb%inflo = d_tbl%act(iac)%const * qtile
                 
             end select
+                                                            
+          !! drainage water management
+          case ("tiledep_control") !! set drain depth for drainage water management
+            j = d_tbl%act(iac)%ob_num
+            if (j == 0) j = ob_cur
+            
+            if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
+              istr = hru(j)%tiledrain
+              hru(j)%lumv%sdr_dep = d_tbl%act(iac)%const
+              pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
+              
+              if (pco%mgtout == "y") then
+                write (2612, *) j, time%yrc, time%mo, time%day_mo, tilldb(idtill)%tillnm, "  DRAIN_CONTROL",    &
+                    phubase(j), pcom(j)%plcur(1)%phuacc, soil(j)%sw, pl_mass(j)%tot(1)%m,        &
+                    pl_mass(j)%rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), hru(j)%lumv%sdr_dep
+              end if
+            end if
                             
           ! set the demand from a reservoir
           case ("res_demand") 
@@ -740,12 +853,12 @@
             !! demand is to fill to principal spillway
             case ("storage")
               if (d_tbl%act(iac)%file_pointer == "pvol") then
-                dmd_m3 = d_tbl%act(iac)%const * res_ob(j)%pvol - res(j)%flo
-                dmd_m3 = Max (0., dmd_m3)
+                trn_m3 = d_tbl%act(iac)%const * res_ob(j)%pvol - res(j)%flo
+                trn_m3 = Max (0., trn_m3)
               end if
               if (d_tbl%act(iac)%file_pointer == "evol") then
-                dmd_m3 = d_tbl%act(iac)%const * res_ob(j)%evol - res(j)%flo
-                dmd_m3 = Max (0., dmd_m3)
+                trn_m3 = d_tbl%act(iac)%const * res_ob(j)%evol - res(j)%flo
+                trn_m3 = Max (0., trn_m3)
               end if
             end select
             
@@ -757,6 +870,9 @@
             hru(j)%dbs%surf_stor = 0
             wet(j) = hz
             wet_wat_d(j) = wbodz
+            if (pco%mgtout == "y") then
+              write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IMPOUND OFF"
+            end if
            
           !turn on hru impounded water - rice paddy or wetland
           case ("impound_on")
@@ -772,6 +888,9 @@
             end do
               
             call wet_initial (iihru)
+            if (pco%mgtout == "y") then
+              write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IMPOUND ON"
+            end if
          
           !adjust weir height - rice paddy
           case ("weir_height")
@@ -788,6 +907,9 @@
               
             else 
               res_ob(j)%weir_hgt = d_tbl%act(iac)%const / 1000.
+            end if
+            if (pco%mgtout == "y") then
+              write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "RESET WEIR HEIGHT (m)", wet_ob(j)%weir_hgt
             end if
            
           !puddling operation for rice paddies
@@ -819,9 +941,17 @@
               if (wet_ob(j)%depth > 0.001) then
                 call mgt_newtillmix_wet(j,idtill) 
               else
-                call mgt_newtillmix(j,0.,idtill) 
+                if (bsn_cc%cswat == 1) then
+                  call mgt_newtillmix_cswat1(j,0.,idtill) 
+                else
+                  call mgt_newtillmix_cswat0(j,0.,idtill) 
+                endif
               endif
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
+
+              if (pco%mgtout == "y") then
+                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "PUDDLE"
+              end if
             endif
             
           !hru area fraction change - update lsu_unit.ele and rout_unit.ele
@@ -877,6 +1007,22 @@
               end do
               !pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
             !end if
+            
+          !snow change - change snow parameters for HRU
+          case ("snow_change")
+            j = d_tbl%act(iac)%ob_num
+            if (j == 0) j = ob_cur
+            d_tbl%snow_chg_mx(iac) = d_tbl%snow_chg_mx(iac) + 1
+            ilu = d_tbl%act_typ(iac)
+            hru(j)%dbs%snow = ilu
+            
+            snow_prev = hru(j)%dbsc%snow
+            hru(j)%dbsc%snow = d_tbl%act(iac)%file_pointer
+            hru(j)%sno = snodb(ilu)
+            !! write to lu_change output file
+            write (3612,*) j, time%yrc, time%mo, time%day_mo,  " SNOW_CHANGE ",        &
+                    snow_prev, hru(j)%dbsc%snow, "   0   0"
+                            
           !land use change - contouring
           case ("p_factor")
             j = d_tbl%act(iac)%ob_num
@@ -1052,7 +1198,7 @@
             ich = ob_cur
             !set new cover and name for calibration
             sd_ch(ich)%cov = d_tbl%act(iac)%const
-            sd_ch(ich)%order = d_tbl%act(iac)%file_pointer
+            sd_ch(ich)%order = d_tbl%act(iac)%const2
         
           ! burning
           case ("burn")
@@ -1060,14 +1206,17 @@
             if (j == 0) j = ob_cur
             
             if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
-              iburn = d_tbl%act_typ(iac)           !burn type from fire data base
+              iburn = d_tbl%act_typ(iac)           !burn type
               do ipl = 1, pcom(j)%npl
                 call pl_burnop (j, iburn)
               end do
                         
+
+              ! reset plant index for output after burn operation
+              ipl = 1
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "    BURN", phubase(j),    &
-                    pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m,   &
+                    pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m,   &
                     sol_sumno3(j), sol_sumsolp(j)
               end if
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
@@ -1082,13 +1231,13 @@
             if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
               cn2(j) = chg_par (cn2(j), d_tbl%act(iac)%option, d_tbl%act(iac)%const, 35., 95.)
               call curno (cn2(j), j)
-            end if
+              if (pco%mgtout == "y") then
+                ipl = 1
+                write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "    CNUP", phubase(j),    &
+                  pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%rsd_tot%m,       &
+                  sol_sumno3(j), sol_sumsolp(j), cn_prev, cn2(j)
+              end if
             
-            if (pco%mgtout == "y") then
-              ipl = 1
-              write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "    CNUP", phubase(j),    &
-                pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, soil1(j)%rsd(1)%m,       &
-                sol_sumno3(j), sol_sumsolp(j), cn_prev, cn2(j)
             end if
             
             pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1

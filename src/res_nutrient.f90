@@ -8,6 +8,8 @@
       
       implicit none      
       
+      real, external :: theta
+      
       integer, intent (in) :: iob
       real :: nitrok = 0.        !              |
       real :: phosk = 0.         !              |
@@ -24,7 +26,6 @@
       real :: conc_p = 0.        !              |
       real :: conc_soln = 0.     !              |
       real :: conc_solp = 0.     !              |
-      real :: theta              !              |
       
 
       !! if reservoir volume less than 1 m^3, set all nutrient levels to
@@ -69,12 +70,12 @@
 
       !! remove nutrients from reservoir by settling - exclude soluble nutrients
       !! other part of equation 29.1.3 in SWAT manual
-      wbody%solp = wbody%solp * (1. - phosk) * wbody_prm%solp_stl_fr
+      wbody%solp = wbody%solp * (1. - phossolk * wbody_prm%solp_stl_fr)
       wbody%sedp = wbody%sedp * (1. - phosk)
       wbody%orgn = wbody%orgn * (1. - nitrok)
-      wbody%no3 = wbody%no3 * (1. - nitrok) * wbody_prm%soln_stl_fr
-      wbody%nh3 = wbody%nh3 * (1. - nitrok) * wbody_prm%soln_stl_fr
-      wbody%no2 = wbody%no2 * (1. - nitrok) * wbody_prm%soln_stl_fr
+      wbody%no3 = wbody%no3 * (1. - nitrosolk * wbody_prm%soln_stl_fr)
+      wbody%nh3 = wbody%nh3 * (1. - nitrosolk * wbody_prm%soln_stl_fr)
+      wbody%no2 = wbody%no2 * (1. - nitrosolk * wbody_prm%soln_stl_fr)
 
       !! calculate chlorophyll-a and water clarity
       chlaco = 0.

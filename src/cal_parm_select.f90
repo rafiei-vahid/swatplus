@@ -22,7 +22,7 @@
       use basin_module
       use channel_data_module 
       use reservoir_data_module
-      use hru_module, only : hru, isol, cn2, brt, tconc
+      use hru_module, only : hru, cn2, brt, tconc
       use soil_module
       use channel_module
       use conditional_module
@@ -38,6 +38,8 @@
       use gwflow_module
       
       implicit none
+      
+      external :: curno, soil_awc_init, soil_text_init, chg_par, fcgd
 
       character(len=16), intent (in) :: chg_parm            !                |               
       character(len=16), intent (in) :: chg_typ             !variable        |type of change (absval, abschg, pctchg)
@@ -45,18 +47,22 @@
       real, intent (in) :: absmin                           !                |minimum range for variable 
       real, intent (in) :: absmax                           !                |maximum change for variable
       integer, intent (in) :: ielem                         !                | 
-      integer, intent (in) :: num_db                        !                | 
       integer, intent (in) :: ly                            !                |
+      integer, intent (in) :: num_db                        !                |database number (unused in current implementation)
       integer :: jj = 0                                     !                |soil layer counter
       integer :: ipl = 0                                    !                |soil layer counter
       integer :: ihru = 0                                   !                |hru counter
       integer :: icell                                      !                |gwflow cell counter (rtb)
+      integer :: ichan                                      !                |gwflow channel counter
       real :: exp                                           !                | 
       real :: c_val = 0.                                    !                | 
       real :: abmax = 0.                                    !                | 
       real :: chg_par                                       !variable        |new parameter value
       real :: perc_ln_func = 0.                             !none       |function to convert perco to perc_lim
       real :: rock = 0.                                     !                | 
+
+      !! suppress unused variable warning for num_db parameter
+      if (num_db < 0) continue
 
       select case (chg_parm)
 
@@ -151,7 +157,7 @@
         if (hru(ielem)%tiledrain == 0) then
         hru(ielem)%hyd%perco = chg_par (hru(ielem)%hyd%perco,           &
                          chg_typ, chg_val, absmin, absmax)
-        if (hru(ielem)%hyd%perco > 1.e-9) then
+        if (hru(ielem)%hyd%perco > 1.e-6) then
           perc_ln_func = 1.0052 * log(-log(hru(ielem)%hyd%perco - 1.e-6)) + 5.6862
           hru(ielem)%hyd%perco_lim = exp(-perc_ln_func)
           hru(ielem)%hyd%perco_lim = amin1 (1., hru(ielem)%hyd%perco_lim)
@@ -842,6 +848,9 @@
          case ("no3_init")
             aqu_dat(ielem)%no3 = chg_par(aqu_dat(ielem)%no3,                &
                          chg_typ, chg_val, absmin, absmax)
+            !! convert ppm -> kg    (m3=10*mm*ha)     kg=m3*ppm/1000
+            aqu_d(ielem)%no3_st = (10. * aqu_d(ielem)%flo * aqu_prm(ielem)%area_ha) &
+                                                       * aqu_dat(ielem)%no3 / 1000.
             
          case ("minp_init")
             aqu_dat(ielem)%minp = chg_par(aqu_dat(ielem)%minp,              &
@@ -875,7 +884,8 @@
          case ("sp_yld")
             aqu_dat(ielem)%spyld = chg_par(aqu_dat(ielem)%spyld,            &
                          chg_typ, chg_val, absmin, absmax)
-            aqu_d(ielem)%stor = 1000. * (aqu_dat(ielem)%dep_bot - aqu_d(ielem)%dep_wt) * aqu_dat(ielem)%spyld
+            aqu_d(ielem)%stor = 1000. * (aqu_dat(ielem)%dep_bot - aqu_d(ielem)%dep_wt) &
+                                                                * aqu_dat(ielem)%spyld
                     
          case ("hlife_n")
             aqu_dat(ielem)%hlife_n = chg_par(aqu_dat(ielem)%hlife_n,        &
@@ -954,45 +964,70 @@
             hlt_db(ielem)%uslels = chg_par (hlt_db(ielem)%uslels, chg_typ, chg_val, absmin, absmax)
 
 
-        !!gwflow (rtb)
-         case ("aquifer_K")
-                    if(bsn_cc%gwflow.eq.1) then
-                      gw_state(ielem)%hydc = chg_par(gw_state(ielem)%hydc, chg_typ, chg_val, absmin, absmax)        
-                        endif
-                        
-                 case ("aquifer_Sy")
-                    if(bsn_cc%gwflow.eq.1) then
-                      gw_state(ielem)%spyd = chg_par(gw_state(ielem)%spyd, chg_typ, chg_val, absmin, absmax)    
-                    endif
-                            
-                 case ("aquifer_delay")
-                    if(bsn_cc%gwflow.eq.1) then
-                      gw_delay(ielem) = chg_par(gw_delay(ielem), chg_typ, chg_val, absmin, absmax)
-            endif
-                            
-                 case ("aquifer_exdp")
-                    if(bsn_cc%gwflow.eq.1) then
-                      gw_state(ielem)%exdp = chg_par(gw_state(ielem)%exdp, chg_typ, chg_val, absmin, absmax)        
-                      endif 
-                            
-                 case ("stream_K")
-                    if(bsn_cc%gwflow.eq.1) then
-                      do icell=1,gw_chan_info(ielem)%ncon !loop through cells connected to channel
-                            gw_chan_info(ielem)%hydc(icell) = chg_par(gw_chan_info(ielem)%hydc(icell), chg_typ, chg_val, absmin, absmax)
-                          enddo
-                    endif
-                            
-                 case ("stream_thk")
-                    if(bsn_cc%gwflow.eq.1) then
-                      do icell=1,gw_chan_info(ielem)%ncon !loop through cells connected to channel
-                            gw_chan_info(ielem)%thck(icell) = chg_par(gw_chan_info(ielem)%thck(icell), chg_typ, chg_val, absmin, absmax)
-                          enddo
-                    endif
-                            
-                 case ("stream_bed")
-                    if(bsn_cc%gwflow.eq.1) then
-                      gw_bed_change = chg_par(gw_bed_change, chg_typ, chg_val, absmin, absmax)      
-                    endif
+        !!gwflow calibration parameters (object type "gwf", ielem = cell index)
+        !! per-cell parameters use ielem directly (supports specific-object targeting)
+        case ("aquifer_K")
+          if(bsn_cc%gwflow == 1) then
+            gw_state(ielem)%hydc = chg_par(gw_state(ielem)%hydc, chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("aquifer_Sy")
+          if(bsn_cc%gwflow == 1) then
+            gw_state(ielem)%spyd = chg_par(gw_state(ielem)%spyd, chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("aquifer_delay")
+          if(bsn_cc%gwflow == 1) then
+            gw_delay(ielem) = chg_par(gw_delay(ielem), chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("aquifer_exdp")
+          if(bsn_cc%gwflow == 1) then
+            gw_state(ielem)%exdp = chg_par(gw_state(ielem)%exdp, chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("tile_K")
+          if(bsn_cc%gwflow == 1 .and. gw_tile_flag > 0) then
+            gw_tile_K(ielem) = chg_par(gw_tile_K(ielem), chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("floodplain_K")
+          if(bsn_cc%gwflow == 1 .and. gw_fp_flag > 0) then
+            gw_fp_K(ielem) = chg_par(gw_fp_K(ielem), chg_typ, chg_val, absmin, absmax)
+          endif
+
+        !! gwflow channel parameters (object type "sdc", ielem = channel index)
+        case ("stream_K")
+          if(bsn_cc%gwflow == 1) then
+            do icell=1,gw_chan_info(ielem)%ncon
+              gw_chan_info(ielem)%hydc(icell) = chg_par(gw_chan_info(ielem)%hydc(icell), chg_typ, chg_val, absmin, absmax)
+            enddo
+          endif
+
+        case ("stream_thk")
+          if(bsn_cc%gwflow == 1) then
+            do icell=1,gw_chan_info(ielem)%ncon
+              gw_chan_info(ielem)%thck(icell) = chg_par(gw_chan_info(ielem)%thck(icell), chg_typ, chg_val, absmin, absmax)
+            enddo
+          endif
+
+        case ("stream_bed")
+          if(bsn_cc%gwflow == 1) then
+            gw_bed_change = chg_par(gw_bed_change, chg_typ, chg_val, absmin, absmax)
+          endif
+
+        !! gwflow global parameters (applied once; ielem==1 guard prevents compounding)
+        case ("reservoir_K")
+          if(bsn_cc%gwflow == 1 .and. ielem == 1 .and. num_res_cells > 0) then
+            res_K = chg_par(res_K, chg_typ, chg_val, absmin, absmax)
+          endif
+
+        case ("pond_bed_K")
+          if(bsn_cc%gwflow == 1 .and. ielem == 1 .and. gw_npond > 0) then
+            do icell=1,gw_npond
+              gw_pond_info(icell)%bed_k = chg_par(gw_pond_info(icell)%bed_k, chg_typ, chg_val, absmin, absmax)
+            enddo
+          endif
 
         !! initial soil properties
         case ("lab_p")

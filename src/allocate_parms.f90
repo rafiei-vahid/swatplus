@@ -32,6 +32,9 @@
       
       !dimension plant arrays used each day and not saved
        mpc = 20
+       !! swatplus_perf OpenMP: these are threadprivate per-day plant scratch; allocate
+       !! a private copy on EACH thread (same team used by the HRU wave parallel-do).
+       !$omp parallel default(shared)
        allocate (uno3d(mpc), source = 0.)
        allocate (uapd(mpc), source = 0.)
        allocate (un2(mpc), source = 0.)
@@ -41,6 +44,7 @@
        allocate (htfac(mpc), source = 0.)
        allocate (epmax(mpc), source = 0.)
        epmax = 0.
+       !$omp end parallel
 
 !!    arrays for plant communities
       allocate (cvm_com(mhru), source = 0.)

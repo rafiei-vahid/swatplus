@@ -530,5 +530,13 @@
 !! land-use ilu/ulu, weather-gen iwgen). Module vars are SAVE/shared, so these must be
 !! threadprivate for a parallel wave; no-op single-thread.
 !$omp threadprivate(ipl, isol, isep, ilu, ulu, iwgen, isep_ly)
+!! Module-level per-DAY plant scratch arrays (sized mpc, "used each day and not saved")
+!! reused per HRU in the plant phase (pl_community/pl_grow/pl_waterup/pl_nut_demand).
+!! Shared, they race across concurrent HRUs -> threadprivate (allocated per-thread in
+!! allocate_parms). NOTE cvm_com/percn are mhru-sized (per-HRU permanent) and stay shared.
+!$omp threadprivate(uno3d, uapd, un2, up2, translt, par, htfac, epmax)
+!! Plant nutrient-demand per-HRU scratch scalars (summed over plants/layers in
+!! pl_nut_demand) — threadprivate so concurrent HRUs don't clobber them.
+!$omp threadprivate(uno3d_tot, uapd_tot, sum_no3, sum_solp, rto_no3, rto_solp)
 
       end module hru_module

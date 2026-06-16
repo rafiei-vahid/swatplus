@@ -512,4 +512,16 @@
       integer, dimension(:), allocatable :: tillage_days
       real, dimension(:), allocatable :: tillage_factor
 
+!! OpenMP: per-HRU transient "current object" scratch scalars. These are written
+!! then read within one HRU's daily land phase (hru_control + its call tree), so
+!! they would race across HRUs under !$omp parallel do. threadprivate gives each
+!! thread its own copy; it is a strict no-op for single-thread runs (no COPYIN
+!! needed — every value is written before it is read each HRU). Active only when
+!! built with -fiopenmp; otherwise treated as a comment. j-indexed arrays (latq,
+!! sepbtm, sedyld, hru(j)%, soil(j)%, ...) are NOT here — they are already safe.
+!! Scope: confirmed HRU water-balance scratch; extend as Phase 2 validation finds gaps.
+!$omp threadprivate(precip_eff, qday, satexq_chan, qp_cms, sw_excess, snomlt, snofall)
+!$omp threadprivate(qtile, latlyr, inflpcp, canev, usle, vpd, pet_day, ep_day, es_day)
+!$omp threadprivate(ls_overq, latqrunon, etday, nd_30)
+
       end module hru_module

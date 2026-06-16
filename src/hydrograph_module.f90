@@ -1219,8 +1219,14 @@
              
       interface operator (//)
         module procedure hydout_div_conv
-      end interface   
-             
+      end interface
+
+!! OpenMP: ht1..ht5 (+delrto) are reusable hydrograph scratch buffers written then
+!! read within one object's processing (e.g. hru_control builds runoff/lateral/tile
+!! hydrographs in ht1/ht2). threadprivate so concurrent HRUs get their own copies;
+!! no-op single-thread, no COPYIN (always written before read each object).
+!$omp threadprivate(ht1, ht2, ht3, ht4, ht5, delrto)
+
       contains
 
       !! function to convert mass to concentration

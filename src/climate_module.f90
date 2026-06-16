@@ -256,5 +256,10 @@
       character(len=50), dimension(:), allocatable :: wnd_n
       character(len=50), dimension(:), allocatable :: atmo_n
       character(len=50), dimension(:), allocatable :: petm_n
-          
+
+!! OpenMP: `w` is the current HRU's daily weather, copied from wst(iwst)%weat each
+!! HRU (hru_control writes it before any read), then read by the ET/snow routines.
+!! threadprivate so concurrent HRUs don't clobber it; no-op single-thread, no COPYIN.
+!$omp threadprivate(w)
+
       end module climate_module

@@ -152,6 +152,10 @@
       
       ! hydrographs used in command for adding incoming hyds
       type (constituent_mass) :: hcs1, hcs2, hcs3
+!! OpenMP: hcs1/hcs2/hcs3 are constituent inflow scratch in command's inflow sum,
+!! written-before-read per object. threadprivate for concurrent-wave safety; no-op
+!! single-thread, inert without -fiopenmp.
+!$omp threadprivate(hcs1, hcs2, hcs3)
       ! set zero constituent hydrograph
       type (constituent_mass) :: hin_csz
       

@@ -1225,7 +1225,9 @@
 !! read within one object's processing (e.g. hru_control builds runoff/lateral/tile
 !! hydrographs in ht1/ht2). threadprivate so concurrent HRUs get their own copies;
 !! no-op single-thread, no COPYIN (always written before read each object).
-!$omp threadprivate(ht1, ht2, ht3, ht4, ht5, delrto)
+!! icmd is the current-object dispatch index (set per object before its control
+!! routine); hdsep1/hdsep2 are hydrograph-separation scratch in the inflow sum.
+!$omp threadprivate(ht1, ht2, ht3, ht4, ht5, delrto, icmd, hdsep1, hdsep2)
 
       contains
 

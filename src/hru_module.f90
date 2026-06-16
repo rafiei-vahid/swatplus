@@ -523,5 +523,7 @@
 !$omp threadprivate(precip_eff, qday, satexq_chan, qp_cms, sw_excess, snomlt, snofall)
 !$omp threadprivate(qtile, latlyr, inflpcp, canev, usle, vpd, pet_day, ep_day, es_day)
 !$omp threadprivate(ls_overq, latqrunon, etday, nd_30)
+!! ihru is the current HRU dispatch index (set = ob(icmd)%num before hru_control).
+!$omp threadprivate(ihru)
 
       end module hru_module

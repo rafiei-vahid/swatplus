@@ -38,4 +38,8 @@
       end type ru_parameters
       type (ru_parameters), dimension(:), allocatable :: ru
 
+!! OpenMP: iru is the current routing-unit dispatch index (set before ru_control).
+!! threadprivate so it can be set per-thread when objects run in a parallel wave.
+!$omp threadprivate(iru)
+
       end module ru_module

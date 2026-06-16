@@ -54,6 +54,12 @@
       type (decision_table), dimension(:), allocatable, target :: dtbl_scen
       type (decision_table), dimension(:), allocatable, target :: dtbl_flo
       type (decision_table), pointer :: d_tbl
+!! OpenMP: act_hit is per-evaluation scratch that the conditions/cond_* routines WRITE.
+!! In stock SWAT+ it lives inside the shared decision table (d_tbl%act_hit) — concurrent
+!! HRUs with the same land-use would mutate the same shared array. Move it to a
+!! threadprivate module array so each thread has its own (grown to d_tbl%alts on demand).
+      character(len=1), dimension(:), allocatable :: act_hit_tl
+!$omp threadprivate(act_hit_tl)
 !! OpenMP: d_tbl is the "current decision table" pointer, re-pointed per object via
 !! `d_tbl => dtbl_lum(id)` etc. deep in the land-phase tree (hru_control, wetland_control).
 !! Shared, it races under a parallel wave -> wrong table -> out-of-bounds cond(). threadprivate

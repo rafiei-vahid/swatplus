@@ -12,11 +12,11 @@
       
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
-      integer :: eof = 0
-      integer :: imax = 0
+      integer :: eof
+      integer :: imax
       logical :: i_exist
-      integer :: isalt = 0
-      integer :: isalti = 0
+      integer :: isalt
+      integer :: isalti
 
       eof = 0
       

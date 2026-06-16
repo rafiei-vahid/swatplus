@@ -10,7 +10,7 @@
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
       character (len=12) :: plant_name = ""
-      integer :: iplant = 0
+      integer :: iplant
       logical :: i_exist              !none       |check to determine if file exists
 
 

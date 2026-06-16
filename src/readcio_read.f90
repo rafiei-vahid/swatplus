@@ -9,10 +9,10 @@
        character (len=15) :: name = ""
        character (len=256) :: out_path_value = ""
        character (len=512) :: line_buffer
-       integer :: eof = 0
-       integer :: idx = 0
+       integer :: eof
+       integer :: idx
        logical :: i_exist              !none       |check to determine if file exists
-       integer :: i = 0
+       integer :: i
        
        eof = 0
        

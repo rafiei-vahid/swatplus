@@ -9,15 +9,15 @@
       
       implicit none
         
-      integer :: ihd = 0       !            |
-      integer :: iob = 0       !            | 
-      integer :: iunit = 0     !            |
-      integer :: itot = 0      !none        |counter       
-      integer :: nly = 0
-      integer :: ly = 0
-      integer :: j = 0
-      integer :: ii = 0
-      integer :: ipl = 0
+      integer :: ihd !            |
+      integer :: iob !            | 
+      integer :: iunit !            |
+      integer :: itot !none        |counter       
+      integer :: nly
+      integer :: ly
+      integer :: j
+      integer :: ii
+      integer :: ipl
       
       character(100) :: lineFmt = ""!used to format plant status write statement
       

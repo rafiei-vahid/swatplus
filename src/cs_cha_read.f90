@@ -12,12 +12,12 @@
       
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
-      integer :: eof = 0
-      integer :: imax = 0
+      integer :: eof
+      integer :: imax
       logical :: i_exist
-      integer :: ics = 0
-      integer :: i = 0
-      integer :: icsi = 0
+      integer :: ics
+      integer :: i
+      integer :: icsi
 
       eof = 0
       

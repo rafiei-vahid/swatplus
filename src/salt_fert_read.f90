@@ -12,8 +12,8 @@
  
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
-      integer :: isalti = 0
-      integer :: eof = 0
+      integer :: isalti
+      integer :: eof
       logical :: i_exist              !none       |check to determine if file exists
 
       eof = 0

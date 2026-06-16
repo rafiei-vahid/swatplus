@@ -11,41 +11,41 @@
       real, intent (in)  :: var_cur         !           |current variable to check alternative
       real, intent (in)  :: var_tbl         !           |decision table variable to cpmpare with
       integer, intent (in)  :: idtbl        !none       |unused
-      integer :: ialt = 0
+      integer :: ialt
 
       !! suppress unused variable warning
       if (idtbl < 0) continue
 
       do ialt = 1, d_tbl%alts
-        if (d_tbl%alt(ic,ialt) /= "-" .and. d_tbl%act_hit(ialt) == "y") then
+        if (d_tbl%alt(ic,ialt) /= "-" .and. act_hit_tl(ialt) == "y") then
           if (d_tbl%alt(ic,ialt) == "<") then
             if (var_cur >= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == ">") then
             if (var_cur <= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "<=") then
             if (var_cur > var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == ">=") then
             if (var_cur < var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "=") then
             if (var_cur /= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "/=") then
             if (var_cur == var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
         end if

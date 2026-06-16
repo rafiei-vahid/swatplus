@@ -12,11 +12,11 @@
  
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
-      integer :: ipathi = 0
-      integer :: eof = 0
-      integer :: imax = 0
+      integer :: ipathi
+      integer :: eof
+      integer :: imax
       logical :: i_exist              !none       |check to determine if file exists
-      integer :: ipath = 0
+      integer :: ipath
 
       eof = 0
       

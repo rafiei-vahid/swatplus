@@ -16,15 +16,15 @@
       implicit none
       
       integer, intent (in) :: ihru             !            |
-      integer :: idp = 0                       !            |
-      integer :: j = 0
-      integer :: iob = 0
-      integer :: ipl = 0
+      integer :: idp !            |
+      integer :: j
+      integer :: iob
+      integer :: ipl
 	  integer :: ilu = 0
-      real :: const = 0.
-      real :: sw_init = 0.
-      real :: sno_init = 0.
-      real :: percn_aa = 0.
+      real :: const
+      real :: sw_init
+      real :: sno_init
+      real :: percn_aa
                          
 !!    ~ ~ ~ PURPOSE ~ ~ ~
 !!    this subroutine outputs HRU variables on daily, monthly and annual time steps

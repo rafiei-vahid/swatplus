@@ -9,9 +9,9 @@
       character (len=500) :: header = "" !              |header of file
       character (len=80) :: titldum = "" !              |title of file
       character (len=16) :: name = ""  !              |name
-      integer :: eof = 0               !              |end of file
+      integer :: eof !              |end of file
       logical :: i_exist               !              |check to determine if file exists
-      integer :: ii = 0                !none          |counter
+      integer :: ii !none          |counter
       integer :: result
        
       eof = 0

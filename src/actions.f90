@@ -97,7 +97,7 @@
       do iac = 1, d_tbl%acts
         action = "n"
         do ial = 1, d_tbl%alts
-          if (d_tbl%act_hit(ial) == "y" .and. d_tbl%act_outcomes(iac,ial) == "y") then
+          if (act_hit_tl(ial) == "y" .and. d_tbl%act_outcomes(iac,ial) == "y") then
             action = "y"
             exit
           end if

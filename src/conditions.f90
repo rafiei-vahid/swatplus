@@ -58,7 +58,12 @@
       real :: rto
       character(len=1) :: pl_chk = ""
       
-      d_tbl%act_hit = "y"
+      !! swatplus_perf OpenMP: per-thread act_hit scratch, grown to this table's alts.
+      if (allocated(act_hit_tl)) then
+        if (size(act_hit_tl) < d_tbl%alts) deallocate(act_hit_tl)
+      end if
+      if (.not. allocated(act_hit_tl)) allocate(act_hit_tl(max(1, d_tbl%alts)))
+      act_hit_tl(1:d_tbl%alts) = "y"
       do ic = 1, d_tbl%conds
         select case (d_tbl%cond(ic)%var)
             
@@ -125,7 +130,7 @@
           do ialt = 1, d_tbl%alts
             !if no plants in the community - set action to no
             if (pcom(ob_num)%npl == 0) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             else
               !if more than one plant in community - use first one that is growing
               ipl = 1
@@ -193,7 +198,7 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then    !determine if growing (y) or not (n)
               if (pcom(ob_num)%plcur(ipl)%gro == "n") then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do
@@ -210,13 +215,13 @@
           end do
           !plant not in community of ipl = 0
           if (ipl == 0) then
-            d_tbl%act_hit(ialt) = "n"
+            act_hit_tl(ialt) = "n"
           else 
             !if plant is in the community - check to see if it is growing
             do ialt = 1, d_tbl%alts
               if (d_tbl%alt(ic,ialt) == "=") then    !determine if growing (y) or not (n)
                 if (pcom(ob_num)%plcur(ipl)%gro == "n") then
-                  d_tbl%act_hit(ialt) = "n"
+                  act_hit_tl(ialt) = "n"
                 end if
               end if
             end do
@@ -408,7 +413,7 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then
               if (soil(ob_num)%hydgrp /= d_tbl%cond(ic)%lim_var) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do
@@ -465,12 +470,12 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then
               if (hru(ob_num)%tiledrain == 0) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
             if (d_tbl%alt(ic,ialt) == "/") then
               if (hru(ob_num)%tiledrain == 1) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do
@@ -519,7 +524,7 @@
           if (time%day /= pcom(ob_cur)%dtbl(idtbl)%apply_day) then
             do ialt = 1, d_tbl%alts
               if (d_tbl%alt(ic,ialt) == "=") then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end do
           end if
@@ -549,7 +554,7 @@
           if (ran_num > d_tbl%prob_cum) then
             do ialt = 1, d_tbl%alts
               if (d_tbl%alt(ic,ialt) == "=") then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end do
           end if
@@ -584,7 +589,7 @@
             if (ran_num > prob_apply) then
               do ialt = 1, d_tbl%alts
                 if (d_tbl%alt(ic,ialt) == "=") then
-                  d_tbl%act_hit(ialt) = "n"
+                  act_hit_tl(ialt) = "n"
                 end if
               end do
             else
@@ -597,7 +602,7 @@
           else
             do ialt = 1, d_tbl%alts
               if (d_tbl%alt(ic,ialt) == "=") then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end do
           end if
@@ -652,7 +657,7 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then
               if (hru(ob_num)%land_use_mgt_c /= d_tbl%cond(ic)%lim_var) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do
@@ -664,7 +669,7 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then
               if (hru(ob_num)%cal_group /= d_tbl%cond(ic)%lim_var) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do
@@ -684,7 +689,7 @@
                 end if
               end do
             end if
-            if (pl_chk == "n") d_tbl%act_hit(ialt) = "n"
+            if (pl_chk == "n") act_hit_tl(ialt) = "n"
           end do
                
         !plants - if plant is in the cummunity
@@ -703,13 +708,13 @@
                   pl_chk = "y"
                 end if
               end do
-              if (pl_chk == "n") d_tbl%act_hit(ialt) = "n"
+              if (pl_chk == "n") act_hit_tl(ialt) = "n"
             end if
             !for not equal condition - set to "n" if in the plant community
             if (d_tbl%alt(ic,ialt) == "/") then
               do ipl = 1, pcom(ob_num)%npl
                 if (pcom(ob_num)%pl(ipl) == d_tbl%cond(ic)%lim_var) then
-                  d_tbl%act_hit(ialt) = "n"
+                  act_hit_tl(ialt) = "n"
                 end if
               end do
             end if
@@ -724,7 +729,7 @@
           do ialt = 1, d_tbl%alts
             if (d_tbl%alt(ic,ialt) == "=") then
               if (sd_ch(ob_num)%order /= d_tbl%cond(ic)%lim_const) then
-                d_tbl%act_hit(ialt) = "n"
+                act_hit_tl(ialt) = "n"
               end if
             end if
           end do

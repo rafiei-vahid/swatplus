@@ -48,34 +48,34 @@
                   soil_carbvar_write
 
       real, dimension(time%step) :: hyd_flo     !flow hydrograph
-      integer :: in = 0               !              | 
-      integer :: iob = 0              !              |
-      integer :: iday = 0             !              |
-      integer :: isd = 0              !none          |counter
-      integer :: ires = 0             !none          |reservoir number
-      integer :: irec = 0             !              |
-      integer :: iout = 0             !none          |counter
-      integer :: ihtyp = 0            !              |
-      integer :: iaq = 0              !none          |counter
-      integer :: j = 0                !none          |counter
-      integer :: ihyd = 0             !              |
-      integer :: idr = 0              !              |
-      integer :: iwro = 0             !              |
-      real :: conv = 0.               !              |
-      real :: frac_in = 0.            !              |
-      integer :: ts1 = 0
-      integer :: ts2 = 0
-      integer :: iw = 0               !              |counter for water allocation object
-      integer :: iwallo = 0           !              |variable to pass to wallo_control
-      integer :: i_count = 0          !rtb gwflow
-      integer :: i_mfl = 0            !rtb gwflow    |counter
-      integer :: i_chan = 0           !rtb gwflow    |counter
-      integer :: iob_chan = 0        !rtb gwflow    |ob index for channel
-      real :: sumflo = 0.
-      integer :: ic_walk = 0          !swatplus_perf: serial-walk index (module icmd is set inside command_object)
-      integer :: lev = 0              !swatplus_perf: wavefront level
-      integer :: k = 0                !swatplus_perf: index within a wave
-      logical :: use_wave = .false.   !swatplus_perf: drive HRU land phase wave-by-wave
+      integer :: in !              | 
+      integer :: iob !              |
+      integer :: iday !              |
+      integer :: isd !none          |counter
+      integer :: ires !none          |reservoir number
+      integer :: irec !              |
+      integer :: iout !none          |counter
+      integer :: ihtyp !              |
+      integer :: iaq !none          |counter
+      integer :: j !none          |counter
+      integer :: ihyd !              |
+      integer :: idr !              |
+      integer :: iwro !              |
+      real :: conv !              |
+      real :: frac_in !              |
+      integer :: ts1
+      integer :: ts2
+      integer :: iw !              |counter for water allocation object
+      integer :: iwallo !              |variable to pass to wallo_control
+      integer :: i_count !rtb gwflow
+      integer :: i_mfl !rtb gwflow    |counter
+      integer :: i_chan !rtb gwflow    |counter
+      integer :: iob_chan !rtb gwflow    |ob index for channel
+      real :: sumflo
+      integer :: ic_walk !swatplus_perf: serial-walk index (module icmd is set inside command_object)
+      integer :: lev !swatplus_perf: wavefront level
+      integer :: k !swatplus_perf: index within a wave
+      logical :: use_wave !swatplus_perf: drive HRU land phase wave-by-wave
       external :: command_object
 
       icmd = sp_ob1%objs

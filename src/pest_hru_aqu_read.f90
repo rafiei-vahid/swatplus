@@ -8,10 +8,10 @@
         
       character (len=80) :: titldum = ""
       character (len=80) :: header = ""
-      integer :: eof = 0
-      integer :: imax = 0
-      integer :: ipest = 0
-      integer :: ipesti = 0
+      integer :: eof
+      integer :: imax
+      integer :: ipest
+      integer :: ipesti
       logical :: i_exist              !none       |check to determine if file exists
 
       eof = 0

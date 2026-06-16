@@ -10,38 +10,38 @@
       integer, intent (in)  :: ic           !           |current condition
       integer, intent (in)  :: var_cur      !           |current variable to check alternative
       integer, intent (in)  :: var_tbl      !           |decision table variable to compare with
-      integer :: ialt = 0
+      integer :: ialt
 
       do ialt = 1, d_tbl%alts
-        if (d_tbl%alt(ic,ialt) /= "-" .and. d_tbl%act_hit(ialt) == "y") then
+        if (d_tbl%alt(ic,ialt) /= "-" .and. act_hit_tl(ialt) == "y") then
           if (d_tbl%alt(ic,ialt) == "<") then
             if (var_cur >= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == ">") then
             if (var_cur <= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "<=") then
             if (var_cur > var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == ">=") then
             if (var_cur < var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "=") then
             if (var_cur /= var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
           if (d_tbl%alt(ic,ialt) == "/=") then
             if (var_cur == var_tbl) then
-              d_tbl%act_hit(ialt) = "n"
+              act_hit_tl(ialt) = "n"
             end if
           end if
         end if

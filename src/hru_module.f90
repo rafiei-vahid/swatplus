@@ -538,5 +538,12 @@
 !! Plant nutrient-demand per-HRU scratch scalars (summed over plants/layers in
 !! pl_nut_demand) — threadprivate so concurrent HRUs don't clobber them.
 !$omp threadprivate(uno3d_tot, uapd_tot, sum_no3, sum_solp, rto_no3, rto_solp)
+!! Per-HRU nutrient / sediment / septic / management / ET scratch scalars written in
+!! the land-phase wave (ero/nut/sep/mgt/et/pl_fert routines). Shared -> they race and
+!! corrupt the HRU nutrient/sediment EXPORT to channels (channel *_in fields).
+!! threadprivate. (rcn/sq_rto are read-only config; sdti is channel-routing/serial.)
+!$omp threadprivate(usle_ei, enratio, albday, snoev, ep_max, bsprev, wt_shall, lyrtile)
+!$omp threadprivate(fixn, sepday, bioday, sepcrk, sepcrktot, voltot, sweepeff)
+!$omp threadprivate(fertn, fertno3, fertnh3, fertorgn, fertsolp, fertorgp, fertp, grazn, grazp)
 
       end module hru_module

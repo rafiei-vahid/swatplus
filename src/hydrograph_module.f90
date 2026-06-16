@@ -1231,6 +1231,9 @@
 !! icmd is the current-object dispatch index (set per object before its control
 !! routine); hdsep1/hdsep2 are hydrograph-separation scratch in the inflow sum.
 !$omp threadprivate(ht1, ht2, ht3, ht4, ht5, delrto, icmd, hdsep1, hdsep2)
+!! Phase C (full-DAG wave): channel/reservoir current-object dispatch indices set per
+!! object before its control routine; threadprivate so same-level channels run concurrently.
+!$omp threadprivate(jrch, isdch, isd_chsur)
 
       contains
 

@@ -76,6 +76,7 @@
       integer :: lev !swatplus_perf: wavefront level
       integer :: k !swatplus_perf: index within a wave
       logical :: use_wave !swatplus_perf: drive HRU land phase wave-by-wave
+      logical :: use_objwave !swatplus_perf Phase C: full-DAG wave over ALL objects
       external :: command_object
 
       icmd = sp_ob1%objs
@@ -86,41 +87,49 @@
       !! Walk drives it serially here; the parallel HRU wavefront (added next)
       !! calls the same routine. ob(icmd)%cmd_next uses the module icmd, which
       !! command_object may advance for gwflow sub-objects (preserves old behavior).
-      !! swatplus_perf: build the HRU wavefront index once (topological levels).
+      !! swatplus_perf: build the wavefront index once (topological levels).
       if (.not. hru_wave_ready) call command_wave_build
 
-      !! swatplus_perf wavefront: run the HRU land phase wave-by-wave (objects at the
-      !! same cmd_order level are mutually independent), then walk the remaining
-      !! (routing/channel/reservoir) objects serially, skipping the already-done HRUs.
-      !! Fall back to a pure serial walk when water/manure allocation is active, since
-      !! allocation is interleaved global state that the wave pre-pass would reorder.
-      use_wave = (hru_wave_ready .and. hru_nwave > 0 .and.                  &
-                  db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0)
+      !! swatplus_perf Phase C FULL-DAG wavefront: process ALL command objects level by
+      !! level. Same-level objects (HRUs, channels, reservoirs, routing units) are mutually
+      !! independent -> run concurrently; level L+1 waits for level L (downstream needs
+      !! upstream). Requires every control routine reentrant. Used only when no water/
+      !! manure allocation and no gwflow (those carry interleaved/advancing global state).
+      use_objwave = (hru_wave_ready .and. obj_nwave > 0 .and. db_mx%wallo_db == 0 .and.   &
+                     db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
 
-      if (use_wave) then
-        do lev = 1, hru_nwave
-          !! All HRUs in a level are mutually independent (none upstream of another),
-          !! so they run concurrently. dynamic schedule balances uneven per-HRU cost.
-          !! command_object is reentrant: dispatch/inflow scratch is threadprivate, its
-          !! locals are automatic (subroutines built -recursive -init=zero), and each
-          !! thread writes only its own ob(icmd) and j-indexed arrays.
+      if (use_objwave) then
+        do lev = 1, obj_nwave
           !$omp parallel do schedule(dynamic, 16) default(shared) private(k)
-          do k = 1, hru_wave_cnt(lev)
-            call command_object (hru_wave_obj(lev, k))
+          do k = 1, obj_wave_cnt(lev)
+            call command_object (obj_wave_obj(lev, k))
           end do
           !$omp end parallel do
         end do
-      end if
-
-      ic_walk = sp_ob1%objs
-      do while (ic_walk /= 0)
-        if (use_wave .and. ob(ic_walk)%typ == "hru") then
-          ic_walk = ob(ic_walk)%cmd_next          ! HRU already done in the wave pre-pass
-        else
-          call command_object (ic_walk)
-          ic_walk = ob(icmd)%cmd_next             ! module icmd may be gwflow-advanced
+      else
+        !! Fallback: HRU land phase wave (parallel) + serial routing walk. Handles
+        !! wallo/mallo/gwflow models, which the full-DAG wave cannot reorder safely.
+        use_wave = (hru_wave_ready .and. hru_nwave > 0 .and.                  &
+                    db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0)
+        if (use_wave) then
+          do lev = 1, hru_nwave
+            !$omp parallel do schedule(dynamic, 16) default(shared) private(k)
+            do k = 1, hru_wave_cnt(lev)
+              call command_object (hru_wave_obj(lev, k))
+            end do
+            !$omp end parallel do
+          end do
         end if
-      end do
+        ic_walk = sp_ob1%objs
+        do while (ic_walk /= 0)
+          if (use_wave .and. ob(ic_walk)%typ == "hru") then
+            ic_walk = ob(ic_walk)%cmd_next          ! HRU already done in the wave pre-pass
+          else
+            call command_object (ic_walk)
+            ic_walk = ob(icmd)%cmd_next             ! module icmd may be gwflow-advanced
+          end if
+        end do
+      end if
 
       !! write object output for entire simulation (fort-leak-fix: no NetCDF backend)
       if (pco%cdfout /= "y") call obj_output

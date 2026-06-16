@@ -237,6 +237,12 @@
       end type channel_rating_curve_parameters
       type (channel_rating_curve_parameters) :: rcurv   !rating curve at each time step
       type (channel_rating_curve_parameters) :: rcz     !zero rating curve
+!! Phase C OpenMP: channel current-object scratch (the "current channel" rating curve +
+!! per-channel hydraulic/reduction scalars), set per channel in the routing routines.
+!! Shared, they race when same-level channels run concurrently -> threadprivate.
+!! (rcz is a constant zero curve - read-only; ch_rcurv is the per-channel saved array.)
+!$omp threadprivate(rcurv, peakrate, wtemp, maxint, sed_reduc_t, no3_reduc_kg)
+!$omp threadprivate(tp_reduc_kg, tp_reduc, srp_reduc_kg)
       
       type channel_rating_curve
         integer :: npts = 4         !none       |number of points on the rating curve

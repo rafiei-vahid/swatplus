@@ -15,6 +15,12 @@
       integer, dimension(:,:), allocatable :: hru_wave_obj       !(level,k) -> object (icmd) index of k-th HRU
       logical :: hru_wave_ready = .false.
 
+      !! Phase C full-DAG wave: ALL command objects (hru/ru/channel/res/aqu/...) bucketed
+      !! by cmd_order level. Same-level objects are mutually independent -> run concurrently.
+      integer :: obj_nwave = 0                                   !number of object levels (max cmd_order)
+      integer, dimension(:),   allocatable :: obj_wave_cnt       !(level) number of command objects at that level
+      integer, dimension(:,:), allocatable :: obj_wave_obj       !(level,k) -> command object index of k-th object
+
       contains
 
       subroutine command_wave_build
@@ -97,6 +103,41 @@
         end if
       end do
 
+      !! Phase C: bucket ALL command objects by level (walk cmd_next = exact command set).
+      obj_nwave = 0
+      ic = sp_ob1%objs
+      do while (ic /= 0)
+        if (ob(ic)%cmd_order > obj_nwave) obj_nwave = ob(ic)%cmd_order
+        ic = ob(ic)%cmd_next
+      end do
+      if (obj_nwave > 0) then
+        if (allocated(obj_wave_cnt)) deallocate (obj_wave_cnt)
+        allocate (obj_wave_cnt(obj_nwave)); obj_wave_cnt = 0
+        ic = sp_ob1%objs
+        do while (ic /= 0)
+          lev = ob(ic)%cmd_order
+          if (lev >= 1) obj_wave_cnt(lev) = obj_wave_cnt(lev) + 1
+          ic = ob(ic)%cmd_next
+        end do
+        maxcnt = 0
+        do lev = 1, obj_nwave
+          if (obj_wave_cnt(lev) > maxcnt) maxcnt = obj_wave_cnt(lev)
+        end do
+        if (allocated(obj_wave_obj)) deallocate (obj_wave_obj)
+        allocate (obj_wave_obj(obj_nwave, maxcnt)); obj_wave_obj = 0
+        obj_wave_cnt = 0
+        ic = sp_ob1%objs
+        do while (ic /= 0)
+          lev = ob(ic)%cmd_order
+          if (lev >= 1) then
+            k = obj_wave_cnt(lev) + 1
+            obj_wave_cnt(lev) = k
+            obj_wave_obj(lev, k) = ic
+          end if
+          ic = ob(ic)%cmd_next
+        end do
+      end if
+
       hru_wave_ready = .true.
 
       !! swatplus_perf diagnostic: dump the wave histogram so we can see HRU-phase
@@ -109,6 +150,11 @@
       write (9123, '(a)') "level   n_hru"
       do lev = 1, hru_nwave
         write (9123, '(i5,3x,i6)') lev, hru_wave_cnt(lev)
+      end do
+      write (9123, '(a,i0)') "full-DAG object waves: ", obj_nwave
+      write (9123, '(a)') "level   n_obj"
+      do lev = 1, obj_nwave
+        write (9123, '(i5,3x,i6)') lev, obj_wave_cnt(lev)
       end do
       close (9123)
 

@@ -48,6 +48,9 @@
       end type output_waterbal
        
       type (output_waterbal), pointer :: h
+!! swatplus_perf OpenMP: current-object pointer re-associated per HRU in the land
+!! phase; shared -> races under a parallel wave. threadprivate (targets stay shared RO).
+!$omp threadprivate(h)
       type (output_waterbal), dimension (:), allocatable, target :: hwb_d
       type (output_waterbal), dimension (:), allocatable :: hwb_m
       type (output_waterbal), dimension (:), allocatable :: hwb_y

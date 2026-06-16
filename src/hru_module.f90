@@ -525,5 +525,10 @@
 !$omp threadprivate(ls_overq, latqrunon, etday, nd_30)
 !! ihru is the current HRU dispatch index (set = ob(icmd)%num before hru_control).
 !$omp threadprivate(ihru)
+!! Module-level current-object INDEX scalars set per HRU and used to subscript arrays
+!! deep in the land-phase tree (plant ipl, soil layer isol, septic isep/isep_ly,
+!! land-use ilu/ulu, weather-gen iwgen). Module vars are SAVE/shared, so these must be
+!! threadprivate for a parallel wave; no-op single-thread.
+!$omp threadprivate(ipl, isol, isep, ilu, ulu, iwgen, isep_ly)
 
       end module hru_module

@@ -39,6 +39,9 @@
       type (water_body) :: bres_wat_y
       type (water_body) :: bres_wat_a
       type (water_body), pointer :: wbody_wb       !! used for reservoir and wetlands
+!! swatplus_perf OpenMP: current-object pointer re-associated per HRU in the land
+!! phase; shared -> races under a parallel wave. threadprivate (targets stay shared RO).
+!$omp threadprivate(wbody_wb)
 
        interface operator (+)
         module procedure watbod_add

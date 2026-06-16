@@ -99,9 +99,16 @@
 
       if (use_wave) then
         do lev = 1, hru_nwave
+          !! All HRUs in a level are mutually independent (none upstream of another),
+          !! so they run concurrently. dynamic schedule balances uneven per-HRU cost.
+          !! command_object is reentrant: dispatch/inflow scratch is threadprivate, its
+          !! locals are automatic (subroutines built -recursive -init=zero), and each
+          !! thread writes only its own ob(icmd) and j-indexed arrays.
+          !$omp parallel do schedule(dynamic, 16) default(shared) private(k)
           do k = 1, hru_wave_cnt(lev)
             call command_object (hru_wave_obj(lev, k))
           end do
+          !$omp end parallel do
         end do
       end if
 

@@ -7,7 +7,7 @@
       
       external :: wet_initial
       
-      integer :: iihru = 0      !              |hru counter
+      integer :: iihru !              |hru counter
       integer :: iprop = 0      !none          |pointer to surface storage data 
 
       do iihru = 1, sp_ob%hru

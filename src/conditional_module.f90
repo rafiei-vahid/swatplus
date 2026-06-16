@@ -54,5 +54,11 @@
       type (decision_table), dimension(:), allocatable, target :: dtbl_scen
       type (decision_table), dimension(:), allocatable, target :: dtbl_flo
       type (decision_table), pointer :: d_tbl
-      
+!! OpenMP: d_tbl is the "current decision table" pointer, re-pointed per object via
+!! `d_tbl => dtbl_lum(id)` etc. deep in the land-phase tree (hru_control, wetland_control).
+!! Shared, it races under a parallel wave -> wrong table -> out-of-bounds cond(). threadprivate
+!! gives each thread its own pointer (re-associated before use; the dtbl_* targets stay shared
+!! read-only). no-op single-thread.
+!$omp threadprivate(d_tbl)
+
       end module conditional_module   

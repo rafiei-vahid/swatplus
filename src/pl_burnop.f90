@@ -22,10 +22,10 @@
       
       external :: curno
    
-      integer :: j = 0                       !none          |counter
+      integer :: j !none          |counter
       integer, intent (in) :: jj             !none          |counter  
       integer, intent (in) :: iburn          !julian date   |date of burning
-      real :: cnop = 0.                      !              |updated cn after fire
+      real :: cnop !              |updated cn after fire
 
       j = jj
 

@@ -102,6 +102,9 @@
       end type plant_db
       type (plant_db), dimension(:),allocatable, target, save :: pldb
       type (plant_db), pointer :: pl_db
+!! swatplus_perf OpenMP: current-object pointer re-associated per HRU in the land
+!! phase; shared -> races under a parallel wave. threadprivate (targets stay shared RO).
+!$omp threadprivate(pl_db)
          
       type plant_cp
         real :: popsc1 = 0.

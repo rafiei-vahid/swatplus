@@ -98,6 +98,9 @@
       type (hyd_output), dimension(:),allocatable :: wet_seep_day !Jaehak 2022 wetland seepage volume
       type (hyd_output) :: resz
       type (hyd_output), pointer :: wbody       !! used for reservoir and wetlands
+!! swatplus_perf OpenMP: current-object pointer re-associated per HRU in the land
+!! phase; shared -> races under a parallel wave. threadprivate (targets stay shared RO).
+!$omp threadprivate(wbody)
       
       type (hyd_output), dimension(:),allocatable :: om_init_water
       type (hyd_output), dimension(:),allocatable :: ch_om_water_init

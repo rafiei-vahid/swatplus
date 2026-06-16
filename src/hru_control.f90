@@ -53,48 +53,48 @@
                   sq_crackvol, mgt_operatn, mgt_newtillmix, sep_biozone, pest_washp, pest_pesty, smp_buffer, &
                   mgt_newtillmix_cswat3, cbn_surfrsd_decomp, cbn_rsd_transfer, mgt_biomix
 
-      integer :: j = 0              !none          |same as ihru (hru number)
-      integer :: j1 = 0             !none          |counter (rtb)
-      integer :: ulu = 0            !              | 
-      integer :: iob = 0            !              |
-      integer :: ith = 0            !              |
-      integer :: iwgn = 0           !              |
-      integer :: ires = 0           !none          |reservoir number
-      integer :: isched = 0         !              |
-      integer :: isalt = 0          !              |salt ion counter (rtb salt)
-      integer :: ics = 0            !              |constituent counter (rtb cs)
-      integer :: iauto = 0          !none          |counter
-      integer :: id = 0             !              |
-      integer :: jj = 0             !              |
-      integer :: ly = 0             !none          |soil layer
-      integer :: ipest = 0          !none          |sequential pesticide number
-      real :: strsa_av = 0.         !              |
-      integer :: icn = 0            !              |
-      real :: xx = 0.               !              |
-      integer :: iob_out = 0        !              |object type out 
-      integer :: iout = 0           !none          |counter
-      integer :: iac = 0
-      integer :: npl_gro = 0        !              |number of plants currently growing
-      real :: dep = 0.              !              |
-      real :: strsw_av = 0.
-      real :: strsn_av = 0.
-      real :: strsp_av = 0.
-      real :: strss_av = 0.         !none (rtb salt)
-      real :: strstmp_av = 0.
-      real :: wet_outflow = 0.      !mm             |outflow from wetland
-      real  :: tile_fr_surf = 0.    !m3             |fraction of tile flow that is overland
-      integer :: ifrt = 0
-      integer :: idp = 0
+      integer :: j !none          |same as ihru (hru number)
+      integer :: j1 !none          |counter (rtb)
+      integer :: ulu !              | 
+      integer :: iob !              |
+      integer :: ith !              |
+      integer :: iwgn !              |
+      integer :: ires !none          |reservoir number
+      integer :: isched !              |
+      integer :: isalt !              |salt ion counter (rtb salt)
+      integer :: ics !              |constituent counter (rtb cs)
+      integer :: iauto !none          |counter
+      integer :: id !              |
+      integer :: jj !              |
+      integer :: ly !none          |soil layer
+      integer :: ipest !none          |sequential pesticide number
+      real :: strsa_av !              |
+      integer :: icn !              |
+      real :: xx !              |
+      integer :: iob_out !              |object type out 
+      integer :: iout !none          |counter
+      integer :: iac
+      integer :: npl_gro !              |number of plants currently growing
+      real :: dep !              |
+      real :: strsw_av
+      real :: strsn_av
+      real :: strsp_av
+      real :: strss_av !none (rtb salt)
+      real :: strstmp_av
+      real :: wet_outflow !mm             |outflow from wetland
+      real :: tile_fr_surf !m3             |fraction of tile flow that is overland
+      integer :: ifrt
+      integer :: idp
       integer :: hru_rcv
       real :: rto
-      real :: sw_volume_begin = 0.
-      real :: soil_prof_labp = 0.
-      real :: sum_conc = 0.              !rtb salt
-      real :: sum_mass = 0.              !rtb salt
-      real :: sum_sorb = 0.              !rtb salt
-      real :: saltcon = 0.       !Jeong 2024
-      real :: qsurf = 0.         !Jeong 2024
-      real :: sedppm = 0.        !Jeong 2024
+      real :: sw_volume_begin
+      real :: soil_prof_labp
+      real :: sum_conc !rtb salt
+      real :: sum_mass !rtb salt
+      real :: sum_sorb !rtb salt
+      real :: saltcon !Jeong 2024
+      real :: qsurf !Jeong 2024
+      real :: sedppm !Jeong 2024
       
       j = ihru
       
@@ -551,9 +551,12 @@
           end if
           if (wet_dat_c(ires)%hyd.eq.'paddy') then !.and.time%yrs > pco%nyskip) then
             if (wet_ob(j)%depth > -0.1) then
+            !! swatplus_perf OpenMP: shared paddy-debug unit; serialize concurrent writes
+            !$omp critical (paddy_dbg_out)
            write(100100,'(4(I6,","),20(f20.1,","))') time%yrc,time%mo,time%day_mo,j,w%precip,irrig(j)%applied,hru(j)%water_seep,     &
             pet_day,etday,wet_ob(j)%weir_hgt*1000,wet_ob(j)%depth*1000.,ht2%flo/(hru(j)%area_ha*10.),soil(j)%sw,sedppm,ht2%sed*1000, &
-            wet(j)%no3,ht2%no3,pcom(j)%lai_sum,saltcon 
+            wet(j)%no3,ht2%no3,pcom(j)%lai_sum,saltcon
+            !$omp end critical (paddy_dbg_out)
             end if
           end if
         end if
@@ -869,6 +872,8 @@
       ! output_losses
         !! don't sum during skip years
         if (time%yrs > pco%nyskip) then
+          !! swatplus_perf OpenMP: basin sediment-budget reduction across HRUs.
+          !$omp atomic
           bsn_sedbud%upland_t = bsn_sedbud%upland_t + sedyld(j)
         end if
         hls_d(j)%sedyld = sedyld(j) / hru(j)%area_ha

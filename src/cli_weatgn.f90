@@ -45,8 +45,8 @@
       
       
       integer, dimension (2) :: zshape = 0  !none          |array shape parameters
-      integer :: n = 0                    !none          |counter                                       
-      integer :: l = 0                    !none          |counter
+      integer :: n !none          |counter                                       
+      integer :: l !none          |counter
       integer :: iwgn
       real, dimension (3,3) :: a = 0.     !none          |3 x 3 matrix whose elements are defined such
                                           !              |that the new sequences of max temp, min temp, 
@@ -58,7 +58,7 @@
                                           !              |correlation and cross-correlation coefficients
       real, dimension (3) :: xx = 0.      !none          |variable to hold calculation value 
       real, dimension (3) :: e = 0.       !none          |3 x 1 matrix of independent random components
-      real :: v2 = 0.                     !none          |random number between 0.0 and 1.0                      !              |
+      real :: v2 !none          |random number between 0.0 and 1.0                      !              |
       real, external :: aunif
       real, external :: cli_dstn1         !              |
  

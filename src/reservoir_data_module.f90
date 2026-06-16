@@ -133,6 +133,9 @@
       type (water_body_data_parameters), dimension(:), allocatable, target :: res_prm
       type (water_body_data_parameters), dimension(:), allocatable, target :: wet_prm
       type (water_body_data_parameters), pointer :: wbody_prm       !! used for reservoir and wetlands
+!! swatplus_perf OpenMP: current-object pointer re-associated per HRU in the land
+!! phase; shared -> races under a parallel wave. threadprivate (targets stay shared RO).
+!$omp threadprivate(wbody_prm)
       
       type reservoir_weir_outflow
         character(len=25) :: name = ""

@@ -28,6 +28,7 @@
       use soil_module
       use recall_module
       use water_allocation_module
+      use command_wave_module
       implicit none
       
       external :: aqu_1d_control, aqu_cs_output, aqu_pesticide_output, aqu_salt_output, aquifer_output, &
@@ -82,6 +83,10 @@
       !! Walk drives it serially here; the parallel HRU wavefront (added next)
       !! calls the same routine. ob(icmd)%cmd_next uses the module icmd, which
       !! command_object may advance for gwflow sub-objects (preserves old behavior).
+      !! swatplus_perf: build the HRU wavefront index once (topological levels).
+      !! Read-only w.r.t. simulation state; not yet consumed by the serial walk below.
+      if (.not. hru_wave_ready) call command_wave_build
+
       ic_walk = sp_ob1%objs
       do while (ic_walk /= 0)
         call command_object (ic_walk)

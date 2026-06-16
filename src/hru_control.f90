@@ -410,6 +410,12 @@
         endif
 
         !! compute plant community partitions
+        !! swatplus_perf OpenMP: the plant phase (pl_community..pl_grow) uses module-level
+        !! scratch arrays (epmax, uno3d, uapd, sum_no3/solp, ...) that are reused per-HRU
+        !! and not yet thread-private. Serialize the whole plant block as one atomic region
+        !! so concurrent HRUs don't clobber that scratch. The expensive water-balance phases
+        !! (ET, percolation, soil temp, nutrient leaching) outside this block stay parallel.
+        !$omp critical (plant_block)
         call pl_community
         !if (j == 136) then
         !write (7778,*) time%day, j, pl_mass(j)%tot(1)%m, pl_mass(j)%ab_gr(1)%m, pl_mass(j)%stem(1)%m, &
@@ -441,6 +447,7 @@
         
         !! compute plant biomass, leaf, root and seed growth
         call pl_grow
+        !$omp end critical (plant_block)
 
         !! reset harvested biomass and number of harvests for yearly yield output
         if (time%end_yr == 1) then

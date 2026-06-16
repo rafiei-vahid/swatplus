@@ -73,6 +73,9 @@
       integer :: iob_chan = 0        !rtb gwflow    |ob index for channel
       real :: sumflo = 0.
       integer :: ic_walk = 0          !swatplus_perf: serial-walk index (module icmd is set inside command_object)
+      integer :: lev = 0              !swatplus_perf: wavefront level
+      integer :: k = 0                !swatplus_perf: index within a wave
+      logical :: use_wave = .false.   !swatplus_perf: drive HRU land phase wave-by-wave
       external :: command_object
 
       icmd = sp_ob1%objs
@@ -84,13 +87,32 @@
       !! calls the same routine. ob(icmd)%cmd_next uses the module icmd, which
       !! command_object may advance for gwflow sub-objects (preserves old behavior).
       !! swatplus_perf: build the HRU wavefront index once (topological levels).
-      !! Read-only w.r.t. simulation state; not yet consumed by the serial walk below.
       if (.not. hru_wave_ready) call command_wave_build
+
+      !! swatplus_perf wavefront: run the HRU land phase wave-by-wave (objects at the
+      !! same cmd_order level are mutually independent), then walk the remaining
+      !! (routing/channel/reservoir) objects serially, skipping the already-done HRUs.
+      !! Fall back to a pure serial walk when water/manure allocation is active, since
+      !! allocation is interleaved global state that the wave pre-pass would reorder.
+      use_wave = (hru_wave_ready .and. hru_nwave > 0 .and.                  &
+                  db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0)
+
+      if (use_wave) then
+        do lev = 1, hru_nwave
+          do k = 1, hru_wave_cnt(lev)
+            call command_object (hru_wave_obj(lev, k))
+          end do
+        end do
+      end if
 
       ic_walk = sp_ob1%objs
       do while (ic_walk /= 0)
-        call command_object (ic_walk)
-        ic_walk = ob(icmd)%cmd_next
+        if (use_wave .and. ob(ic_walk)%typ == "hru") then
+          ic_walk = ob(ic_walk)%cmd_next          ! HRU already done in the wave pre-pass
+        else
+          call command_object (ic_walk)
+          ic_walk = ob(icmd)%cmd_next             ! module icmd may be gwflow-advanced
+        end if
       end do
 
       !! write object output for entire simulation (fort-leak-fix: no NetCDF backend)

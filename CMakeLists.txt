@@ -20,7 +20,16 @@ if(SWATPLUS_NETCDF)
   pkg_check_modules(NETCDF_F REQUIRED IMPORTED_TARGET netcdf-fortran)
 endif()
 
+# Shared-memory (OpenMP) multi-core parallelism. OFF by default so existing builds are unchanged.
+# Enables -fopenmp (gfortran) / -qopenmp (ifx) via the OpenMP::Fortran imported target.
+# (find_package(OpenMP) is below, after project() enables the Fortran language.)
+option(SWATPLUS_OPENMP "Build with OpenMP shared-memory parallelism" OFF)
+
 project(swatplus VERSION 0.2 LANGUAGES Fortran)
+
+if(SWATPLUS_OPENMP)
+  find_package(OpenMP REQUIRED)
+endif()
 
 include(CTest)
 
@@ -158,6 +167,9 @@ endif()
 
 file(GLOB sources src/*.f90)
 add_executable(${SWATPLUS_EXE} ${sources})
+if(SWATPLUS_OPENMP)
+  target_link_libraries(${SWATPLUS_EXE} PRIVATE OpenMP::OpenMP_Fortran)
+endif()
 if(SWATPLUS_NETCDF)
   target_link_libraries(${SWATPLUS_EXE} PRIVATE PkgConfig::NETCDF_F)
   target_include_directories(${SWATPLUS_EXE} PRIVATE ${NETCDF_F_INCLUDE_DIRS})

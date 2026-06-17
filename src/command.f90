@@ -29,6 +29,7 @@
       use recall_module
       use water_allocation_module
       use command_wave_module
+!$    use omp_lib
       implicit none
       
       external :: aqu_1d_control, aqu_cs_output, aqu_pesticide_output, aqu_salt_output, aquifer_output, &
@@ -77,6 +78,7 @@
       integer :: k !swatplus_perf: index within a wave
       logical :: use_wave !swatplus_perf: drive HRU land phase wave-by-wave
       logical :: use_objwave !swatplus_perf Phase C: full-DAG wave over ALL objects
+      integer :: n_threads !swatplus_perf: OpenMP team size (1 if built/run serial)
       external :: command_object
 
       icmd = sp_ob1%objs
@@ -95,30 +97,48 @@
       !! independent -> run concurrently; level L+1 waits for level L (downstream needs
       !! upstream). Requires every control routine reentrant. Used only when no water/
       !! manure allocation and no gwflow (those carry interleaved/advancing global state).
-      use_objwave = (hru_wave_ready .and. obj_nwave > 0 .and. db_mx%wallo_db == 0 .and.   &
-                     db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
+      !! swatplus_perf: at ONE thread (or a non-OpenMP build) use the ORIGINAL cmd_next
+      !! serial walk, NOT the wavefront. The wavefront reorders inflow summation (level
+      !! order vs cmd_next), which is byte-equivalent only up to floating-point round-off;
+      !! gating it on n_threads>=2 makes single-thread output bit-identical to the stock
+      !! production engine, while >=2 threads get the parallel wave. The `!$` sentinel
+      !! leaves n_threads=1 when OpenMP is disabled.
+      n_threads = 1
+!$    n_threads = omp_get_max_threads()
+
+      use_objwave = (n_threads > 1 .and. hru_wave_ready .and. obj_nwave > 0 .and.          &
+                     db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
 
       if (use_objwave) then
+        !! swatplus_perf: ONE parallel region for the whole day, not one per level.
+        !! The team is forked once; each level is an !$omp do whose implicit barrier
+        !! enforces level-ordering (downstream waits for upstream). This removes the
+        !! 265-levels x 365-days fork/join overhead that made the deep, width-1
+        !! main-stem levels dominate at 8 threads. Parallel semantics are identical.
+        !$omp parallel default(shared) private(k, lev)
         do lev = 1, obj_nwave
-          !$omp parallel do schedule(dynamic, 16) default(shared) private(k)
+          !$omp do schedule(dynamic, 16)
           do k = 1, obj_wave_cnt(lev)
             call command_object (obj_wave_obj(lev, k))
           end do
-          !$omp end parallel do
+          !$omp end do
         end do
+        !$omp end parallel
       else
         !! Fallback: HRU land phase wave (parallel) + serial routing walk. Handles
         !! wallo/mallo/gwflow models, which the full-DAG wave cannot reorder safely.
-        use_wave = (hru_wave_ready .and. hru_nwave > 0 .and.                  &
+        use_wave = (n_threads > 1 .and. hru_wave_ready .and. hru_nwave > 0 .and.  &
                     db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0)
         if (use_wave) then
+          !$omp parallel default(shared) private(k, lev)
           do lev = 1, hru_nwave
-            !$omp parallel do schedule(dynamic, 16) default(shared) private(k)
+            !$omp do schedule(dynamic, 16)
             do k = 1, hru_wave_cnt(lev)
               call command_object (hru_wave_obj(lev, k))
             end do
-            !$omp end parallel do
+            !$omp end do
           end do
+          !$omp end parallel
         end if
         ic_walk = sp_ob1%objs
         do while (ic_walk /= 0)

@@ -82,7 +82,11 @@
       type (hyd_output), dimension(:),allocatable :: hhr
       type (hyd_output) :: ht1, ht2, ht3, ht4, ht5, delrto
       type (hyd_output) :: fp_dep, ch_dep, bank_ero, bed_ero, ch_trans
-      
+!!    swatplus_perf OpenMP: per-channel sediment-budget scratch hydrographs, zeroed
+!!    then accumulated within sd_channel_sediment3 for the current channel. Shared ->
+!!    race under the parallel channel wave; threadprivate gives each thread its own.
+!$omp threadprivate(fp_dep, ch_dep, bank_ero, bed_ero, ch_trans)
+
       !rtb hydrograph separation
       type (hyd_sep) :: hdsep1,hdsep2
       type (hyd_sep), dimension(:),allocatable :: ch_stor_hdsep
@@ -1233,7 +1237,13 @@
 !$omp threadprivate(ht1, ht2, ht3, ht4, ht5, delrto, icmd, hdsep1, hdsep2)
 !! Phase C (full-DAG wave): channel/reservoir current-object dispatch indices set per
 !! object before its control routine; threadprivate so same-level channels run concurrently.
-!$omp threadprivate(jrch, isdch, isd_chsur)
+!! ich = current channel object number (set ich=isdch in sd_channel_control3, read in ch_temp).
+!$omp threadprivate(jrch, isdch, isd_chsur, ich)
+!! iwst = current object's weather-station index (set per HRU in hru_control:117 then read at
+!! :124 w=wst(iwst)%weat, and per channel in sd_channel_control3/ch_temp). Shared, it was
+!! clobbered between set and use by concurrent HRUs -> wrong station -> ~0.2% PET/ET drift on a
+!! station-dependent subset of HRUs. threadprivate gives each thread its own current-station index.
+!$omp threadprivate(iwst)
 
       contains
 

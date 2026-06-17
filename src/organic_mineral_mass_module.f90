@@ -181,6 +181,10 @@
       type (plant_community_mass), dimension (:), allocatable :: pl_mass
       type (plant_community_mass), dimension (:), allocatable :: pl_mass_init
       type (organic_mass) :: pl_yield                               !kg/ha      |crop yield
+!!    swatplus_perf OpenMP: pl_yield is current-HRU harvest scratch - set in the harvest/kill
+!!    operation then read at hru_control:851 (hpw_d(j)%yield = pl_yield%m) and reset. Shared, it
+!!    races across concurrent HRUs on harvest days; threadprivate (all-scalar type, no alloc).
+!$omp threadprivate(pl_yield)
       type (organic_mass) :: pl_mass_up                             !kg/ha      |daily biomass and c increase; n and p uptake
       type (organic_mass) :: pl_residue
       type (organic_mass) :: harv_seed, harv_leaf, harv_stem, harv_left
@@ -190,6 +194,18 @@
       type (organic_mass) :: stem_drop                              !kg/ha      |stem that dies at dormancy
       type (organic_mass) :: seed_drop                              !kg/ha      |seed that dies at dormancy
       type (organic_mass) :: plt_mass_z
+!!    swatplus_perf OpenMP: these are per-HRU / per-plant "temporary storage" scratch for
+!!    residue decomposition, transfers, plant uptake, senescence drops, harvest and grazing -
+!!    written then read within a single HRU's hru_control call tree (cbn_rsd_decomp,
+!!    cbn_surfrsd_decomp, cbn_rsd_transfer, rsd_decomp, nut_nminrl, pl_grow, pl_dormant,
+!!    pl_leaf_senes, harvest/graze ops). Shared, they race across concurrent HRUs and perturb
+!!    residue/biomass -> cover -> soil-evap (es_max) -> ~0.01 mm ET drift that compounds.
+!!    threadprivate (organic_mass is all-scalar m/c/n/p, no allocatable components -> no per-
+!!    thread allocation needed). plt_mass_z is a read-only zero template -> left shared.
+!$omp threadprivate(decomp, photo_decomp, transfer, pl_burn, rsd_meta, rsd_str, &
+!$omp                pl_mass_up, pl_residue, harv_seed, harv_leaf, harv_stem, harv_left, &
+!$omp                graz_plant, graz_seed, graz_leaf, graz_stem, &
+!$omp                leaf_drop, abgr_drop, stem_drop, seed_drop)
 
       type mineral_mass
         real :: m = 0.          !kg or kg/ha      |total object mass

@@ -23,9 +23,14 @@
       
       ts_sed = Max (10, time%step)
       allocate (timeint(ts_sed), source = 0.)
+      !! swatplus_perf OpenMP: hyd_rad/trav_time/flo_dep are threadprivate per-substep
+      !! routing scratch - allocate one copy per thread so the parallel channel wave
+      !! doesn't share (and race on) a single buffer.
+      !$omp parallel default(shared)
       allocate (hyd_rad(ts_sed), source = 0.)
       allocate (trav_time(ts_sed), source = 0.)
       allocate (flo_dep(ts_sed), source = 0.)
+      !$omp end parallel
       
       inquire (file=in_cha%hyd_sed, exist=i_exist)
       if (.not. i_exist .or. in_cha%hyd_sed == "null") then

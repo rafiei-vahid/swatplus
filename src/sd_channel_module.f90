@@ -14,7 +14,12 @@
       real, dimension(:), allocatable :: trav_time  !days       |time spent in each hydrograph time step
       real, dimension(:), allocatable :: flo_dep    !m^2        |hydraulic radius for each hydrograph time step
       real, dimension(:), allocatable :: timeint    !days       |time spent in each hydrograph time step
-      
+!!    swatplus_perf OpenMP: per-substep routing scratch (sized ts_sed), written then
+!!    read within a single channel's ch_rtmusk/ch_rthr call - not indexed by channel,
+!!    so shared they race under the parallel channel wave. threadprivate; allocated
+!!    per-thread inside an !$omp parallel region in sd_hydsed_read.
+!$omp threadprivate(hyd_rad, trav_time, flo_dep)
+
       type swatdeg_hydsed_data
         character(len=25) :: name = ""
         integer :: order = 0

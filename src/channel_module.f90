@@ -56,8 +56,14 @@
       real :: rtwtr = 0.          !m^3 H2O           |water leaving reach on day
       real :: wtrin = 0.          !m^3               |water entering reach during day
       integer:: sed_ch = 0
-      
-      
+
+!!    swatplus_perf OpenMP: these scalars are per-channel "current object" scratch -
+!!    written then read within a single channel's sd_channel_control3 call tree
+!!    (jhyd/jsed in ch_rtmusk, jnut/ben_area in sd_channel_control3, rttime in
+!!    sd_channel_sediment3/ch_temp, rchdep/rt_delt in ch_watqual4). Shared, they race
+!!    when same-level channels run concurrently under the parallel wave -> threadprivate.
+!$omp threadprivate(jhyd, jsed, jnut, rttime, ben_area, rchdep, rt_delt)
+
       type channel
           real :: algae = 0.     ! mg alg/L      |algal biomass concentration in reach
           real :: ammonian = 0.  ! mg N/L        |ammonia concentration in reach

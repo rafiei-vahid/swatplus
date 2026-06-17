@@ -186,12 +186,19 @@
       ! maybe there is a way to get the variables in a better way
 
       !initialize 0 outputs
-      do ilsu = 1, db_mx%lsu_out
-          lsu_wb_d(ilsu) = hwbz
-          q_lsu_sno = 0
-          q_lsu_surf = 0
-          q_lsu_lat = 0
-          q_lsu_wyld = 0
+      !! swatplus_perf: zero ONLY the LSUs this channel actually uses (its routing units,
+      !! ruid_array(1:ru_count)), not the entire lsu_wb_d array. The original reset all
+      !! db_mx%lsu_out entries for every channel every day - O(N_lsu * N_channels) - but
+      !! the summing loop below only reads this channel's own LSUs; the rest were zeroed
+      !! and never used. VTune attributed ~731 s (97% of ch_temp, the single hottest line
+      !! in the engine) to that full-array reset. Output-identical: the used LSUs are still
+      !! zeroed here then (re)set below, and the unused ones are never read for this channel.
+      q_lsu_sno = 0
+      q_lsu_surf = 0
+      q_lsu_lat = 0
+      q_lsu_wyld = 0
+      do ru_index = 1, ru_count
+          lsu_wb_d(ruid_array(ru_index)) = hwbz
       end do
 
       ! summing HRU output for the landscape unit

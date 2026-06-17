@@ -83,10 +83,12 @@
         hcs1 = obcs(icmd)%hin(1)
       end if
       
-      chsd_d(ich)%flo_in = ht1%flo / 86400.     !flow for morphology output
-      ch_in_d(ich) = ht1                        !set inflow om hydrograph
-      ch_in_d(ich)%flo = ht1%flo / 86400.       !flow for om output
-      
+      !! swatplus_perf: the inflow om hydrograph (ch_in_d) and chsd_d%flo_in are set
+      !! unconditionally below (after lapse + aquifer add) at the "set inflow hyds for
+      !! printing" block, and nothing reads them in between - so this early copy was a
+      !! redundant full hyd_output struct assignment per channel per day. Removed; the
+      !! VTune profile showed derived-type memcpy dominates the channel phase.
+
       !rtb hydrograph separation
       hdsep1%flo_surq = ob(icmd)%hdsep_in%flo_surq
       hdsep1%flo_latq = ob(icmd)%hdsep_in%flo_latq

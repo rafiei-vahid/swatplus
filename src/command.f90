@@ -79,6 +79,9 @@
       logical :: use_wave !swatplus_perf: drive HRU land phase wave-by-wave
       logical :: use_objwave !swatplus_perf Phase C: full-DAG wave over ALL objects
       integer :: n_threads !swatplus_perf: OpenMP team size (1 if built/run serial)
+      integer :: lev_end !swatplus_perf: end (exclusive) of a fused narrow-level run
+      integer :: lv2 !swatplus_perf: inner level index within a fused narrow run
+      integer, parameter :: narrow_thr = 1 !swatplus_perf: fuse levels with <= this many objects (width-1 main stem: no parallelism to lose)
       external :: command_object
 
       icmd = sp_ob1%objs
@@ -111,17 +114,46 @@
 
       if (use_objwave) then
         !! swatplus_perf: ONE parallel region for the whole day, not one per level.
-        !! The team is forked once; each level is an !$omp do whose implicit barrier
+        !! The team is forked once; each WIDE level is an !$omp do whose implicit barrier
         !! enforces level-ordering (downstream waits for upstream). This removes the
         !! 265-levels x 365-days fork/join overhead that made the deep, width-1
-        !! main-stem levels dominate at 8 threads. Parallel semantics are identical.
-        !$omp parallel default(shared) private(k, lev)
-        do lev = 1, obj_nwave
-          !$omp do schedule(dynamic, 16)
-          do k = 1, obj_wave_cnt(lev)
-            call command_object (obj_wave_obj(lev, k))
-          end do
-          !$omp end do
+        !! main-stem levels dominate at 8 threads.
+        !!
+        !! Narrow-level fusion: with the channel compute now cheap (ch_temp fix), the cost
+        !! left is barrier spin — the deep main stem is a chain of width-1 levels, one
+        !! barrier each. A run of consecutive narrow (<= narrow_thr objects) levels carries
+        !! no parallelism to exploit, so we run it serially on the master thread in level
+        !! order (dependencies preserved) under a SINGLE barrier, instead of one barrier per
+        !! level. All threads compute the same lev/lev_end from the shared counts, so they
+        !! encounter the same worksharing/barrier sequence. Output is identical (same objects,
+        !! same level order; per-object work is independent of which thread runs it).
+        !$omp parallel default(shared) private(k, lev, lev_end, lv2)
+        lev = 1
+        do while (lev <= obj_nwave)
+          if (obj_wave_cnt(lev) > narrow_thr) then
+            !$omp do schedule(dynamic, 16)
+            do k = 1, obj_wave_cnt(lev)
+              call command_object (obj_wave_obj(lev, k))
+            end do
+            !$omp end do
+            lev = lev + 1
+          else
+            !! extent of the consecutive narrow run (identical on every thread)
+            lev_end = lev
+            do while (lev_end <= obj_nwave)
+              if (obj_wave_cnt(lev_end) > narrow_thr) exit
+              lev_end = lev_end + 1
+            end do
+            !$omp master
+            do lv2 = lev, lev_end - 1
+              do k = 1, obj_wave_cnt(lv2)
+                call command_object (obj_wave_obj(lv2, k))
+              end do
+            end do
+            !$omp end master
+            !$omp barrier
+            lev = lev_end
+          end if
         end do
         !$omp end parallel
       else

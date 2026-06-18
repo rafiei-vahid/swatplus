@@ -16,22 +16,22 @@
       external :: rcurv_interp_flo
       real, external :: theta, wq_k2m, wq_semianalyt
 
-      real :: tday
-      real :: wtmp
-      real :: fll
-      real :: gra
-      real :: lambda
-      real :: fnn
-      real :: fpp
-      real :: algi
-      real :: fl_1
-      real :: xx
-      real :: yy
-      real :: zz
-      real :: ww
-      real :: cordo
-      real :: f1
-      real :: algcon
+      real :: tday = 0.
+      real :: wtmp = 0.
+      real :: fll = 0.
+      real :: gra = 0.
+      real :: lambda = 0.
+      real :: fnn = 0.
+      real :: fpp = 0.
+      real :: algi = 0.
+      real :: fl_1 = 0.
+      real :: xx = 0.
+      real :: yy = 0.
+      real :: zz = 0.
+      real :: ww = 0.
+      real :: cordo = 0.
+      real :: f1 = 0.
+      real :: algcon = 0.
       real :: thgra = 1.047
       real :: thrho = 1.047
       real :: thrs1 = 1.024
@@ -47,45 +47,57 @@
       real :: thrk2 = 1.024
       real :: thrk3 = 1.024
       real :: thrk4 = 1.060
-      real :: soxy !mg O2/L       |saturation concetration of dissolved oxygen
-      real :: rs2_s
-      real :: rs3_s
-      real :: rk4_s
-      real :: disoxin
-      real :: dispin
-      real :: ammoin
-      real :: cinn
-      real :: algin
-      real :: factk
-      real :: alg_m1
-      real :: alg_m
-      real :: alg_m2
-      real :: alg_no3_m
-      real :: alg_nh4_m
-      real :: alg_p_m
-      real :: alg_set
-      real :: algcon_out
-      real :: cbodo
-      real :: cbodoin
-      real :: rk1_k
-      real :: rk1_m
-      real :: rk3_k
-      real :: factm
-      real :: bc1_k
-      real :: bc3_k
-      real :: rs4_k
-      real :: bc3_m
-      real :: rk2_m
-      real :: rk2_k
-      real :: alg_m_o2
-      real :: bc2_k
-      real :: bc1_m
-      real :: bc2_m
-      real :: bc4_k
-      real :: bc4_m
-      real :: rs5_k
-      real :: flo_rate
-      integer :: iwgn
+      real :: soxy = 0.        !mg O2/L       |saturation concetration of dissolved oxygen
+      real :: rs2_s = 0.
+      real :: rs3_s = 0.
+      real :: rk4_s = 0.
+      real :: disoxin = 0.
+      real :: dispin = 0.
+      real :: ammoin = 0.
+      real :: cinn = 0.
+      real :: algin = 0.
+      real :: factk = 0.
+      real :: alg_m1 = 0.
+      real :: alg_m = 0.
+      real :: alg_m2 = 0.
+      real :: alg_no3_m = 0.
+      real :: alg_nh4_m = 0.
+      real :: alg_p_m = 0.
+      real :: alg_set = 0.
+      real :: algcon_out = 0.
+      real :: cbodo = 0.
+      real :: cbodoin = 0.
+      real :: rk1_k = 0.
+      real :: rk1_m = 0.
+      real :: rk3_k = 0.
+      real :: factm = 0.
+      real :: bc1_k = 0.
+      real :: bc3_k = 0.
+      real :: rs4_k = 0.
+      real :: bc3_m = 0.
+      real :: rk2_m = 0.
+      real :: rk2_k = 0.
+      real :: alg_m_o2 = 0.
+      real :: bc2_k = 0.
+      real :: bc1_m = 0.
+      real :: bc2_m = 0.
+      real :: bc4_k = 0.
+      real :: bc4_m = 0.
+      real :: rs5_k = 0.
+      real :: flo_rate = 0.
+      integer :: iwgn = 0
+
+!     swatplus_perf reentrancy: these SAVE scratch locals were stripped engine-wide for the OpenMP
+!     wavefront, but a few are read-before-written (rate terms gated on rchdep, inflow-conc helpers)
+!     and relied on cross-call persistence — stripping + -init=zero reset them each call and shifted
+!     the in-channel WQ (chla etc.) ~0.3% vs the serial engine. Keeping them SAVE + threadprivate
+!     gives each thread its own PERSISTENT copy: byte-identical to production at 1 thread, race-free
+!     at N>1. (Read-only Theta constants th* stay shared.)
+!$omp threadprivate(tday, wtmp, fll, gra, lambda, fnn, fpp, algi, fl_1, xx, yy, zz, ww, cordo,    &
+!$omp   f1, algcon, soxy, rs2_s, rs3_s, rk4_s, disoxin, dispin, ammoin, cinn, algin, factk,        &
+!$omp   alg_m1, alg_m, alg_m2, alg_no3_m, alg_nh4_m, alg_p_m, alg_set, algcon_out, cbodo, cbodoin, &
+!$omp   rk1_k, rk1_m, rk3_k, factm, bc1_k, bc3_k, rs4_k, bc3_m, rk2_m, rk2_k, alg_m_o2, bc2_k,      &
+!$omp   bc1_m, bc2_m, bc4_k, bc4_m, rs5_k, flo_rate, iwgn)
 
       jrch = isdch
       icmd = sp_ob1%chandeg + jrch - 1

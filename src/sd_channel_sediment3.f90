@@ -140,6 +140,12 @@
         ht1 = ht1 - fp_dep
 
         !! if flood plain link - fill wetlands to emergency
+        !! RACE FIX (OpenMP): wet/wet_in_d are SHARED arrays indexed by a CHANNEL's floodplain HRU
+        !! (iihru = sd_ch(ich)%fp%hru(ihru)), NOT the threadprivate channel index. Under the parallel
+        !! channel wavefront two channels can read-modify-write the same wet(iihru) concurrently ->
+        !! lost-update + order dependence (drove the ~15% organic-N/NH3/sed-P divergence vs serial).
+        !! Serialize this cross-object overbank write with a named critical (overbank-only -> cheap).
+        !$omp critical (sd_fp_wet)
         do ihru = 1, sd_ch(ich)%fp%hru_tot
           iihru = sd_ch(ich)%fp%hru(ihru)
           ires= hru(iihru)%dbs%surf_stor
@@ -164,6 +170,7 @@
             end if
           end if
         end do
+        !$omp end critical (sd_fp_wet)
 
       end if     ! florate_ob > 0.
 

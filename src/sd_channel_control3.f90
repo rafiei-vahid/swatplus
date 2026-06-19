@@ -204,9 +204,7 @@
         ben_area = sd_ch(ich)%chw * sd_ch(ich)%chl
       
         !! compute max flow depth and corresponding travel time during day
-        !! FIX: ht3%flo is never assigned here (stale threadprivate residue from the thread's prior
-        !! channel -> order-dependent). Use the freshly-set inflow ht1%flo (set at line ~61).
-        inflo_rate = ht1%flo / 86400.
+        inflo_rate = ht3%flo / 86400.
         call rcurv_interp_flo (jrch, inflo_rate)
       
         !! compute channel water quality

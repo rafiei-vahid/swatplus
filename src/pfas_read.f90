@@ -173,6 +173,21 @@
       !! nothing more to do if no PFAS compounds were defined
       if (npfas <= 0) return
 
+      !! optional calibration multipliers: pfas_calib.dat = one line
+      !! "soil_scale koc_scale" (global). Missing -> both stay 1.0 (no scaling).
+      inquire (file="pfas_calib.dat", exist=i_exist)
+      if (i_exist) then
+        open (171, file="pfas_calib.dat")
+        read (171,*,iostat=eof) pfas_soil_scale, pfas_koc_scale
+        if (eof /= 0) then
+          pfas_soil_scale = 1.0
+          pfas_koc_scale  = 1.0
+        end if
+        close (171)
+        if (pfas_soil_scale < 0.) pfas_soil_scale = 1.0
+        if (pfas_koc_scale  < 0.) pfas_koc_scale  = 1.0
+      end if
+
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 !!    (2) ALLOCATE PER-HRU SOIL COLUMN  ->  pfas_soil_hru(:)%ly(:)
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
@@ -269,7 +284,7 @@
             pfas_flag(ihru) = 1
             do ly = 1, mly
               pfas_soil_hru(ihru)%ly(ly)%sol_pfas(pfasid) =               &
-     &                                              1.e-9 * xx(ly)
+     &                                  pfas_soil_scale * 1.e-9 * xx(ly)
             end do
 
             !! -- Freundlich coefficient kf (solver "c") per layer --

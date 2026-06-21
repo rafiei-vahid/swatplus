@@ -68,6 +68,13 @@
       end type pfas_soil
       type (pfas_soil), dimension(:), allocatable, save :: pfas_soil_hru   !! dimensioned by HRU
 
+      !!    ~ ~ ~ CALIBRATION GLOBAL MULTIPLIERS (optional pfas_calib.dat) ~ ~ ~
+      !!    Let a PFAS calibration tune magnitude without regenerating the big
+      !!    per-HRU pfas_hru.ini: pfas_soil_scale multiplies all initial soil
+      !!    PFAS (sets background conc); pfas_koc_scale multiplies in-stream koc.
+      real, save :: pfas_soil_scale = 1.0     !! none |x initial soil PFAS pools
+      real, save :: pfas_koc_scale  = 1.0     !! none |x in-stream koc (partition)
+
       !!    ~ ~ ~ MODULE-LEVEL COUNTS / FLAGS / CROSSWALK ~ ~ ~
       integer, save :: npfas = 0                                  !! none |number of PFAS simulated
       integer, dimension(:), allocatable, save :: pfas_num        !! none |sequential PFAS -> pfasdb index crosswalk

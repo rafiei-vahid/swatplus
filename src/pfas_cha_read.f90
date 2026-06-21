@@ -68,7 +68,7 @@
 !!      act_dep=0.1 m.  Initial water/benthic conc default to zero.
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
-      use pfas_module, only : npfas, pfas_num, pfasdb
+      use pfas_module, only : npfas, pfas_num, pfasdb, pfas_koc_scale
       use pfas_cha_module
       use constituent_mass_module
       use sd_channel_module, only : sd_ch
@@ -174,6 +174,11 @@
       !! no db_mx slot is required since pfas_chadb is sized by npfas, not by a
       !! separate file-record max.  Add a db_mx%pfas_cha field if a count is
       !! wanted in the input-summary output.
+
+      !! calibration: scale the in-stream koc (partition) by pfas_koc_scale
+      do ipf = 1, npfas
+        pfas_chadb(ipf)%koc = pfas_chadb(ipf)%koc * pfas_koc_scale
+      end do
 
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 !!    (3) ALLOCATE per-channel water + benthic PFAS pools and the daily/

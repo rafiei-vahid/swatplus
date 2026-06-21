@@ -23,6 +23,12 @@
       real, save    :: pfdiag_bury = 0.   !! sum of per-reach-day burial (permanent sink)
       integer, save :: pfdiag_active = 0  !! count of reach-days with nonzero PFAS inflow
 
+      !! PFAS point-source loads injected directly to a channel (kg/day),
+      !! dimensioned (channel, npfas). Models WWTP effluent, contaminated-site
+      !! leachate, AFFF discharge etc. Read from optional pfas_source.dat.
+      real, dimension(:,:), allocatable, save :: pfas_src_load
+      real, save :: pfdiag_src = 0.       !! run-cumulative point-source input (kg)
+
       !! per-PFAS in-stream routing parameters (extends pfasdb)
       type pfas_cha_db
         character(len=16) :: name = ""    !          |PFAS compound name

@@ -23,7 +23,7 @@
       use soil_module, only : soil
       use hru_module, only : hru
       use pfas_cha_module, only : pfdiag_in, pfdiag_out, pfdiag_bury,        &
-     &                            pfdiag_active
+     &                            pfdiag_active, pfdiag_src
       use constituent_mass_module, only : ch_pfas_water, ch_pfas_benthic
 
       implicit none
@@ -50,6 +50,7 @@
           write (7710,'(a)') "PFAS in-stream (channel) routing mass balance "  &
      &      // "(run-cumulative, kg)"
           write (7710,'(a,i12)')   " reach-days with PFAS inflow : ", pfdiag_active
+          write (7710,'(a,es15.7)')" point-source input (kg)     : ", pfdiag_src
           write (7710,'(a,es15.7)')" cumulative reach inflow     : ", pfdiag_in
           write (7710,'(a,es15.7)')" cumulative reach outflow    : ", pfdiag_out
           write (7710,'(a,es15.7)')" cumulative burial (sink)    : ", pfdiag_bury

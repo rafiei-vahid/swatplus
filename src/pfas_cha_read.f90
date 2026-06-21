@@ -256,6 +256,29 @@
       end do
 
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+!!    (3b) PFAS POINT SOURCES (optional pfas_source.dat): per-channel constant
+!!         daily load (kg/day) -- WWTP effluent, contaminated-site leachate, AFFF.
+!!         Format: title, header, then "channel pfas_id load_kgday [name]" rows;
+!!         a row with channel<=0 (or EOF) ends the list. Missing file -> no sources.
+!!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
+      if (.not. allocated(pfas_src_load))                                   &
+     &  allocate (pfas_src_load(sp_ob%chandeg, npfas), source = 0.)
+      inquire (file="pfas_source.dat", exist=i_exist)
+      if (i_exist) then
+        open (173, file="pfas_source.dat")
+        read (173,*,iostat=eof) titldum
+        read (173,*,iostat=eof) header
+        do
+          read (173,*,iostat=eof) ich, id, water_ppt     !ich=channel, id=pfas, water_ppt reused as load kg/day
+          if (eof < 0) exit
+          if (ich <= 0) exit
+          if (ich <= sp_ob%chandeg .and. id >= 1 .and. id <= npfas)         &
+     &      pfas_src_load(ich, id) = pfas_src_load(ich, id) + water_ppt
+        end do
+        close (173)
+      end if
+
+!!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 !!    (4) ALLOCATE the %pfas slot on the constituent hydrographs that the
 !!        channel command carries.  Mirrors the %pest allocation in
 !!        hyd_connect.f90 (hcs*, hin_csz) and hyd_read_connect.f90 (obcs).

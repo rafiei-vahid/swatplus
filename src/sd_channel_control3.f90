@@ -20,6 +20,7 @@
       use water_allocation_module
       use maximum_data_module
       use pfas_module, only : npfas
+      use pfas_cha_module, only : pfas_src_load, pfdiag_src
 
       implicit none
 
@@ -29,6 +30,7 @@
     
       integer :: isd_db = 0           !              |
       integer :: ipest = 0            !              |
+      integer :: ipf = 0              !              |PFAS compound counter
       integer :: isalt = 0            !              |salt ion counter (rtb salt)
       real :: ebtm_m = 0.             !m             |erosion of bottom of channel
       real :: ebank_m = 0.            !m             |meander cut on one side
@@ -176,6 +178,14 @@
       !! Numerically validated == ch_rtpest (minus pesticide decay/volat/metab)
       !! to FP tolerance -- see pfas_xval_selftest. No-op unless PFAS active.
       if (npfas > 0 .and. cs_db%num_tot > 0) then
+        !! inject channel PFAS point sources (kg/day) into the inflow before
+        !! routing (WWTP effluent, contaminated-site leachate, AFFF)
+        if (allocated(pfas_src_load)) then
+          do ipf = 1, npfas
+            hcs1%pfas(ipf) = hcs1%pfas(ipf) + pfas_src_load(jrch, ipf)
+            pfdiag_src = pfdiag_src + pfas_src_load(jrch, ipf)
+          end do
+        end if
         call pfas_cha
         obcs(icmd)%hd(1)%pfas = hcs2%pfas
       end if

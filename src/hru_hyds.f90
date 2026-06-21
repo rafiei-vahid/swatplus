@@ -16,7 +16,9 @@
       use output_landscape_module
       use output_ls_pesticide_module
       use climate_module
-      
+      use pfas_module, only : npfas
+      use pfas_output_module, only : hpfasb_d
+
       implicit none
       
       external :: flow_hyd_ru_hru
@@ -31,6 +33,7 @@
       integer :: ipath = 0           !none          |counter 
       integer :: isalt = 0           !none          |counter for salt ions (rtb salt)
       integer :: ics = 0             !none          |counter for constituents (rtb cs)
+      integer :: ipf = 0             !none          |counter for PFAS compounds
       integer :: istep = 0           !none          |counter
       integer :: istep_bak = 0       !none          |counter
       integer :: day_cur = 0         !none          |counter
@@ -100,7 +103,15 @@
       do ics = 1, cs_db%num_cs !rtb cs
               obcs(icmd)%hd(3)%cs(ics) = (surqcs(j,ics)+sedmcs(j,ics)+urbqcs(j,ics)+wetqcs(j,ics)) * cnv_kg !kg of each constituent (surface runoff + attached)
       enddo
-      
+      !! PFAS surface hydrograph (3) = dissolved runoff + sediment-bound (kg)
+      !! gate on num_tot>0 (scalar; .and. is NOT short-circuit in Fortran) so
+      !! obcs(icmd)%hd + %pfas are guaranteed allocated (pfas_cha_read).
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        do ipf = 1, npfas
+          obcs(icmd)%hd(3)%pfas(ipf) = (hpfasb_d(j)%surq(ipf) + hpfasb_d(j)%sed(ipf)) * cnv_kg
+        end do
+      end if
+
       !recharge hydrograph (2)
       ob(icmd)%hd(2)%flo = sepbtm(j) * cnv_m3           !! recharge flow
       ob(icmd)%hd(2)%no3 = percn(j) * cnv_kg            !! recharge nitrate
@@ -117,7 +128,13 @@
       do ics = 1, cs_db%num_cs !rtb cs
         obcs(icmd)%hd(2)%cs(ics) = perccs(j,ics) * cnv_kg !kg of each constituent
       enddo
-      
+      !! PFAS recharge hydrograph (2) = percolation (kg); to aquifer, not channel total
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        do ipf = 1, npfas
+          obcs(icmd)%hd(2)%pfas(ipf) = hpfasb_d(j)%perc(ipf) * cnv_kg
+        end do
+      end if
+
       !lateral soil flow hydrograph (4)
       ob(icmd)%hd(4)%flo = latq(j) * cnv_m3                 !! lateral flow
       ob(icmd)%hdsep%flo_latq = latq(j) * cnv_m3            !!rtb gwflow - hydrograph separation
@@ -135,7 +152,13 @@
       do ics = 1, cs_db%num_cs !rtb cs
         obcs(icmd)%hd(4)%cs(ics) = latqcs(j,ics) * cnv_kg !kg of each constituent
       enddo
-      
+      !! PFAS lateral hydrograph (4) = lateral soil flow PFAS (kg)
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        do ipf = 1, npfas
+          obcs(icmd)%hd(4)%pfas(ipf) = hpfasb_d(j)%latq(ipf) * cnv_kg
+        end do
+      end if
+
       !tile flow hydrograph (5)
       ob(icmd)%hd(5)%flo = qtile * cnv_m3               !! tile flow
       ob(icmd)%hd(5)%no3 = tileno3(j) * cnv_kg          !! tile flow nitrate 
@@ -184,7 +207,13 @@
         obcs(icmd)%hd(1)%cs(ics) = obcs(icmd)%hd(3)%cs(ics) + obcs(icmd)%hd(4)%cs(ics) +    &  !total = surface runoff + lateral flow + tile flow
                                                               obcs(icmd)%hd(5)%cs(ics)
       enddo
-      
+      !! PFAS total outflow hydrograph (1) = surface(3) + lateral(4); no tile (hpfasb_d has no tileq), perc(2)->aquifer
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        do ipf = 1, npfas
+          obcs(icmd)%hd(1)%pfas(ipf) = obcs(icmd)%hd(3)%pfas(ipf) + obcs(icmd)%hd(4)%pfas(ipf)
+        end do
+      end if
+
       !! set subdaily hydrographs
       !! set previous and next days for adding previous and translating to next
       day_cur = ob(icmd)%day_cur

@@ -68,7 +68,7 @@
 !!      act_dep=0.1 m.  Initial water/benthic conc default to zero.
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
-      use pfas_module, only : npfas, pfas_num
+      use pfas_module, only : npfas, pfas_num, pfasdb
       use pfas_cha_module
       use constituent_mass_module
       use sd_channel_module, only : sd_ch
@@ -229,8 +229,16 @@
         por = 1. - sd_ch(ich)%ch_bd / 2.65
         if (por < 0.) por = 0.
         if (por > 1.) por = 1.
+        !! PFAS aquatic mixing velocity (diffusion), dimensioned by npfas.
+        !! Same formula as sd_hydsed_init for pesticides (aq_mix), but with PFAS
+        !! molar mass converted kg/mol -> g/mol (mw*1000) so it matches a
+        !! pesticide of identical mol_wt exactly (ch_rtpest cross-validation).
+        if (.not. allocated(sd_ch(ich)%aq_mix_pfas))                       &
+     &    allocate (sd_ch(ich)%aq_mix_pfas(npfas), source = 0.)
         do ipf = 1, npfas
           jpf = pfas_num(ipf)
+          sd_ch(ich)%aq_mix_pfas(ipf) = (pfasdb(jpf)%mw * 1000.)           &
+     &        ** (-.6666) * (1. - sd_ch(ich)%ch_bd / 2.65) * (69.35 / 365)
           !! water column (kg): ng/L -> kg/m^3 is 1.e-9
           ch_pfas_water(ich)%pfas(ipf) =                                  &
      &        pfas_water_ini(jpf)%water(1) * 1.e-9 * ch_stor(ich)%flo

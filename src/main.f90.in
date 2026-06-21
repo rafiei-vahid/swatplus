@@ -12,6 +12,7 @@
       external :: proc_bsn, proc_date_time, proc_db, proc_read, hyd_connect, exco_db_read, dr_db_read
       external :: cli_lapse, object_read_output, om_water_init, pest_cha_res_read, path_cha_res_read
       external :: salt_cha_read, cs_cha_read, lsu_read_elements, proc_hru, proc_cha, proc_aqu, pfas_read, pfas_output
+      external :: pfas_cha_read, pfas_xval_selftest
       external :: dtbl_lum_read, hru_lte_read, proc_cond, res_read_weir, dtbl_res_read, dtbl_scen_read
       external :: cal_cond_read, manure_allocation_read, dtbl_flocon_read, om_treat_read, om_use_read
       external :: water_treatment_read, water_use_read, water_tower_read, water_pipe_read, water_allocation_read
@@ -37,8 +38,16 @@
      &          "    Program reading . . . executing",/)
       
       open (888,file="erosion.txt",recl = 1500)
-      
-      call proc_bsn   
+
+      !! PFAS in-stream routing cross-validation self-test (opt-in via sentinel
+      !! file "pfas_xval.run"); runs standalone before any model init and STOPs.
+      block
+        logical :: xv_exist
+        inquire (file="pfas_xval.run", exist=xv_exist)
+        if (xv_exist) call pfas_xval_selftest
+      end block
+
+      call proc_bsn
       call proc_date_time
       call proc_db
       call proc_read
@@ -75,6 +84,12 @@
       call pfas_read
 
       call proc_cha
+
+      !! PFAS in-stream init (after proc_cha so sp_ob%chandeg + sd_ch geometry +
+      !! obcs exist; no-op if npfas==0). Allocates channel pools + %pfas hydrograph
+      !! slots + aq_mix_pfas; reads optional pfas_cha.dat.
+      call pfas_cha_read
+
       call proc_aqu
       
       !! read decision table data for conditional management

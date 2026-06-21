@@ -218,6 +218,7 @@
         type (floodplain_parameters) :: fp
         real, dimension (:), allocatable :: kd      !           |aquatic mixing velocity (diffusion/dispersion)-using mol_wt
         real, dimension (:), allocatable :: aq_mix  ! m/day     |aquatic mixing velocity (diffusion/dispersion)-using mol_wt
+        real, dimension (:), allocatable :: aq_mix_pfas  ! m/day |PFAS aquatic mixing velocity (diffusion)-using PFAS mol_wt; dim npfas
         character (len=2) :: overbank = ""          !           |"ib"=in bank; "ob"=overbank flood
       end type swatdeg_channel_dynamic
       type (swatdeg_channel_dynamic), dimension (:), allocatable :: sd_ch

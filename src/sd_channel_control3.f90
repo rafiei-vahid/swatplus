@@ -19,12 +19,13 @@
       use channel_velocity_module
       use water_allocation_module
       use maximum_data_module
-      
-      implicit none     
-      
+      use pfas_module, only : npfas
+
+      implicit none
+
       external :: actions, ch_rtmusk, ch_rtpath, ch_rtpest, ch_temp, ch_watqual4, conditions, gwflow_canal, &
                   gwflow_channel_exch, gwflow_floodplain, gwflow_satexcess, gwflow_tile, rcurv_interp_flo, &
-                  sd_channel_sediment3, wallo_control, cli_lapse
+                  sd_channel_sediment3, wallo_control, cli_lapse, pfas_cha
     
       integer :: isd_db = 0           !              |
       integer :: ipest = 0            !              |
@@ -169,6 +170,14 @@
         call ch_rtpest
         !call ch_rtpest2 -  mike winchell's new routine for pesticide routing
         obcs(icmd)%hd(1)%pest = hcs2%pest
+      end if
+
+      !! route PFAS (dedicated linear-Koc in-stream: settle/resus/diffuse/bury).
+      !! Numerically validated == ch_rtpest (minus pesticide decay/volat/metab)
+      !! to FP tolerance -- see pfas_xval_selftest. No-op unless PFAS active.
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        call pfas_cha
+        obcs(icmd)%hd(1)%pfas = hcs2%pfas
       end if
       
       !! route pathogens

@@ -62,8 +62,8 @@
       use sd_channel_module
       use pfas_cha_module
       use pfas_module, only : npfas, pfas_num
-      use hydrograph_module, only : jrch, ht1, ht2, ch_stor, hcs1, hcs2
-      use constituent_mass_module, only : ch_pfas_water, ch_pfas_benthic
+      use hydrograph_module, only : jrch, ht1, ht2, ch_stor
+      use constituent_mass_module, only : ch_pfas_water, ch_pfas_benthic, hcs1, hcs2
 
       implicit none
 
@@ -80,7 +80,7 @@
       real :: tday = 0.         !none          |flow duration (fraction of 24 hr)
       real :: por = 0.          !none          |porosity of bottom sediments
       real :: rto_out = 0.      !none          |ratio of outflow to (outflow + storage)
-      real :: wtrin = 0.        !m^3 H2O       |volume of water entering+stored in reach
+      !! wtrin is a module global (channel_module) -- shared with ch_rtpest
 
       !! zero daily outputs for this reach
       chpfas_d(jrch) = chpfasz
@@ -165,7 +165,9 @@
           chpfmass = chpfmass + chpfas_d(jrch)%pfas(ipf)%resus
 
           !! calculate diffusion of PFAS between reach water and sediment
-          chpfas_d(jrch)%pfas(ipf)%difus = sd_ch(jrch)%aq_mix(ipf) *     &
+          !! (aq_mix_pfas is PFAS-mol_wt-based + dimensioned by npfas; aq_mix is
+          !!  pesticide-dimensioned -- see sd_channel_module / pfas_cha_read)
+          chpfas_d(jrch)%pfas(ipf)%difus = sd_ch(jrch)%aq_mix_pfas(ipf) *  &
      &        (fd2 * sedpfmass - frsol * chpfmass) * tday / depth
           if (chpfas_d(jrch)%pfas(ipf)%difus > 0.) then
             if (chpfas_d(jrch)%pfas(ipf)%difus > sedpfmass) then
@@ -211,11 +213,12 @@
         !! benthic reaction term OMITTED for PFAS (non-degradable)
 
         !! set new water-column mass (in + store) after processes
+        !! (matches ch_rtpest exactly for cross-validation parity: the dead
+        !!  write to hcs1 and the no-zero dry branch mirror ch_rtpest L200-204)
         if (wtrin > 1.e-6) then
           hcs1%pfas(ipf) = chpfmass
         else
           sedpfmass = sedpfmass + chpfmass
-          chpfmass = 0.
         end if
         ch_pfas_benthic(jrch)%pfas(ipf) = sedpfmass
 

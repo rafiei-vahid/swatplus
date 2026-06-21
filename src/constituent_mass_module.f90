@@ -87,6 +87,7 @@
         real, dimension (:), allocatable :: csc         !constituent concentration (mg/L)
         real, dimension (:), allocatable :: cs_sorb     !sorbed constituent mass (kg/ha)
         real, dimension (:), allocatable :: csc_sorb    !sorbed constituent concentration (mg/kg)
+        real, dimension (:), allocatable :: pfas        !PFAS mass (kg) - sol+sorbed combined, repartitioned each day by frsol
       end type constituent_mass
       
       ! irrigation water constituent mass - dimensioned by hru
@@ -116,6 +117,20 @@
       type (constituent_mass), dimension (:), allocatable :: ch_benthic
       type (constituent_mass), dimension (:), allocatable :: ch_water_init
       type (constituent_mass), dimension (:), allocatable :: ch_benthic_init
+
+      ! storing water and benthic PFAS in channel (dimensioned by channel; %pfas by npfas)
+      type (constituent_mass), dimension (:), allocatable :: ch_pfas_water
+      type (constituent_mass), dimension (:), allocatable :: ch_pfas_benthic
+      type (constituent_mass), dimension (:), allocatable :: ch_pfas_water_init
+      type (constituent_mass), dimension (:), allocatable :: ch_pfas_benthic_init
+
+      !initial PFAS water-benthic concentrations for channels
+      type pfas_water_init_concentrations
+        character (len=16) :: name = ""
+        real, dimension (:), allocatable :: water     !! ng/L  |initial water-column PFAS conc
+        real, dimension (:), allocatable :: benthic   !! ng/g  |initial bed-sediment PFAS conc
+      end type pfas_water_init_concentrations
+      type (pfas_water_init_concentrations), dimension(:), allocatable :: pfas_water_ini
       
       ! water treatment plant storage
       type (constituent_mass), dimension (:), allocatable :: wtp_cs_stor
@@ -630,6 +645,13 @@
         do ics = 1, cs_db%num_cs
           hydcs3%cs(ics) =  hydcs2%cs(ics) + hydcs1%cs(ics)
         end do
+        !! PFAS: count lives in pfas_module (avoid module cycle); guard by allocation
+        if (allocated(hydcs1%pfas) .and. allocated(hydcs2%pfas)) then
+          allocate (hydcs3%pfas(size(hydcs1%pfas)), source = 0.)
+          do ipest = 1, size(hydcs1%pfas)
+            hydcs3%pfas(ipest) = hydcs2%pfas(ipest) + hydcs1%pfas(ipest)
+          end do
+        end if
       return
       end function hydcsout_add
       
@@ -664,6 +686,13 @@
         do ics = 1, cs_db%num_cs !rtb cs
           hydcs2%cs(ics) =  const * hydcs1%cs(ics)
         end do
+        !! PFAS (guard by allocation; pfas count not in cs_db)
+        if (allocated(hydcs1%pfas)) then
+          allocate (hydcs2%pfas(size(hydcs1%pfas)), source = 0.)
+          do ipest = 1, size(hydcs1%pfas)
+            hydcs2%pfas(ipest) =  const * hydcs1%pfas(ipest)
+          end do
+        end if
         return
       end function hydcsout_mult_const
       
@@ -699,6 +728,13 @@
         do ics = 1, cs_db%num_cs !rtb cs
           hydcs2%cs(ics) =  vol_m3 * hydcs1%cs(ics) / 1000.
         end do
+        !! PFAS (guard by allocation; pfas count not in cs_db)
+        if (allocated(hydcs1%pfas)) then
+          allocate (hydcs2%pfas(size(hydcs1%pfas)), source = 0.)
+          do ipest = 1, size(hydcs1%pfas)
+            hydcs2%pfas(ipest) =  vol_m3 * hydcs1%pfas(ipest) / 1000.
+          end do
+        end if
         return
       end subroutine hydcsout_conc_mass
       

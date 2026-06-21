@@ -45,6 +45,7 @@
         real :: bury    = 0.    !kg |PFAS buried in bed sediment
         real :: water   = 0.    !kg |PFAS in reach water at end of day
         real :: benthic = 0.    !kg |PFAS in bed sediment at end of day
+        real :: conc    = 0.    !ng/L |total PFAS conc of reach outflow (calibration target)
       end type pfas_cha_processes
 
       type pfas_cha_output

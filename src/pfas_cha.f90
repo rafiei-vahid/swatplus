@@ -237,6 +237,17 @@
         chpfas_d(jrch)%pfas(ipf)%water   = ch_pfas_water(jrch)%pfas(ipf)
         chpfas_d(jrch)%pfas(ipf)%benthic = ch_pfas_benthic(jrch)%pfas(ipf)
 
+        !! total water-column concentration of reach outflow (ng/L); kg/m3*1e9
+        !! = ng/L. The in-stream calibration target vs grab samples. Guarded at
+        !! 1 m3/day outflow so essentially-dry headwater reaches (tiny denominator
+        !! -> unphysical spikes) report 0 rather than blowing up; flowing reaches,
+        !! incl. all gauged/monitored mainstem reaches, are unaffected.
+        if (ht2%flo > 1.0) then
+          chpfas_d(jrch)%pfas(ipf)%conc = hcs2%pfas(ipf) / ht2%flo * 1.e9
+        else
+          chpfas_d(jrch)%pfas(ipf)%conc = 0.
+        end if
+
         !! in-stream routing run-cumulative mass balance (-> pfas_cha_balance.out)
         pfdiag_in    = pfdiag_in   + chpfas_d(jrch)%pfas(ipf)%tot_in
         pfdiag_out   = pfdiag_out  + chpfas_d(jrch)%pfas(ipf)%sol_out          &

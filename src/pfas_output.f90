@@ -22,6 +22,9 @@
       use hydrograph_module, only : sp_ob
       use soil_module, only : soil
       use hru_module, only : hru
+      use pfas_cha_module, only : pfdiag_in, pfdiag_out, pfdiag_bury,        &
+     &                            pfdiag_active
+      use constituent_mass_module, only : ch_pfas_water, ch_pfas_benthic
 
       implicit none
 
@@ -30,6 +33,33 @@
       real(8), dimension(:), allocatable :: tinit, tfinal, tsurq, tlatq, tperc, tsed
 
       if (npfas <= 0) return
+
+      !! in-stream PFAS routing mass-balance summary (no-op if pfas_cha never ran)
+      block
+        integer :: ic, ipf
+        real(8) :: stored
+        stored = 0.d0
+        if (allocated(ch_pfas_water)) then
+          do ic = 1, ubound(ch_pfas_water, 1)
+            do ipf = 1, npfas
+              stored = stored + ch_pfas_water(ic)%pfas(ipf)                  &
+     &                        + ch_pfas_benthic(ic)%pfas(ipf)
+            end do
+          end do
+          open (7710, file="pfas_cha_balance.out")
+          write (7710,'(a)') "PFAS in-stream (channel) routing mass balance "  &
+     &      // "(run-cumulative, kg)"
+          write (7710,'(a,i12)')   " reach-days with PFAS inflow : ", pfdiag_active
+          write (7710,'(a,es15.7)')" cumulative reach inflow     : ", pfdiag_in
+          write (7710,'(a,es15.7)')" cumulative reach outflow    : ", pfdiag_out
+          write (7710,'(a,es15.7)')" cumulative burial (sink)    : ", pfdiag_bury
+          write (7710,'(a,es15.7)')" final channel storage       : ", real(stored)
+          write (7710,'(a)') " note: in - out == bury + final storage (no "    &
+     &      // "decay/volat); reach in/out are pass-through sums across reaches"
+          close (7710)
+        end if
+      end block
+
       if (.not. allocated(pfas_init_hru)) return
       nhru = sp_ob%hru
       if (nhru <= 0) return

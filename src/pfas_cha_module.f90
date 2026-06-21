@@ -17,6 +17,12 @@
       real :: frsol = 0.        !none |fraction of reach PFAS that is soluble
       real :: frsrb = 0.        !none |fraction of reach PFAS that is sorbed
 
+      !! in-stream routing run-cumulative diagnostics (kg) + activity counter
+      real, save    :: pfdiag_in   = 0.   !! sum of per-reach-day inflow
+      real, save    :: pfdiag_out  = 0.   !! sum of per-reach-day outflow (sol+sor)
+      real, save    :: pfdiag_bury = 0.   !! sum of per-reach-day burial (permanent sink)
+      integer, save :: pfdiag_active = 0  !! count of reach-days with nonzero PFAS inflow
+
       !! per-PFAS in-stream routing parameters (extends pfasdb)
       type pfas_cha_db
         character(len=16) :: name = ""    !          |PFAS compound name

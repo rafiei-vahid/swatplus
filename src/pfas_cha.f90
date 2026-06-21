@@ -237,6 +237,14 @@
         chpfas_d(jrch)%pfas(ipf)%water   = ch_pfas_water(jrch)%pfas(ipf)
         chpfas_d(jrch)%pfas(ipf)%benthic = ch_pfas_benthic(jrch)%pfas(ipf)
 
+        !! in-stream routing run-cumulative mass balance (-> pfas_cha_balance.out)
+        pfdiag_in    = pfdiag_in   + chpfas_d(jrch)%pfas(ipf)%tot_in
+        pfdiag_out   = pfdiag_out  + chpfas_d(jrch)%pfas(ipf)%sol_out          &
+     &                             + chpfas_d(jrch)%pfas(ipf)%sor_out
+        pfdiag_bury  = pfdiag_bury + chpfas_d(jrch)%pfas(ipf)%bury
+        if (chpfas_d(jrch)%pfas(ipf)%tot_in > 1.e-12)                          &
+     &      pfdiag_active = pfdiag_active + 1
+
       end do
 
       return

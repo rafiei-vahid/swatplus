@@ -16,6 +16,7 @@
       use hydrograph_module
       use time_module
       use constituent_mass_module
+      use pfas_module, only : npfas
       use output_landscape_module
       use salt_module !rtb salt
       use cs_module !rtb cs
@@ -42,6 +43,7 @@
       real :: rto = 0.                   !none        |cloud cover factor
       integer :: istep = 0               !            |
       integer :: ipest = 0               !            |
+      integer :: ipf = 0                 !            |PFAS compound counter
       integer :: isalt = 0               !            |salt ion counter
       integer :: ics = 0                 !            |constituent counter
       integer :: hru_num = 0
@@ -130,6 +132,9 @@
               do ics = 1, cs_db%num_cs !rtb cs
                 hcs1%cs(ics) = obcs(iob)%hd(ihtypno)%cs(ics)    !store constituent loads from source object
               end do
+              do ipf = 1, npfas
+                hcs1%pfas(ipf) = obcs(iob)%hd(ihtypno)%pfas(ipf)    !store PFAS loads from source object
+              end do
             else
               !! don't apply dr to recharge
               ht1 = ob(iob)%hd(ihtypno)
@@ -143,6 +148,9 @@
               do ics = 1, cs_db%num_cs !rtb cs
                 hcs1%cs(ics) = obcs(iob)%hd(ihtypno)%cs(ics)
               end do
+              do ipf = 1, npfas
+                hcs1%pfas(ipf) = obcs(iob)%hd(ihtypno)%pfas(ipf)
+              end do
             end if
             ht1 = ef * ht1
             ob(icmd)%hd(ihtypno) = ob(icmd)%hd(ihtypno) + ht1
@@ -151,8 +159,12 @@
             do ipest = 1, cs_db%num_pests
               obcs(icmd)%hd(ihtypno)%pest(ipest) = obcs(icmd)%hd(ihtypno)%pest(ipest) + hcs1%pest(ipest)
             end do
+            !! PFAS: aggregate HRU land loads into the routing-unit outflow
+            do ipf = 1, npfas
+              obcs(icmd)%hd(ihtypno)%pfas(ipf) = obcs(icmd)%hd(ihtypno)%pfas(ipf) + hcs1%pfas(ipf)
+            end do
             !rtb salt
-            do isalt = 1, cs_db%num_salts 
+            do isalt = 1, cs_db%num_salts
               obcs(icmd)%hd(ihtypno)%salt(isalt) = obcs(icmd)%hd(ihtypno)%salt(isalt) + hcs1%salt(isalt) !add salt loads to routing unit object
               if(ob(iob)%typ == "hru") then !only store fluxes if they come from HRUs
                 rusaltb_d(iru)%hd(ihtypno)%salt(isalt) = rusaltb_d(iru)%hd(ihtypno)%salt(isalt) + hcs1%salt(isalt)

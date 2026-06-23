@@ -78,6 +78,9 @@
       integer :: k !swatplus_perf: index within a wave
       logical :: use_wave !swatplus_perf: drive HRU land phase wave-by-wave
       logical :: use_objwave !swatplus_perf Phase C: full-DAG wave over ALL objects
+      logical, save :: routing_serial = .false.       !swatplus_perf: SWATPLUS_ROUTING_SERIAL=1 -> byte-identical mode
+      logical, save :: routing_serial_init = .false.  !swatplus_perf: env checked once
+      character(len=8) :: routing_serial_env = ""     !swatplus_perf: env value
       integer :: n_threads !swatplus_perf: OpenMP team size (1 if built/run serial)
       integer :: lev_end !swatplus_perf: end (exclusive) of a fused narrow-level run
       integer :: lv2 !swatplus_perf: inner level index within a fused narrow run
@@ -111,6 +114,18 @@
 
       use_objwave = (n_threads > 1 .and. hru_wave_ready .and. obj_nwave > 0 .and.          &
                      db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
+
+      !! swatplus_perf: SWATPLUS_ROUTING_SERIAL=1 forces the byte-identical configuration --
+      !! HRU land phase parallel, channel routing serial (command order). Use this when in-stream
+      !! water quality must be thread-count invariant; ifx places the hydrograph derived-type
+      !! temporaries in shared static storage, which races only in the parallel routing phase.
+      !! Checked once on the first command() call (cheap; routing_serial_init defaults .false.).
+      if (.not. routing_serial_init) then
+        call get_environment_variable ("SWATPLUS_ROUTING_SERIAL", routing_serial_env)
+        routing_serial = (trim(routing_serial_env) == "1")
+        routing_serial_init = .true.
+      end if
+      if (routing_serial) use_objwave = .false.
 
       if (use_objwave) then
         !! swatplus_perf: ONE parallel region for the whole day, not one per level.

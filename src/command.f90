@@ -20,6 +20,7 @@
       use reservoir_module
       use organic_mineral_mass_module
       use constituent_mass_module
+      use pfas_module, only : npfas
       use hru_module, only : ihru, hru
       use basin_module
       use netcdf_output_module
@@ -33,7 +34,7 @@
       implicit none
       
       external :: aqu_1d_control, aqu_cs_output, aqu_pesticide_output, aqu_salt_output, aquifer_output, &
-                  ch_cs_output, ch_salt_output, cha_pesticide_output, channel_output, constit_hyd_mult, &
+                  ch_cs_output, ch_salt_output, cha_pesticide_output, cha_pfas_output, channel_output, constit_hyd_mult, &
                   cs_str_output, flow_dur_curve, gwflow_simulate, hru_carbon_output, hru_control, &
                   hru_cs_output, hru_lte_control, hru_lte_output, hru_output, hru_pathogen_output, &
                   hru_pesticide_output, hru_salt_output, hydin_output, hydout_output, manure_demand_output, &
@@ -302,10 +303,11 @@
           call sd_chanmorph_output (jrch)
           call sd_chanbud_output (jrch)
           call sd_channel_output (jrch)
-          if (cs_db%num_tot > 0) then 
-            call cha_pesticide_output (jrch)   
+          if (cs_db%num_tot > 0) then
+            call cha_pesticide_output (jrch)
             !call ch_pathogen_output (jrch)
-          end if   
+          end if
+          if (npfas > 0) call cha_pfas_output (jrch)
           if (cs_db%num_salts > 0) then !rtb salt
             call ch_salt_output (jrch)
           endif

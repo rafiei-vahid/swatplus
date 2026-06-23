@@ -13,7 +13,7 @@
                   hru_lte_read, lsu_read_elements, manure_allocation_read, om_treat_read, om_use_read, &
                   path_cha_res_read, pest_cha_res_read, salt_cha_read, water_allocation_read, &
                   water_pipe_read, water_tower_read, water_treatment_read, water_use_read, cs_uptake, &
-                  shade_factor_read
+                  shade_factor_read, pfas_read
              
       call ch_read_temp
       call cli_read_atmodep

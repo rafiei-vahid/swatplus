@@ -9,6 +9,7 @@
       use conditional_module
       use water_body_module
       use constituent_mass_module  !! added nbs
+      use pfas_module, only : npfas
       
       implicit none
 
@@ -25,6 +26,9 @@
       real :: weir_hgt
       real :: alpha_up
       real :: alpha_down
+      integer :: ipf                 !none          |PFAS compound counter
+      real :: pfin                   !kg            |PFAS in reservoir (inflow + storage)
+      real :: pfout                  !kg            |PFAS leaving reservoir this day
 
       external :: gwflow_reservoir
       integer :: dom !           |Day of month
@@ -224,7 +228,26 @@
           call res_cs(jres, icon, iob)
           obcs(icmd)%hd(1)%cs = hcs2%cs
         endif
-        
+
+        !! reservoir PFAS: mass-conserving CSTR (storage + dilution; no benthic
+        !! sink -- PFOS is mobile). Sets hcs2%pfas so the whole-type copy below
+        !! propagates it instead of stale channel-phase values.
+        if (npfas > 0) then
+          if (.not. allocated(res_water(jres)%pfas))                          &
+     &      allocate (res_water(jres)%pfas(npfas), source = 0.)
+          do ipf = 1, npfas
+            pfin = obcs(icmd)%hin(1)%pfas(ipf) + res_water(jres)%pfas(ipf)
+            if (res(jres)%flo > 1.) then
+              pfout = ht2%flo * pfin / res(jres)%flo   !fraction leaving = outvol/resvol
+            else
+              pfout = pfin                              !empty reservoir -> pass through
+            end if
+            if (pfout > pfin) pfout = pfin
+            res_water(jres)%pfas(ipf) = pfin - pfout    !remaining storage
+            hcs2%pfas(ipf) = pfout
+          end do
+        end if
+
         !! set values for outflow variables
         ob(icmd)%hd(1) = ht2
         if (cs_db%num_tot > 0) then

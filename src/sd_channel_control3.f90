@@ -19,12 +19,14 @@
       use channel_velocity_module
       use water_allocation_module
       use maximum_data_module
-      
-      implicit none     
-      
+      use pfas_module, only : npfas
+      use pfas_cha_module, only : pfas_src_load, pfdiag_src
+
+      implicit none
+
       external :: actions, ch_rtmusk, ch_rtpath, ch_rtpest, ch_temp, ch_watqual4, conditions, gwflow_canal, &
                   gwflow_channel_exch, gwflow_floodplain, gwflow_satexcess, gwflow_tile, rcurv_interp_flo, &
-                  sd_channel_sediment3, wallo_control, cli_lapse
+                  sd_channel_sediment3, wallo_control, cli_lapse, pfas_cha
     
       integer :: isd_db !              |
       integer :: ipest !              |
@@ -42,6 +44,7 @@
       real :: gw_salt_in !kg            |salt loading to channel from aquifer
       real :: gw_cs_in !kg            |constituent loading to channel from aquifer
       real :: seep_mass !kg            |salt mass in seepage water
+      integer :: ipf                 !none          |PFAS compound counter
       real :: salt_conc(8) = 0.       !kg            |salt concentration in channel water
       real :: cs_conc(8) = 0.         !kg            |constituent concentration in channel water
       real :: conc_chng !              |change in concentration (and mass) in channel sol and org N and P
@@ -171,6 +174,22 @@
         call ch_rtpest
         !call ch_rtpest2 -  mike winchell's new routine for pesticide routing
         obcs(icmd)%hd(1)%pest = hcs2%pest
+      end if
+
+      !! route PFAS (dedicated linear-Koc in-stream: settle/resus/diffuse/bury).
+      !! Numerically validated == ch_rtpest (minus pesticide decay/volat/metab)
+      !! to FP tolerance -- see pfas_xval_selftest. No-op unless PFAS active.
+      if (npfas > 0 .and. cs_db%num_tot > 0) then
+        !! inject channel PFAS point sources (kg/day) into the inflow before
+        !! routing (WWTP effluent, contaminated-site leachate, AFFF)
+        if (allocated(pfas_src_load)) then
+          do ipf = 1, npfas
+            hcs1%pfas(ipf) = hcs1%pfas(ipf) + pfas_src_load(jrch, ipf)
+            pfdiag_src = pfdiag_src + pfas_src_load(jrch, ipf)
+          end do
+        end if
+        call pfas_cha
+        obcs(icmd)%hd(1)%pfas = hcs2%pfas
       end if
       
       !! route pathogens

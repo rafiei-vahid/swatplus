@@ -1,91 +1,79 @@
-[![Release](https://img.shields.io/github/release/swat-model/swatplus.svg?style=flat-square)](https://github.com/swat-model/swatplus/releases)
+# SWAT+ — SWATGenX accelerated fork
 
-# SWAT+
+> **This is a divergent fork of [`swat-model/swatplus`](https://github.com/swat-model/swatplus),
+> maintained for the SWATGenX platform.** It is an **independent engine line**: it adds
+> shared-memory (OpenMP) parallelism, NetCDF output, and an in-stream + land-phase PFAS
+> fate-and-transport module on top of the upstream science. It **fetches** upstream changes
+> selectively but does **not** track toward upstream contribution (see *Relationship to upstream*).
+> Because of the reentrancy refactor (see below) the engine **requires the Intel `ifx` compiler**;
+> `gfortran` is not supported for production-scale models.
 
-The **Soil and Water Assessment Tool Plus** [SWAT+](https://swatplus.gitbook.io/docs) is an open source model jointly developed by the USDA Agricultural Research Service ([USDA-ARS](http://ars.usda.gov)) and Texas A&M AgriLife Research, part of The Texas A&M University System. Model contributions have been made by Colorado State University and others. SWAT+ is a small watershed to river basin-scale model to simulate the quality and quantity of surface and ground water and predict the environmental impact of land use, land management practices, and climate change. SWAT is widely used in assessing soil erosion prevention and control, non-point source pollution control and regional management in watersheds.
+The **Soil and Water Assessment Tool Plus** [SWAT+](https://swatplus.gitbook.io/docs) is an open-source
+model jointly developed by the USDA Agricultural Research Service ([USDA-ARS](http://ars.usda.gov)) and
+Texas A&M AgriLife Research. SWAT+ simulates the quantity and quality of surface and ground water at
+small-watershed to river-basin scale. This fork preserves that science unchanged and accelerates the
+runtime.
 
-This repository contains the latest SWAT+ source code and some test data to create and test the executable for various compiler and platforms. 
+## What this fork adds over upstream
 
-## Repository
+1. **Shared-memory (OpenMP) parallelism** — a routing-aware wavefront over the daily object DAG with
+   per-thread "current-object" state, giving multi-core speedup without changing results. Build option
+   `SWATPLUS_OPENMP=ON`.
+2. **NetCDF output backend** — per-stream NetCDF-4 output (`*_day.nc`, …) when `cdfout = y` in
+   `print.prt`. Build option `SWATPLUS_NETCDF=ON`.
+3. **PFAS fate-and-transport** — land-phase (`pfas_lch`, `pfas_sed`) and in-stream (`pfas_cha`)
+   modules (PFOS-like Freundlich sorption, point-source injection, daily channel concentrations),
+   activated only when a model carries PFAS inputs (`pfas.dat`).
+4. **Reentrancy refactor** — engine-wide removal of implicit-`SAVE` locals (the Fortran
+   "`var = 0` initializer ⇒ static" hazard) and per-thread scratch, so every routine is thread-safe.
+   This is the change that makes the fork `ifx`-only.
 
-Get the SWAT+ sources by cloning the forked repository using `git`.  
+## Building this fork (Intel `ifx` + NetCDF + OpenMP)
+
+Requirements: Intel oneAPI (`ifx`), CMake, an `ifx`-built NetCDF-Fortran (`libnetcdff`), `git`.
 
 ```bash
-$ git clone https://github.com/<user>/swatplus.git
+# 1. one-time: build NetCDF-Fortran against ifx (see swatplus_perf/scripts/build_netcdf_ifx.sh)
+# 2. source the Intel runtime and point pkg-config at the ifx NetCDF
+source /opt/intel/oneapi/setvars.sh
+export PKG_CONFIG_PATH=/path/to/netcdf-ifx/lib/pkgconfig:$PKG_CONFIG_PATH
+
+# 3. configure + build (the two options below are what make this the production engine)
+cmake -S . -B build/ifx -DCMAKE_BUILD_TYPE=Release \
+      -DCMAKE_Fortran_COMPILER=ifx -DCMAKE_Fortran_FLAGS="-O3" \
+      -DSWATPLUS_NETCDF=ON -DSWATPLUS_OPENMP=ON
+cmake --build build/ifx -j"$(nproc)"
 ```
 
-Or, download the sources directly from the artifacts, unzip. Use a tagged version (preferred).
+Runtime: `OMP_NUM_THREADS=<n>` sets the core count; `SWATPLUS_ROUTING_SERIAL=1` selects the
+byte-identical (serial-routing) mode.
 
-```bash
-$ wget https://github.com/swat-model/swatplus/archive/refs/tags/61.0.zip
-```
+## Reproducibility / correctness standard
 
-## Directory Structure
+The acceleration preserves the science to a documented standard (methodology paper: *"Accelerating a
+Regional Hyper-Resolution SWAT+ Model Without Changing the Science"*):
 
-The directory structure is shown below. The `build` directory gets created and populated during the generation of the `cmake` files and the `cmake` build. 
+- **Byte-parity** — bit-for-bit identical output is the goal, and **thread-count invariance**
+  (output independent of `OMP_NUM_THREADS`) doubles as an automatable data-race detector. `N=1`
+  reproduces the original serial order exactly.
+- **Documented model-equivalence** — where a parallel reduction reorders a summation, aggregates may
+  differ at the last ULP (≤ 1e-3 absolute, ~1e-7 relative); the core science (flow, sediment, water
+  balance, PFAS) stays byte-identical.
+- **Standing gate** — `swatplus_perf/scripts/byteid_rogue_pfas.sh` runs the full SW+GW PFAS Rogue model
+  at `N=1` vs `N=4` and asserts this standard before any engine is promoted to production.
 
-```
-swatplus
-├── build
-│   ├── ...
-│   ├── *.mod
-│   ├── Testing
-│   └── CMakeFiles
-│       ├── Makefile.cmake
-│       ├── ...
-│       └── swatplus-<ver>.dir
-│           ├── *.mod.tstamp
-│           ├── src
-│           └── ...
-├── data                      ---> contains all data sets for testing
-│   ├── Ames_sub1
-│   ├── <other>
-│   └── ...
-├── src                       ---> contains all swatplus Fortran source files
-│   └── *.f90
-├── test                      ---> contains all unit tests sources
-│   ├── check.py
-│   └── ...
-├── doc                       ---> contains all hosted documentation
-├── CMakeLists.txt            ---> cmake project file
-├── ford.md.in                ---> FORD Documentation creation project
-├── README.md                 ---> this file
-└── ...
-```
+## Relationship to upstream
 
-## Developing SWAT+
+This fork **diverges permanently** from `swat-model/swatplus`. The reentrancy refactor and `ifx`
+dependency make the changes a poor fit for general SWAT+ users, so they are not mainlined. The fork
+**pulls** future upstream engine changes and accepts/rejects them per-change; it does not push back.
 
-This GitHub repository is setup to build, test, and deploy SWAT+ using the CMake tool. CMake is a cross-platform build tool that can be used at the command line but it is also supported through various IDEs, etc. More information can be found at [http://cmake.org](http://cmake.org). 
+## Directory structure & upstream docs
 
-In addition to CMake, the following tools are also needed:
+The CMake layout, scenario tests, and coding conventions follow upstream:
 
-- `git` tool for version control
-- `make` tool (for building)
-- `gfortran` or `ifort/ifx` compiler and linker (for compiling/linking)
-- `python3` (for testing, optional)
-- `ford` (for documentation generation)
-
-Use the operating system's preferred way of adding those tools to your installation. There is certainly more than one way of getting and installing them.
-
-__The following sections are emphasizing various development aspects.__
-
-* [Configuring, Building, Installing SWAT+ using cmake](doc/Building.md)
-- [Scenario Testing](doc/Testing.md)
-
-- [Tagging and Versioning](doc/Tagging.md)
-
-- [Developing in Visual Studio](doc/VS-Win.md)
-
-- [Developing with Codespaces Visual Studio Code](doc/VSCode_Codespace.md)
-
-- [FORTRAN Coding Conventions (alpha)](doc/coding_conventions.md)
-
-## Documentation and References
-
-[SWAT+ Source Documentation on GitHub](https://swat-model.github.io/swatplus)
-
-[SWAT+ Input/Output Documentation on Gitbook](https://swatplus.gitbook.io/docs)
-
-[SWAT at TAMU](https://swat.tamu.edu)
-
-[Older SWAT+ versions on Bitbucket](https://bitbucket.org/blacklandgrasslandmodels/modular_swatplus/src/master)
+- [Configuring, Building, Installing SWAT+ using cmake](doc/Building.md)
+- [Scenario Testing](doc/Testing.md) · [Tagging and Versioning](doc/Tagging.md)
+- [Developing in Visual Studio](doc/VS-Win.md) · [VS Code Codespaces](doc/VSCode_Codespace.md)
+- [SWAT+ Source Documentation](https://swat-model.github.io/swatplus) ·
+  [SWAT+ I/O Documentation](https://swatplus.gitbook.io/docs) · [SWAT at TAMU](https://swat.tamu.edu)

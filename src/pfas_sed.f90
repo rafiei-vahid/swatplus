@@ -42,12 +42,12 @@
 
       implicit none
 
-      integer :: j = 0          !! none      |HRU number
-      integer :: k = 0          !! none      |sequential PFAS counter
-      integer :: kk = 0         !! none      |PFAS number from pfas.dat (crosswalk)
-      real :: xx = 0.           !! kg/ha     |PFAS mass available in top soil layer
-      real :: conc = 0.         !! kg PFAS/kg soil |sediment-phase PFAS concentration
-      real :: er = 0.           !! none      |enrichment ratio applied
+      integer :: j          !! none      |HRU number
+      integer :: k          !! none      |sequential PFAS counter
+      integer :: kk         !! none      |PFAS number from pfas.dat (crosswalk)
+      real :: xx           !! kg/ha     |PFAS mass available in top soil layer
+      real :: conc         !! kg PFAS/kg soil |sediment-phase PFAS concentration
+      real :: er           !! none      |enrichment ratio applied
 
       j = ihru
 

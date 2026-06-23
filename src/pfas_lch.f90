@@ -41,23 +41,23 @@
 
       implicit none
 
-      integer :: j = 0          !! none      |HRU number
-      integer :: ly = 0         !! none      |counter (soil layers)
-      integer :: k = 0          !! none      |sequential PFAS counter
-      integer :: kk = 0         !! none      |PFAS number from pfas.dat (crosswalk)
-      integer :: nly = 0        !! none      |number of soil layers in this HRU
-      real :: a_aw = 0.         !! 1/mm      |air-water interfacial area
-      real :: cw = 0.           !! nM        |aqueous equilibrium conc (per contaminated site)
-      real :: cw_hru = 0.       !! nM        |HRU-scaled aqueous conc (= num_pconta * cw), solubility-capped
-      real :: cw_cap = 0.       !! nM        |solubility cap on the aqueous conc
-      real :: co = 0.           !! kg/mm-ha  |PFAS water-phase mass concentration
-      real :: csurf = 0.        !! kg/mm-ha  |PFAS conc applied to surface runoff / lateral flow
-      real :: totmass = 0.      !! kg/ha     |sol_pfas / num_pconta (solver mass term f)
-      real :: thick = 0.        !! mm        |thickness of soil layer (solver g)
-      real :: vf = 0.           !! mm H2O    |effective flow through the layer (gate)
-      real :: qsurf = 0.        !! mm H2O    |surface runoff seen by the layer (top layer only)
-      real :: xx = 0.           !! kg/ha     |PFAS mass removed from the layer
-      real :: yy = 0.           !! kg/ha     |PFAS mass removed from the layer
+      integer :: j          !! none      |HRU number
+      integer :: ly         !! none      |counter (soil layers)
+      integer :: k          !! none      |sequential PFAS counter
+      integer :: kk         !! none      |PFAS number from pfas.dat (crosswalk)
+      integer :: nly        !! none      |number of soil layers in this HRU
+      real :: a_aw         !! 1/mm      |air-water interfacial area
+      real :: cw           !! nM        |aqueous equilibrium conc (per contaminated site)
+      real :: cw_hru       !! nM        |HRU-scaled aqueous conc (= num_pconta * cw), solubility-capped
+      real :: cw_cap       !! nM        |solubility cap on the aqueous conc
+      real :: co           !! kg/mm-ha  |PFAS water-phase mass concentration
+      real :: csurf        !! kg/mm-ha  |PFAS conc applied to surface runoff / lateral flow
+      real :: totmass      !! kg/ha     |sol_pfas / num_pconta (solver mass term f)
+      real :: thick        !! mm        |thickness of soil layer (solver g)
+      real :: vf           !! mm H2O    |effective flow through the layer (gate)
+      real :: qsurf        !! mm H2O    |surface runoff seen by the layer (top layer only)
+      real :: xx           !! kg/ha     |PFAS mass removed from the layer
+      real :: yy           !! kg/ha     |PFAS mass removed from the layer
 
       j = ihru
 

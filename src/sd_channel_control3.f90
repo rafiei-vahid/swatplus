@@ -21,7 +21,8 @@
       use maximum_data_module
       use pfas_module, only : npfas
       use pfas_cha_module, only : pfas_src_load, pfdiag_src
-      use mf6_coupler, only : mf6_baseflow_active, mf6_channel_baseflow
+      use mf6_coupler, only : mf6_baseflow_active, mf6_channel_baseflow, &
+                              mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
 
       implicit none
 
@@ -125,6 +126,12 @@
         end if
         ht1%flo = ht1%flo + aqu_inflo          !! +ve adds baseflow, -ve seepage
         if (ht1%flo < 0.) ht1%flo = 0.
+        !! groundwater PFAS discharge (kg/day) from MF6 GWT into the channel
+        if (mf6_pfas_disch_active() .and. npfas > 0 .and. cs_db%num_tot > 0) then
+          ipf = mf6_pfas_compound()
+          if (ipf >= 1 .and. ipf <= npfas) &
+            hcs1%pfas(ipf) = hcs1%pfas(ipf) + real(mf6_channel_pfas(ob(icmd)%gis_id))
+        end if
       !! if connected to aquifer - add flow (native; skipped when MF6 active)
       else if (sd_ch(ich)%aqu_link > 0) then
         iaq = sd_ch(ich)%aqu_link

@@ -34,6 +34,7 @@
       private
       public :: mf6_coupler_init, mf6_coupler_step, mf6_coupler_finalize
       public :: mf6_active, mf6_baseflow_active, mf6_channel_baseflow
+      public :: mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
 
       logical :: mf6_active = .false.    !! set .true. once MF6 is initialized
       character(len=256) :: mf6_ws = "." !! MF6 workspace (relative to TxtInOut)
@@ -97,6 +98,7 @@
       procedure(bmi_noarg), pointer :: p_do_time_step => null()
       procedure(bmi_noarg), pointer :: p_finalize_time_step => null()
       procedure(bmi_getptr),pointer :: p_get_value_ptr_double => null()
+      procedure(bmi_getptr),pointer :: p_get_value_ptr_int => null()
 
       !! ---- recharge down-coupling (M2): area-weighted HRU -> MF6 cell map --
       integer :: n_map = 0          !! number of (cell,hru) overlap entries
@@ -120,6 +122,27 @@
       logical :: bf_ready = .false.
       character(len=256) :: gwf_addr = "MODFLOW_SFR/SFR_0/GWFLOW"
       real(c_double) :: bf_cum_gain = 0.0_c_double, bf_cum_loss = 0.0_c_double
+
+      !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
+      integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
+      integer :: n_src = 0          !! number of SRC cells (BOUND size)
+      integer :: pfas_k = 1         !! which simulated PFAS compound (PFOS) feeds GWT
+      integer, allocatable :: leach_src(:)  !! 0-based SRC cell index per link
+      integer, allocatable :: leach_hru(:)  !! SWAT+ HRU id per link
+      real,    allocatable :: leach_ov(:)   !! overlap area (ha) per link
+      real(c_double), pointer :: src_arr(:) => null()   !! BMI ptr to SRC BOUND
+      logical :: src_ready = .false.
+      character(len=256) :: src_addr = "PFAS/SRC_PFAS/BOUND"
+      real(c_double) :: pfas_src_cum = 0.0_c_double   !! cumulative ug loaded
+
+      !! ---- PFAS up-coupling (M4c): GW-discharged PFAS -> SWAT+ channels ----
+      real(c_double), pointer :: gwt_conc(:) => null()  !! BMI ptr GWT concentration (ng/L)
+      integer(c_int), pointer :: igwf(:) => null()      !! BMI ptr SFR reach -> GWF node
+      real(c_double), allocatable :: pfas_chan(:)       !! GW PFAS to channel (kg/day) by gis
+      logical :: pdis_ready = .false.
+      character(len=256) :: gwtx_addr = "PFAS/X"
+      character(len=256) :: igwf_addr = "MODFLOW_SFR/SFR_0/IGWFNODE"
+      real(c_double) :: pfas_disch_cum = 0.0_c_double   !! cumulative kg discharged
 
       contains
 
@@ -199,7 +222,83 @@
       call mf6_recharge_setup
       !! --- M3: set up the MF6 SFR baseflow -> SWAT+ channel up-coupling ---
       call mf6_baseflow_setup
+      !! --- M4b: set up the SWAT+ PFAS leaching -> GWT SRC mass source ---
+      call mf6_pfas_src_setup
+      !! --- M4c: set up the GW PFAS discharge -> SWAT+ channel up-coupling ---
+      call mf6_pfas_disch_setup
       end subroutine mf6_coupler_init
+
+      !! ================================================================
+      subroutine mf6_pfas_disch_setup
+      !! Bind pointers to the GWT concentration (PFAS/X) and the SFR reach->GWF
+      !! node map (IGWFNODE).  Reuses the M3 baseflow reach->channel map, so it
+      !! needs bf_ready.  Each gaining reach discharges PFAS to its channel at
+      !! rate baseflow * GW concentration.  No-op if any pointer is unavailable.
+      implicit none
+      integer :: ios
+      type(c_ptr) :: cx, ci
+      if (.not. bf_ready) then
+        call trace("pfas-disch: baseflow map not ready -> PFAS up off"); return
+      end if
+      cx = c_null_ptr; ci = c_null_ptr
+      ios = p_get_value_ptr_double(trim(gwtx_addr)//c_null_char, cx)
+      if (ios /= 0 .or. .not. c_associated(cx)) then
+        call trace("pfas-disch: no GWT concentration ("//trim(gwtx_addr)//")"); return
+      end if
+      ios = p_get_value_ptr_int(trim(igwf_addr)//c_null_char, ci)
+      if (ios /= 0 .or. .not. c_associated(ci)) then
+        call trace("pfas-disch: no IGWFNODE ("//trim(igwf_addr)//")"); return
+      end if
+      call c_f_pointer(ci, igwf, [n_sfr])
+      !! GWT concentration array length is unknown a priori; use the largest
+      !! node referenced by the reaches as a safe lower bound and bind generously.
+      call c_f_pointer(cx, gwt_conc, [maxval(igwf)])
+      allocate (pfas_chan(0:max_gis)); pfas_chan = 0.0_c_double
+      pdis_ready = .true.
+      write (*,'(a)') "   pfas discharge: GW concentration -> channels (PFAS up-coupling on)"
+      end subroutine mf6_pfas_disch_setup
+
+      !! ================================================================
+      subroutine mf6_pfas_src_setup
+      !! Read pfas_leach.map (HRU -> SRC cell, overlap ha) and bind a pointer to
+      !! the GWT SRC mass-loading array (PFAS/SRC_PFAS/BOUND).  No-op if absent.
+      implicit none
+      integer :: iu, ios, e, sidx, hru, nleach, nsrc
+      real :: ov
+      logical :: have_map
+      type(c_ptr) :: cptr
+
+      inquire (file="pfas_leach.map", exist=have_map)
+      if (.not. have_map) then
+        call trace("pfas-src: no pfas_leach.map -> PFAS down-coupling off")
+        return
+      end if
+      open (newunit=iu, file="pfas_leach.map", status="old", action="read")
+      read (iu,*,iostat=ios) nleach, nsrc
+      if (ios /= 0 .or. nleach <= 0) then; close(iu); return; end if
+      n_leach = nleach; n_src = nsrc
+      allocate (leach_src(n_leach), leach_hru(n_leach), leach_ov(n_leach))
+      do e = 1, n_leach
+        read (iu,*,iostat=ios) sidx, hru, ov
+        if (ios /= 0) then
+          call trace("pfas-src: map truncated -> disabled"); close(iu)
+          deallocate (leach_src, leach_hru, leach_ov); return
+        end if
+        leach_src(e) = sidx; leach_hru(e) = hru; leach_ov(e) = ov
+      end do
+      close (iu)
+
+      cptr = c_null_ptr
+      ios = p_get_value_ptr_double(trim(src_addr)//c_null_char, cptr)
+      if (ios /= 0 .or. .not. c_associated(cptr)) then
+        call trace("pfas-src: get_value_ptr_double failed for "//trim(src_addr))
+        deallocate (leach_src, leach_hru, leach_ov); return
+      end if
+      call c_f_pointer(cptr, src_arr, [n_src])
+      src_ready = .true.
+      write (*,'(a,i0,a,i0,a)') "   pfas leach map: ", n_leach, &
+        " HRU-cell links onto ", n_src, " GWT source cells (SWAT+ drives PFAS)"
+      end subroutine mf6_pfas_src_setup
 
       !! ================================================================
       subroutine mf6_recharge_setup
@@ -272,13 +371,15 @@
       if (tnow < mf6_tend) then
         !! granular step so we can inject recharge between prepare and solve
         dt0 = 0.0_c_double
-        ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads its recharge
-        if (rch_ready) call push_recharge     !! overwrite with SWAT+ percolation
+        ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads recharge + sources
+        if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
+        if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
         ios = p_do_time_step()
         if (ios /= 0) write (*,*) "MF6 COUPLER: do_time_step failed day ", &
                                   mf6_daycount, " status ", ios
         ios = p_finalize_time_step()
         if (bf_ready) call pull_baseflow      !! aggregate MF6 SFR baseflow -> channels
+        if (pdis_ready) call pull_pfas_discharge  !! GW PFAS discharge -> channels
         ios = p_get_current_time(tnow)
       end if
       call fpe_restore(halt_save)
@@ -291,6 +392,10 @@
           "   cum recharge depth (m) = ", rch_depth_cum
         if (bf_ready) write (*,'(a,es11.3,a,es11.3,a)') &
           "   cum SFR exchange: gaining ", bf_cum_gain, "  losing ", bf_cum_loss, " (m3)"
+        if (src_ready) write (*,'(a,es11.3,a)') &
+          "   cum PFAS loaded to aquifer = ", pfas_src_cum, " (ug)"
+        if (pdis_ready) write (*,'(a,es11.3,a)') &
+          "   cum PFAS discharged to streams = ", pfas_disch_cum, " (kg)"
       end if
       end subroutine mf6_coupler_step
 
@@ -320,6 +425,69 @@
       end do
       rch_depth_cum = rch_depth_cum + dsum
       end subroutine push_recharge
+
+      !! ================================================================
+      subroutine push_pfas_src
+      !! Overwrite the GWT SRC mass-loading (ug/day) with SWAT+ soil-profile
+      !! PFAS leaching: SRC[cell] = sum_HRU( hpfasb_d(hru)%perc(pfas_k)[kg/ha]
+      !! * overlap_ha ) * 1e9.  (GWT conc = ng/L, length = m => GWT mass unit =
+      !! ng/L*m^3 = ug; 1 kg = 1e9 ug.)  Called between prepare & do_time_step.
+      use pfas_output_module, only : hpfasb_d
+      use pfas_module, only : npfas
+      use hydrograph_module, only : sp_ob
+      implicit none
+      integer :: e, h, nhru
+      real(c_double) :: dsum, mass
+      nhru = sp_ob%hru
+      src_arr(:) = 0.0_c_double
+      if (pfas_k < 1 .or. pfas_k > npfas) return
+      do e = 1, n_leach
+        h = leach_hru(e)
+        if (h >= 1 .and. h <= nhru) then
+          if (allocated(hpfasb_d(h)%perc)) then
+            mass = real(hpfasb_d(h)%perc(pfas_k), c_double) &   ! kg/ha
+                 * real(leach_ov(e), c_double) * 1.0e9_c_double  ! * ha * 1e9 = ug/day
+            src_arr(leach_src(e)+1) = src_arr(leach_src(e)+1) + mass
+          end if
+        end if
+      end do
+      dsum = 0.0_c_double
+      do e = 1, n_src
+        dsum = dsum + src_arr(e)
+      end do
+      pfas_src_cum = pfas_src_cum + dsum
+      end subroutine push_pfas_src
+
+      !! ================================================================
+      subroutine pull_pfas_discharge
+      !! GW PFAS mass discharged to each SWAT+ channel (kg/day):
+      !!   pfas_chan(gis) = sum_reach( baseflow[m3/d] * GWconc[ng/L] ) * 1e-9
+      !! over gaining reaches (baseflow = -GWFLOW > 0).  ng/L * m3 * 1000 L/m3 *
+      !! 1e-12 kg/ng = 1e-9.  GW concentration read at the reach's GWF node.
+      implicit none
+      integer :: e, r, node
+      real(c_double) :: bf, conc
+      pfas_chan = 0.0_c_double
+      do e = 1, n_bf
+        r = bf_reach(e)
+        if (r >= 0 .and. r < n_sfr) then
+          bf = -gwf_arr(r+1)                       ! baseflow, +ve = aquifer->stream
+          if (bf > 0.0_c_double) then
+            node = igwf(r+1)                        ! reach's GWF/GWT node (reduced)
+            if (node >= 1 .and. node <= size(gwt_conc)) then
+              conc = gwt_conc(node)                 ! ng/L
+              if (conc > 0.0_c_double) then
+                pfas_chan(bf_gis(e)) = pfas_chan(bf_gis(e)) &
+                  + bf * conc * 1.0e-9_c_double      ! kg/day
+              end if
+            end if
+          end if
+        end if
+      end do
+      do e = 0, max_gis
+        pfas_disch_cum = pfas_disch_cum + pfas_chan(e)
+      end do
+      end subroutine pull_pfas_discharge
 
       !! ================================================================
       subroutine mf6_baseflow_setup
@@ -408,6 +576,15 @@
       istat = chdir(trim(cwd0))
       if (c_associated(mf6_handle)) istat = c_dlclose(mf6_handle)
       write (*,'(a,i0)') " MF6 COUPLER: finalized, status=", ios
+      write (*,'(a,i0,a)') " MF6 COUPLER summary over ", mf6_daycount, " coupled days:"
+      if (rch_ready) write (*,'(a,es12.4,a)') &
+        "   recharge (sum of daily basin depths) = ", rch_depth_cum, " m"
+      if (bf_ready) write (*,'(a,es12.4,a,es12.4,a)') &
+        "   SFR exchange: gaining ", bf_cum_gain, "  losing ", bf_cum_loss, " m3"
+      if (src_ready) write (*,'(a,es12.4,a)') &
+        "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
+      if (pdis_ready) write (*,'(a,es12.4,a)') &
+        "   PFAS discharged to stream = ", pfas_disch_cum, " kg"
       mf6_active = .false.
       end subroutine mf6_coupler_finalize
 
@@ -427,6 +604,25 @@
       if (bf_ready .and. gis >= 0 .and. gis <= max_gis) &
         mf6_channel_baseflow = bf_chan(gis)
       end function mf6_channel_baseflow
+
+      logical function mf6_pfas_disch_active()
+      !! true when MF6 supplies the channel groundwater-PFAS discharge
+      mf6_pfas_disch_active = mf6_active .and. pdis_ready
+      end function mf6_pfas_disch_active
+
+      integer function mf6_pfas_compound()
+      !! which simulated PFAS compound (index into hcs1%pfas) the GWT carries
+      mf6_pfas_compound = pfas_k
+      end function mf6_pfas_compound
+
+      real(c_double) function mf6_channel_pfas(gis)
+      !! groundwater PFAS mass discharged into the channel (kg/day) for the
+      !! coupled compound, from the previous day's MF6 solve.
+      integer, intent(in) :: gis
+      mf6_channel_pfas = 0.0_c_double
+      if (pdis_ready .and. gis >= 0 .and. gis <= max_gis) &
+        mf6_channel_pfas = pfas_chan(gis)
+      end function mf6_channel_pfas
 
       !! ---- helpers --------------------------------------------------
       subroutine fpe_off(saved)
@@ -466,6 +662,7 @@
       if (.not. resolve("finalize_time_step", p_finalize_time_step)) return
       if (.not. resolve_dt("prepare_time_step", p_prepare_time_step)) return
       if (.not. resolve_ptr("get_value_ptr_double", p_get_value_ptr_double)) return
+      if (.not. resolve_ptr("get_value_ptr_int", p_get_value_ptr_int)) return
       bind_bmi = .true.
       end function bind_bmi
 

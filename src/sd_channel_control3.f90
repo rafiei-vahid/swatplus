@@ -21,6 +21,7 @@
       use maximum_data_module
       use pfas_module, only : npfas
       use pfas_cha_module, only : pfas_src_load, pfdiag_src
+      use mf6_coupler, only : mf6_baseflow_active, mf6_channel_baseflow
 
       implicit none
 
@@ -111,8 +112,21 @@
         ob(icmd)%tsin(1) = ht1%flo
       end if
             
-      !! if connected to aquifer - add flow
-      if (sd_ch(ich)%aqu_link > 0) then
+      !! MF6 coupling: groundwater<->stream exchange supplied by MODFLOW 6
+      !! (from the previous day's MF6 solve).  Replaces the native SWAT+
+      !! aquifer return flow so baseflow is not double counted.
+      if (mf6_baseflow_active()) then
+        aqu_inflo = real(mf6_channel_baseflow(ob(icmd)%gis_id))   !m3/day, +ve=gain
+        chsd_d(ich)%aqu_in = aqu_inflo / 86400.
+        chsd_d(ich)%aqu_in_mm = aqu_inflo / (10. * ob(icmd)%area_ha)
+        if (ht1%flo > 1.e-6 .and. aqu_inflo > 0.) then
+          rto = aqu_inflo / ht1%flo
+          ob(icmd)%tsin(:) = (1. + rto) * ob(icmd)%tsin(:)
+        end if
+        ht1%flo = ht1%flo + aqu_inflo          !! +ve adds baseflow, -ve seepage
+        if (ht1%flo < 0.) ht1%flo = 0.
+      !! if connected to aquifer - add flow (native; skipped when MF6 active)
+      else if (sd_ch(ich)%aqu_link > 0) then
         iaq = sd_ch(ich)%aqu_link
         iaq_ch = sd_ch(ich)%aqu_link_ch
         if (aq_ch(iaq)%ch(iaq_ch)%flo_fr > 0.) then

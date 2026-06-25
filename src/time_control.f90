@@ -54,7 +54,8 @@
       use water_body_module
       use water_allocation_module
       !use reservoir_data_module
-      
+      use mf6_coupler
+
       implicit none
       
       external :: actions, aqu_pest_output_init, basin_sw_init, calsoft_ave_output, calsoft_sum_output, &
@@ -98,6 +99,9 @@
       time%mo = mo
       time%day_mo = day_mo
       call cli_precip_control (0)
+
+      !! SWAT+ <-> MODFLOW 6 daily coupler: init if mf6.con present (no-op otherwise)
+      call mf6_coupler_init
 
       do curyr = 1, time%nbyr
     !!!!!  uncomment next three lines for RELEASE version only (Srin/Karim)
@@ -246,8 +250,11 @@
             end do
           end if
           
-          call command              !! command loop 
-          
+          call command              !! command loop
+
+          !! SWAT+ <-> MODFLOW 6: advance groundwater one coupling step (no-op if inactive)
+          call mf6_coupler_step
+
           ! reset base0 heat units and yr_skip at end of year for southern hemisphere
           ! near winter solstace (winter solstice is around June 22)
           if (time%day == 181) then

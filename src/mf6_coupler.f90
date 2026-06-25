@@ -110,6 +110,7 @@
       logical :: rch_ready = .false.
       character(len=256) :: rch_addr = "MODFLOW_SFR/RCHA_0/RECHARGE"
       real(c_double) :: rch_depth_cum = 0.0_c_double   !! diagnostic (sum m/day)
+      real :: rch_mult = 1.0        !! recharge multiplier (mf6.con line 4; OAT knob)
 
       !! ---- baseflow up-coupling (M3): MF6 SFR GWFLOW -> SWAT+ channels ----
       integer :: n_bf = 0           !! number of reach->channel links
@@ -167,6 +168,14 @@
       call read_setting(iu, mf6_ws)
       call read_int_setting(iu, gwf_cadence)
       call read_int_setting(iu, gwt_cadence)
+      !! line 4 (optional): recharge multiplier (calibration / OAT sensitivity knob)
+      tmp = ""
+      call read_setting(iu, tmp)
+      if (len_trim(tmp) > 0) then
+        read (tmp,*,iostat=ios) rch_mult
+        if (ios /= 0) rch_mult = 1.0
+      end if
+      !! line 5 (optional): libmf6.so path
       tmp = ""
       call read_setting(iu, tmp)
       if (len_trim(tmp) > 0) mf6_lib = tmp
@@ -417,7 +426,8 @@
         h = map_hru(e)
         if (h >= 1 .and. h <= nhru) &
           rch_arr(map_idx(e)+1) = rch_arr(map_idx(e)+1) &
-            + real(sepbtm(h), c_double) / 1000.0_c_double * real(map_w(e), c_double)
+            + real(sepbtm(h), c_double) / 1000.0_c_double * real(map_w(e), c_double) &
+              * real(rch_mult, c_double)
       end do
       dsum = 0.0_c_double
       do e = 1, n_rch

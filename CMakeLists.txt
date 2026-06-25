@@ -177,6 +177,15 @@ if(SWATPLUS_NETCDF)
   target_compile_definitions(${SWATPLUS_EXE} PRIVATE SWATPLUS_NETCDF=1)
 endif()
 
+# SWAT+ <-> MODFLOW 6 coupler (mf6_coupler.f90, picked up by the GLOB above).
+# We do NOT link libmf6.so at build time: it statically embeds the Intel Fortran
+# runtime (for__* symbols) which would interpose the engine's own Fortran I/O
+# runtime and corrupt SWAT+ file buffers (munmap_chunk crash). Instead the
+# coupler dlopen()s libmf6.so with RTLD_LOCAL at run time, so we only need the
+# dynamic-loader library here.
+target_link_libraries(${SWATPLUS_EXE} PRIVATE ${CMAKE_DL_LIBS})
+message("-- MODFLOW 6 coupling   dlopen libmf6.so at runtime (RTLD_LOCAL)")
+
 #############################################################################
 # Install
 install(TARGETS ${SWATPLUS_EXE} DESTINATION RUNTIME DESTINATION ${PROJECT_SOURCE_DIR})

@@ -6,6 +6,7 @@
       use calibration_data_module
       use hru_module
       use netcdf_output_module, only: netcdf_output_finish
+      use mf6_coupler, only: mf6_coupler_finalize
 
       implicit none
       
@@ -171,6 +172,7 @@
         call command
       else
         call time_control
+        call mf6_coupler_finalize    !! SWAT+ <-> MODFLOW 6: finalize (no-op if inactive)
         call netcdf_output_finish
       end if
 

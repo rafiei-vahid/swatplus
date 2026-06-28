@@ -21,10 +21,11 @@ analysis-ready output, and carry contaminant transport across the surface-water/
 
 ## What this engine adds over upstream SWAT+
 
-1. **Shared-memory (OpenMP) parallelism.** A routing-aware wavefront over the daily object dependency
-   graph, with per-thread "current-object" state, gives multi-core speedup on a single model **without
-   changing results**. This required an engine-wide reentrancy refactor (below). Build option
-   `SWATPLUS_OPENMP=ON`; threads via `OMP_NUM_THREADS`.
+1. **Shared-memory (OpenMP) parallelism.** A wavefront over the daily object dependency graph, with
+   per-thread "current-object" state, gives multi-core speedup on a single model. The **HRU land phase
+   is byte-identical** in parallel; channel routing is a separate opt-in mode because its parallel
+   wavefront reorders in-stream summation (see *Running*). This required an engine-wide reentrancy
+   refactor (below). Build option `SWATPLUS_OPENMP=ON`; threads via `OMP_NUM_THREADS`.
 
 2. **NetCDF output backend.** Per-stream NetCDF-4 output (`*_day.nc`, …) when `cdfout = y` in
    `print.prt`, in place of the wide fixed-width text files — far smaller and directly readable by
@@ -70,12 +71,30 @@ A stock SWAT+ build (`gfortran`, no options) still compiles and runs small seria
 
 ## Running
 
-- `OMP_NUM_THREADS=<n>` — core count for the parallel routing wavefront.
-- `SWATPLUS_ROUTING_SERIAL=1` — force the byte-identical serial-routing path (production default for
-  reproducibility-critical runs).
-- **PFAS** activates automatically when the model directory contains the PFAS input files.
+Run the engine from inside a SWAT+ model directory. Two environment variables select the parallelism
+mode; **the default is fully serial and byte-identical**:
+
+| Mode | Environment | Result |
+|---|---|---|
+| Serial (default) | `OMP_NUM_THREADS=1` | byte-identical reference results |
+| HRU-parallel | `OMP_NUM_THREADS=N` + `SWATPLUS_ROUTING_SERIAL=1` | **byte-identical**, multi-core speedup |
+| Fully parallel | `OMP_NUM_THREADS=N` + `SWATPLUS_ROUTING_SERIAL=0` | fastest; channel routing carries an N>1 round-off — opt-in |
+
+- `OMP_NUM_THREADS` sets the **HRU land-phase** thread count; the HRU phase is byte-identical in parallel.
+- `SWATPLUS_ROUTING_SERIAL=1` keeps channel routing in serial command order (byte-identical); `=0` enables
+  the parallel routing wavefront, which reorders in-stream summation and is **not** bit-reproducible at N>1.
+- **PFAS** activates when the model directory carries the PFAS inputs (`pfas.dat` / `pfas_calib.dat`); otherwise dormant.
 - **MODFLOW 6 coupling** activates when `mf6.con` is present (and the MODFLOW 6 shared library is on the
   library path); otherwise the run is plain SWAT+.
+
+In the [SWATGenX](https://swatgenx.com) deployment the engine is wrapped in a launcher that exposes the
+same modes as a convenience CLI (serial by default):
+
+```bash
+swatplus                                              # serial, byte-identical (default)
+swatplus -n 4 -hru-parallel on                        # HRU parallel, routing serial (byte-identical)
+swatplus -n 8 -hru-parallel on -routing-parallel on   # both parallel (round-off; use with care)
+```
 
 ## Correctness & reproducibility standard
 

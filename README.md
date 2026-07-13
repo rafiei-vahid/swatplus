@@ -19,6 +19,40 @@ analysis-ready output, and carry contaminant transport across the surface-water/
 
 ---
 
+## Has anyone parallelized SWAT+ — for both HRUs and streams? Yes: this engine.
+
+This fork is the **SWATGenX parallel SWAT+ engine**. It parallelizes **both** phases of the daily
+simulation loop, which is the part usually considered impossible to split:
+
+- **HRU land phase** — OpenMP across HRUs with per-thread object state. Results are
+  **byte-identical** to serial SWAT+ at any thread count.
+- **Channel / stream routing** — an opt-in **wavefront over the full daily object dependency graph**
+  (channels, reservoirs, aquifers, recall points), so independent reaches route concurrently while
+  upstream→downstream order is preserved.
+
+Measured on a dedicated AWS c8a (32 physical cores) node with a production river-basin model
+(one-simulated-year benchmark, daily channel output; numbers from the manuscript below):
+
+| Metric | Value |
+|---|---|
+| Peak thread speedup, full routing wavefront | **5.33× at 24 threads** (still climbing) |
+| Byte-identical mode (HRU-parallel, routing serial) | 2.81× at 16 threads |
+| Single-thread serial engineering gain vs stock SWAT+ | 1.67–2.47× (machine-dependent) |
+| **End-to-end vs stock serial SWAT+** | **7.14× at 24 threads** (≈27 s per simulated year) |
+
+**Honest caveats.** Production-scale builds require **Intel `ifx`** (the reentrancy refactor is
+`ifx`-only at scale). The parallel routing wavefront reorders in-stream summations, so **N>1 routing
+carries a documented floating-point round-off** (~1e-7 relative on channel aggregates) and is
+opt-in; **HRU-parallel mode is byte-identical** and, together with fully-serial, is the production
+default on [SWATGenX](https://swatgenx.com).
+
+Benchmarks, figures, and the full write-up:
+**[swatgenx.com/swat-plus-parallel-engine](https://swatgenx.com/swat-plus-parallel-engine)**.
+The acceleration methodology and validation standard are described in a manuscript submitted to
+*Geoscientific Model Development* (2026, under review).
+
+---
+
 ## What this engine adds over upstream SWAT+
 
 1. **Shared-memory (OpenMP) parallelism.** A wavefront over the daily object dependency graph, with
@@ -120,11 +154,29 @@ refactor, the NetCDF backend, and the PFAS and MODFLOW 6 modules — are maintai
 line that advances SWAT+ toward high-resolution and coupled contaminant-transport applications, and we
 welcome collaboration with the SWAT+ developer community on bringing these advances to the wider model.
 
+## Branches — where each piece lives
+
+**`main` is the consolidated engine line and already contains everything described above** (OpenMP
+HRU land phase + wavefront routing, NetCDF backend, PFAS fate-and-transport, MODFLOW 6 coupling).
+The other branches are the development history and upstream-contribution lines:
+
+| Branch | What it holds |
+|---|---|
+| `main` | **Consolidated production engine** — parallel + NetCDF + PFAS + MF6 coupling |
+| `prod/engine-consolidated-20260623` | the consolidation merge point of the parallel / PFAS / NetCDF lines |
+| `exp/openmp-hru-20260616` | OpenMP development line — reentrancy refactor + DAG wavefront as it evolved |
+| `fix/n1-byte-identity-20260618` | N=1 byte-identity restoration (`ch_watqual4` / `et_pot` threadprivate scratch) |
+| `feat/pfas-surface-water` | PFAS land-phase + in-stream development line |
+| `feature/netcdf-cdfout` | NetCDF output backend development line |
+| `perf/hru-read-name-index` | O(1) HRU name-index startup fix |
+| `upstream-pr/*` | changes prepared as contributions to upstream `swat-model/swatplus` |
+
 ## Citing
 
 If you use this engine, please cite SWAT+ (USDA-ARS / Texas A&M) together with the SWATGenX
 publications describing the acceleration, the PFAS fate-and-transport implementation, and the SWAT+ ↔
-MODFLOW 6 coupling. See [swatgenx.com](https://swatgenx.com) for the current reference list.
+MODFLOW 6 coupling — the acceleration manuscript is under review at *Geoscientific Model
+Development* (2026). See [swatgenx.com](https://swatgenx.com) for the current reference list.
 
 ## Directory structure & upstream docs
 

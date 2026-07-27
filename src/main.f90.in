@@ -7,6 +7,7 @@
       use hru_module
       use netcdf_output_module, only: netcdf_output_finish
       use mf6_coupler, only: mf6_coupler_finalize
+      use sched_conflict_module, only: sched_audit_requested, sched_conflict_report
 
       implicit none
       
@@ -156,6 +157,16 @@
       call dr_ru
         
       call hyd_connect_out
+
+      !! STAGE 0 AUDIT (SWATPLUS_SCHED_AUDIT=1): count how much shared-state conflict
+      !! this model actually contains and what ordering it would cost in parallelism,
+      !! then stop. Init-only, no simulation, no state mutated -- the go/no-go for
+      !! building the augmented-dependency scheduler. See sched_conflict_module.
+      if (sched_audit_requested()) then
+        call sched_conflict_report
+        write (*,*) "sched audit written to conflict_audit.out"
+        stop
+      end if
       
       ! save initial time settings for soft calibration runs
       time_init = time

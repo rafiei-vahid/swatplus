@@ -31,7 +31,9 @@ def run(engine, src, dst, threads, label):
     env = dict(os.environ)
     env["LD_LIBRARY_PATH"] = f"{NETCDF_LIB}:{IFX_LIB}"
     env["OMP_NUM_THREADS"] = str(threads)
-    env["SWATPLUS_ROUTING_SERIAL"] = "1"       # the shipped byte-identical mode
+    # Mode is now caller-controlled: the shipped mode pins routing serial, but the
+    # full wavefront (ROUTING_SERIAL=0) is what we need to test for the conflict work.
+    env["SWATPLUS_ROUTING_SERIAL"] = os.environ.get("RC_ROUTING_SERIAL", "1")
     log = dst / "engine.log"
     with open(log, "w") as fh:
         rc = subprocess.run([str(engine)], cwd=dst, env=env, stdout=fh,

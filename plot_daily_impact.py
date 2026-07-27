@@ -103,8 +103,14 @@ def main():
             ms=3.5, label="Observed", zorder=3)
     ax.plot(S["flo_out"].loc[sl].index, S["flo_out"].loc[sl].values, color=SER_C, lw=2.4,
             marker="o", ms=3.8, label=L_SER, zorder=4)
-    ax.plot(H["flo_out"].loc[sl].index, H["flo_out"].loc[sl].values, color=HRU_C, lw=1.3,
-            ls=(0, (2, 2)), label=L_HRU, zorder=6)
+    # Identity must READ as identity. A thin dashed line laid over a thick one looks like
+    # "similar", and next to a second dashed line the eye groups the two dashed series
+    # together — the exact misreading this panel caused. Spaced ring markers riding the
+    # serial line cannot be mistaken for a separate trajectory.
+    _h = H["flo_out"].loc[sl]
+    ax.plot(_h.index[::2], _h.values[::2], color=HRU_C, lw=0, marker="o", ms=7,
+            markerfacecolor="none", markeredgewidth=1.6, label=L_HRU + " — exactly on serial",
+            zorder=6)
     ax.plot(W["flo_out"].loc[sl].index, W["flo_out"].loc[sl].values, color=WAV_C, lw=2.0,
             ls=(0, (5, 2)), marker="s", ms=3.5, label=L_WAV, zorder=5)
     ax.set_ylabel("Daily flow  (m³/s)", color=INK, fontsize=9)

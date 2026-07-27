@@ -52,7 +52,13 @@
         !! adjust precip and temperature for elevation using lapse rates
         w = wst(iwst)%weat
         if (bsn_cc%lapse == 1) call cli_lapse
-        wst(iwst)%weat = w
+        !! swatplus_perf: the write-back of the shared weather record was REMOVED.
+        !! w is threadprivate and cli_lapse does not modify it (it only writes
+        !! ob(:)%plaps/tlaps), so this stored back a value it had just read -- no
+        !! effect on results. It was not harmless in parallel: weather_daily has
+        !! ALLOCATABLE components, so intrinsic assignment deallocates/reallocates,
+        !! and up to 185 objects share one weather station. Concurrent writers raced
+        !! in the ALLOCATOR, not over values -- memory corruption, not FP noise.
       
         !! set water body pointer to res
         wbody => res(jres)

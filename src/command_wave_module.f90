@@ -15,6 +15,13 @@
       integer, dimension(:,:), allocatable :: hru_wave_obj       !(level,k) -> object (icmd) index of k-th HRU
       logical :: hru_wave_ready = .false.
 
+      !! ISOLATION EXPERIMENT support (SWATPLUS_HRU_SERIAL=1): per-level flag, true when
+      !! the level contains at least one HRU object. Used by command.f90 to run those
+      !! levels on the master thread while non-HRU levels stay parallel, isolating
+      !! "HRU parallel" from "routing parallel". All .false. unless the env var is set,
+      !! so the shipped behaviour is untouched.
+      logical, dimension(:), allocatable :: obj_wave_has_hru
+
       !! Phase C full-DAG wave: ALL command objects (hru/ru/channel/res/aqu/...) bucketed
       !! by cmd_order level. Same-level objects are mutually independent -> run concurrently.
       integer :: obj_nwave = 0                                   !number of object levels (max cmd_order)
@@ -30,6 +37,8 @@
       use hydrograph_module, only : ob, sp_ob, sp_ob1
       implicit none
       integer :: ic, in, iob, newlev, lev, k, maxcnt, npass
+      integer :: env_st
+      character(len=8) :: hru_ser_env
       logical :: changed
 
       if (sp_ob%objs <= 0) return
@@ -125,6 +134,22 @@
         end do
         if (allocated(obj_wave_obj)) deallocate (obj_wave_obj)
         allocate (obj_wave_obj(obj_nwave, maxcnt)); obj_wave_obj = 0
+
+        !! ISOLATION EXPERIMENT: mark levels containing at least one HRU. Populated ONLY
+        !! when SWATPLUS_HRU_SERIAL=1, so the flag stays all-.false. and the shipped
+        !! scheduling is bit-for-bit unchanged in normal operation.
+        if (allocated(obj_wave_has_hru)) deallocate (obj_wave_has_hru)
+        allocate (obj_wave_has_hru(obj_nwave)); obj_wave_has_hru = .false.
+        hru_ser_env = " "
+        call get_environment_variable ("SWATPLUS_HRU_SERIAL", hru_ser_env, status=env_st)
+        if (env_st == 0 .and. (hru_ser_env(1:1) == "1" .or. hru_ser_env(1:1) == "y")) then
+          ic = sp_ob1%objs
+          do while (ic /= 0)
+            lev = ob(ic)%cmd_order
+            if (lev >= 1 .and. ob(ic)%typ == "hru") obj_wave_has_hru(lev) = .true.
+            ic = ob(ic)%cmd_next
+          end do
+        end if
         obj_wave_cnt = 0
         ic = sp_ob1%objs
         do while (ic /= 0)
@@ -160,5 +185,15 @@
 
       return
       end subroutine command_wave_build
+
+      logical function lev_is_hru (lev)
+      implicit none
+      integer, intent(in) :: lev
+      lev_is_hru = .false.
+      if (.not. allocated(obj_wave_has_hru)) return
+      if (lev < 1 .or. lev > size(obj_wave_has_hru)) return
+      lev_is_hru = obj_wave_has_hru(lev)
+      return
+      end function lev_is_hru
 
       end module command_wave_module

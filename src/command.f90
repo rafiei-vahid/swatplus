@@ -146,12 +146,28 @@
         !$omp parallel default(shared) private(k, lev, lev_end, lv2)
         lev = 1
         do while (lev <= obj_nwave)
-          if (obj_wave_cnt(lev) > narrow_thr) then
+          if (obj_wave_cnt(lev) > narrow_thr .and. .not. lev_is_hru(lev)) then
             !$omp do schedule(static)
             do k = 1, obj_wave_cnt(lev)
               call command_object (obj_wave_obj(lev, k))
             end do
             !$omp end do
+            lev = lev + 1
+          else if (obj_wave_cnt(lev) > narrow_thr) then
+            !! ISOLATION EXPERIMENT (SWATPLUS_HRU_SERIAL=1): run levels that contain any
+            !! HRU on the master thread only, while non-HRU levels stay parallel. This
+            !! fills the one untested cell of the 2x2 -- HRU serial + routing parallel.
+            !! Motivation: the shipped mode (HRU parallel + routing SERIAL) reproduces
+            !! serial exactly, the full wavefront does not, and on the failing basin
+            !! level 1 co-schedules all 11282 HRUs with 1418 non-HRU objects. If routing
+            !! parallelism alone is clean, the fault is the HRU/routing OVERLAP, not the
+            !! wavefront; if it is dirty, the fault is inside routing.
+            !$omp master
+            do k = 1, obj_wave_cnt(lev)
+              call command_object (obj_wave_obj(lev, k))
+            end do
+            !$omp end master
+            !$omp barrier
             lev = lev + 1
           else
             !! extent of the consecutive narrow run (identical on every thread)

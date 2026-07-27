@@ -18,7 +18,11 @@ import numpy as np, pandas as pd, xarray as xr
 from matplotlib.ticker import FuncFormatter
 
 CFS = 0.0283168
-OBS_C, SER_C, WAV_C = "#52514e", "#2a78d6", "#eb6834"   # validated: gray / blue / orange
+# validated 4-series palette (dataviz six checks, light mode): gray / blue / aqua / orange
+OBS_C, SER_C, HRU_C, WAV_C = "#52514e", "#2a78d6", "#1baf7a", "#eb6834"
+L_SER = "Serial (1 core)"
+L_HRU = "HRU-parallel · serial routing (shipped)"
+L_WAV = "Full wavefront · parallel routing"
 INK, MUTED, GRID = "#0b0b0b", "#52514e", "#d8d7d2"
 
 _BASE = ["flo", "sed", "orgn", "sedp", "no3", "solp", "chla", "nh3", "no2",
@@ -58,7 +62,7 @@ def style(ax):
 
 def main():
     root, obs_csv, out = Path(sys.argv[1]), Path(sys.argv[2]), Path(sys.argv[3])
-    S, W = load(root / "serial"), load(root / "wave")
+    S, H, W = load(root / "serial"), load(root / "rtser"), load(root / "wave")
 
     o = pd.read_csv(obs_csv, parse_dates=["date"])
     o.loc[o["streamflow"] <= -90, "streamflow"] = np.nan
@@ -72,15 +76,17 @@ def main():
 
     # ---- (a) monthly flow vs observations --------------------------------
     ax = axes[0, 0]; style(ax)
-    sm, wm = S["flo_out"].resample("MS").mean(), W["flo_out"].resample("MS").mean()
+    sm = S["flo_out"].resample("MS").mean()
+    hm = H["flo_out"].resample("MS").mean()
+    wm = W["flo_out"].resample("MS").mean()
     win = obs_m.index.intersection(sm.index)
     ax.plot(win, obs_m.loc[win], color=OBS_C, lw=2.4, label="Observed (USGS)", zorder=3)
-    ax.plot(win, sm.loc[win], color=SER_C, lw=2.0, label="Serial (1 core)", zorder=4)
-    ax.plot(win, wm.loc[win], color=WAV_C, lw=2.0, ls=(0, (4, 2)),
-            label="Full wavefront (8 threads)", zorder=5)
+    ax.plot(win, sm.loc[win], color=SER_C, lw=2.6, label=L_SER, zorder=4)
+    ax.plot(win, hm.loc[win], color=HRU_C, lw=1.6, ls=(0, (2, 2)), label=L_HRU, zorder=6)
+    ax.plot(win, wm.loc[win], color=WAV_C, lw=2.0, ls=(0, (5, 2)), label=L_WAV, zorder=5)
     ax.set_ylabel("Monthly mean flow  (m³/s)", color=INK, fontsize=9)
-    ax.legend(frameon=False, fontsize=8, labelcolor=MUTED, loc="upper left")
-    ax.text(0.0, 1.06, "a · Streamflow against observations — all three overlap",
+    ax.legend(frameon=False, fontsize=7.5, labelcolor=MUTED, loc="upper left")
+    ax.text(0.0, 1.06, "a · Against observations — HRU-parallel sits exactly on serial",
             transform=ax.transAxes, color=INK, fontsize=9.5, fontweight="bold")
 
     # ---- (b) daily flow around the largest event, fully inside the run ----
@@ -92,12 +98,14 @@ def main():
     sl = slice(lo, hi)
     d_obs = oq.loc[sl]
     ax.plot(d_obs.index, d_obs.values, color=OBS_C, lw=1.7, label="Observed", zorder=3)
-    ax.plot(flo.loc[sl].index, flo.loc[sl].values, color=SER_C, lw=1.7,
-            label="Serial", zorder=4)
-    ax.plot(W["flo_out"].loc[sl].index, W["flo_out"].loc[sl].values, color=WAV_C, lw=1.7,
-            ls=(0, (4, 2)), label="Full wavefront", zorder=5)
+    ax.plot(flo.loc[sl].index, flo.loc[sl].values, color=SER_C, lw=2.2,
+            label=L_SER, zorder=4)
+    ax.plot(H["flo_out"].loc[sl].index, H["flo_out"].loc[sl].values, color=HRU_C, lw=1.4,
+            ls=(0, (2, 2)), label=L_HRU, zorder=6)
+    ax.plot(W["flo_out"].loc[sl].index, W["flo_out"].loc[sl].values, color=WAV_C, lw=1.8,
+            ls=(0, (5, 2)), label=L_WAV, zorder=5)
     ax.set_ylabel("Daily flow  (m³/s)", color=INK, fontsize=9)
-    ax.legend(frameon=False, fontsize=8, labelcolor=MUTED, loc="upper left")
+    ax.legend(frameon=False, fontsize=7.5, labelcolor=MUTED, loc="upper left")
     ax.xaxis.set_major_locator(matplotlib.dates.MonthLocator())
     ax.xaxis.set_major_formatter(matplotlib.dates.DateFormatter("%d %b"))
     ax.text(0.0, 1.06, f"b · Daily hydrograph around the largest event "
@@ -110,15 +118,17 @@ def main():
               ("nh3_out", "Ammonia", axes[2, 0], "e")]
     for key, label, ax, tag in panels:
         style(ax)
-        s, w = S[key].resample("MS").sum(), W[key].resample("MS").sum()
-        ax.plot(s.index, s.values, color=SER_C, lw=2.0, label="Serial (1 core)", zorder=4)
-        ax.plot(w.index, w.values, color=WAV_C, lw=2.0, ls=(0, (4, 2)),
-                label="Full wavefront", zorder=5)
+        s = S[key].resample("MS").sum()
+        h = H[key].resample("MS").sum()
+        w = W[key].resample("MS").sum()
+        ax.plot(s.index, s.values, color=SER_C, lw=2.6, label=L_SER, zorder=4)
+        ax.plot(h.index, h.values, color=HRU_C, lw=1.6, ls=(0, (2, 2)), label=L_HRU, zorder=6)
+        ax.plot(w.index, w.values, color=WAV_C, lw=2.0, ls=(0, (5, 2)), label=L_WAV, zorder=5)
         ax.fill_between(s.index, s.values, w.values, color=WAV_C, alpha=0.16,
                         lw=0, zorder=2)
         tot = 100 * (w.sum() - s.sum()) / s.sum()
         ax.set_ylabel(f"{label} load  (kg/month)", color=INK, fontsize=9)
-        ax.legend(frameon=False, fontsize=8, labelcolor=MUTED, loc="upper left")
+        ax.legend(frameon=False, fontsize=7.5, labelcolor=MUTED, loc="upper left")
         ax.text(0.0, 1.06, f"{tag} · {label} — wavefront {tot:+.1f}% over the run",
                 transform=ax.transAxes, color=INK, fontsize=9.5, fontweight="bold")
 
@@ -132,13 +142,21 @@ def main():
         agg = "mean" if key == "flo_out" else "sum"
         s = getattr(S[key].resample("MS"), agg)()
         w = getattr(W[key].resample("MS"), agg)()
+        h = getattr(H[key].resample("MS"), agg)()
         m = np.abs(s.values) > 1e-9
         ax.plot(s.index[m], 100 * (w.values[m] - s.values[m]) / s.values[m],
                 color=c, lw=1.9, ls=ls, label=label, zorder=4)
-    ax.set_ylabel("Wavefront − serial  (% of serial)", color=INK, fontsize=9)
+        ax.plot(s.index[m], 100 * (h.values[m] - s.values[m]) / s.values[m],
+                color=c, lw=2.6, ls="-", alpha=0.85, zorder=5)
+    ax.set_ylabel("Parallel − serial  (% of serial)", color=INK, fontsize=9)
+    ax.annotate("all four HRU-parallel traces lie on zero",
+                xy=(0.5, 0.0), xycoords=("axes fraction", "data"),
+                xytext=(0.30, 0.16), textcoords="axes fraction",
+                color=INK, fontsize=8,
+                arrowprops=dict(arrowstyle="->", color=INK, lw=1.0))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, _: f"{v:+.0f}%"))
     ax.legend(frameon=False, fontsize=8, labelcolor=MUTED, ncol=2, loc="lower left")
-    ax.text(0.0, 1.06, "f · Month-by-month divergence — event-driven, not a constant offset",
+    ax.text(0.0, 1.06, "f · Divergence from serial — wavefront (dashed) swings; HRU-parallel is flat zero",
             transform=ax.transAxes, color=INK, fontsize=9.5, fontweight="bold")
 
     fig.savefig(out, dpi=200, facecolor="#fcfcfb", bbox_inches="tight")

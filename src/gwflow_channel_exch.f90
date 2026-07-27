@@ -40,6 +40,9 @@
       real :: heat_flux !J/day  |heat transferred between groundwater and channel
       real :: chan_flow
 			real :: chan_temp = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(chan_temp)
 
 
       !current channel storage (m3) and temperature (deg C)

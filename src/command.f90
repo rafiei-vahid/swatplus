@@ -147,7 +147,7 @@
         lev = 1
         do while (lev <= obj_nwave)
           if (obj_wave_cnt(lev) > narrow_thr) then
-            !$omp do schedule(dynamic, 16)
+            !$omp do schedule(static)
             do k = 1, obj_wave_cnt(lev)
               call command_object (obj_wave_obj(lev, k))
             end do
@@ -180,7 +180,7 @@
         if (use_wave) then
           !$omp parallel default(shared) private(k, lev)
           do lev = 1, hru_nwave
-            !$omp do schedule(dynamic, 16)
+            !$omp do schedule(static)
             do k = 1, hru_wave_cnt(lev)
               call command_object (hru_wave_obj(lev, k))
             end do

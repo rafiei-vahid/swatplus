@@ -52,6 +52,9 @@
 			real :: irrig_mass = 0.
 			real :: canal_conc = 0.
 			real :: mass_div = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(sol_index, canal_conc, mass_div)
             real :: mass_stor
             real :: mass_pond
             real :: mass_seep

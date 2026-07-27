@@ -25,6 +25,9 @@
       real :: chan_heat !J      |heat in the channel
 			real :: chan_flow = 0.
 			real :: chan_temp = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(chan_flow, chan_temp)
 			real :: gw_temp,gw_storage,gw_heat
 
 

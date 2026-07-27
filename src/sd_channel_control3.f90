@@ -49,6 +49,8 @@
       integer :: ipf                 !none          |PFAS compound counter
       real :: salt_conc(8) = 0.       !kg            |salt concentration in channel water
       real :: cs_conc(8) = 0.         !kg            |constituent concentration in channel water
+!! initialized locals => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(salt_conc, cs_conc)
       real :: conc_chng !              |change in concentration (and mass) in channel sol and org N and P
       real :: inflo_rate
       real :: aqu_inflo !m3            |aquifer inflow if using geomorphic baseflow

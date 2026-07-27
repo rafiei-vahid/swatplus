@@ -56,6 +56,9 @@
       real :: sumle !              |
       real :: fi !              |
       character(len=1) :: comp_light = ""
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(comp_light)
       
       j = ihru  
       par = 0.

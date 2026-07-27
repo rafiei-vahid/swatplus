@@ -57,6 +57,8 @@
       real :: p_lab_ppm
       real :: rto
       character(len=1) :: pl_chk = ""
+!! initialized local => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(pl_chk)
       
       !! swatplus_perf OpenMP: per-thread act_hit scratch, grown to this table's alts.
       if (allocated(act_hit_tl)) then

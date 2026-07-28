@@ -97,7 +97,12 @@
                   pcom(j)%plcur(ipl)%gro = "y"
                   pcom(j)%plcur(ipl)%idorm = "n"
                   call mgt_plantop
-                  !itr = 0
+                  !! itr must be cleared on every operation: the lookup below runs only when
+                  !! op3 > 0, but the call is made outside that guard, so a stale index would
+                  !! transplant on an operation that asked for none -- or index transpl() out
+                  !! of bounds. This reset replaces the declaration initializer, which gave itr
+                  !! the SAVE attribute and so was not reentrant.
+                  itr = 0
                   if (mgt%op3 > 1.e-6) then
                     do idb = 1, db_mx%transplant
                       if (mgt%op_plant == transpl(idb)%name) then

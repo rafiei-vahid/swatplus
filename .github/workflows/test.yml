@@ -50,7 +50,19 @@ jobs:
         if: runner.os == 'Linux'
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq libnetcdff-dev
+          # netcdf-c is a C library, so the distribution build is fine. netcdf-fortran is not:
+          # its .mod must be written by the compiler that consumes it, so build it with $FC.
+          sudo apt-get install -y -qq libnetcdf-dev
+          VER=4.6.1
+          curl -sSL "https://downloads.unidata.ucar.edu/netcdf-fortran/${VER}/netcdf-fortran-${VER}.tar.gz" | tar xz
+          cd "netcdf-fortran-${VER}"
+          ./configure --prefix=/opt/netcdf-fortran --enable-shared --disable-fortran-type-check \
+            FC="${{ env.FC }}" F77="${{ env.FC }}" \
+            CPPFLAGS="$(pkg-config --cflags netcdf)" LDFLAGS="$(pkg-config --libs netcdf)"
+          make -j"$(nproc)"
+          sudo make install
+          echo "PKG_CONFIG_PATH=/opt/netcdf-fortran/lib/pkgconfig" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=/opt/netcdf-fortran/lib:${LD_LIBRARY_PATH}" >> "$GITHUB_ENV"
       - name: Build SWAT+
         id: build_exe
         run: |

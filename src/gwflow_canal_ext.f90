@@ -16,6 +16,9 @@
       integer :: s !       |counter of groundwater solutes
       integer :: cell_id !       |cell in connection with the canal
 	  integer :: sol_index = 0
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(sol_index)
       integer :: ics
 	  integer :: isalt = 0
       real :: width !m      |canal width

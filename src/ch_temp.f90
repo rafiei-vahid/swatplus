@@ -255,6 +255,15 @@
       
       yrs_to_start = time%yrs - tmp(ig)%yrs_start   !model year - (tmp start year is model year)
 
+      !! simulation years outside the gage record (weather-generator spin-up before
+      !! the measured series, or beyond its end) would index tmp(ig)%ts with a
+      !! non-positive / out-of-range year: out-of-bounds read -> NaN -> FP crash.
+      !! Fall back to the default water temperature, same as no gage assigned.
+      if (yrs_to_start < 1 .or. yrs_to_start > size(tmp(ig)%ts, 2)) then
+        tw_local = tw_def
+        goto 900
+      endif
+
       if (jday <= surf_lag .and. yrs_to_start > 1) then
           t_air_max_av = (sum(tmp(ig)%ts(1:jday,yrs_to_start))+sum(tmp(ig)%ts(jday+365-surf_lag+1:365,yrs_to_start-1)))/surf_lag
           t_air_min_av = (sum(tmp(ig)%ts2(1:jday,yrs_to_start))+sum(tmp(ig)%ts2(jday+365-surf_lag+1:365,yrs_to_start-1)))/surf_lag

@@ -29,6 +29,8 @@
       real :: wet_inflow_no3 !kg             |groundwater no3 mass to wetland (from all connected cells)
       real :: wet_inflow_solp !kg             |groundwater p mass to wetland (from all connected cells)
       real :: solmass(100) = 0.       !g              |solute mass in cell
+!! initialized local => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(solmass)
       real :: heat_flux !J              |heat transport in groundwater inflow to wetland
       real :: wet_depth !m
 

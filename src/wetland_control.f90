@@ -49,6 +49,8 @@
       real :: volseep
       real :: volex
       real :: swst(20) = 0.
+!! initialized locals => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(bypass, swst)
       j = ihru
       ires = hru(j)%dbs%surf_stor
       ihyd = wet_dat(ires)%hyd

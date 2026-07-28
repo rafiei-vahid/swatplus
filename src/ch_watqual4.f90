@@ -88,11 +88,18 @@
       integer :: iwgn = 0
 
 !     swatplus_perf reentrancy: these SAVE scratch locals were stripped engine-wide for the OpenMP
-!     wavefront, but a few are read-before-written (rate terms gated on rchdep, inflow-conc helpers)
-!     and relied on cross-call persistence — stripping + -init=zero reset them each call and shifted
-!     the in-channel WQ (chla etc.) ~0.3% vs the serial engine. Keeping them SAVE + threadprivate
-!     gives each thread its own PERSISTENT copy: byte-identical to production at 1 thread, race-free
-!     at N>1. (Read-only Theta constants th* stay shared.)
+!     wavefront, then restored here because stripping shifted the in-channel WQ (chla etc.) ~0.3%
+!     vs the serial engine. threadprivate gives each thread its own persistent copy: byte-identical
+!     to production at 1 thread, race-free at N>1. (Read-only Theta constants th* stay shared.)
+!
+!     CORRECTION, 2026-07-28. The original note blamed that ~0.3% on "rate terms gated on rchdep"
+!     and "inflow-conc helpers" relying on cross-call persistence, and on a "-init=zero" build.
+!     Both were wrong. A full def-use pass over the routine shows every rchdep-gated term
+!     (alg_set, rk3_k, rs4_k, rs5_k) carries an unconditional "= 0." immediately BEFORE its guarded
+!     write, and the inflow helpers (disoxin, dispin, cbodoin) are dead stores; -init=zero is not in
+!     this build at all (CMakeLists sets only "-O"). The single genuine cross-call dependence was
+!     "gra" -- see the comment at its reset below -- and it is now removed. The remaining locals are
+!     kept threadprivate because that is correct and free, not because any of them carries state.
 !$omp threadprivate(tday, wtmp, fll, gra, lambda, fnn, fpp, algi, fl_1, xx, yy, zz, ww, cordo,    &
 !$omp   f1, algcon, soxy, rs2_s, rs3_s, rk4_s, disoxin, dispin, ammoin, cinn, algin, factk,        &
 !$omp   alg_m1, alg_m, alg_m2, alg_no3_m, alg_nh4_m, alg_p_m, alg_set, algcon_out, cbodo, cbodoin, &
@@ -195,6 +202,22 @@
         fll = 0.92 * (wgn_pms(iwgn)%daylth / 24.) * fl_1
 
         !! calculate local algal growth rate
+        !! swatplus_perf: gra MUST be reset here. It is declared with an initializer, so
+        !! Fortran's implicit-SAVE rule (F2018 8.5.16) makes it persist across calls, and
+        !! it is read UNCONDITIONALLY at "factk = Theta(gra,...)" below -- but it is only
+        !! written inside this "algcon < 5000." guard, and inside a select case with no
+        !! case default. So on any channel-day where algal concentration reaches the 5000
+        !! cap (routine in low-flow channels: algcon = 1000*chla/ai0, and ai0 is 50), or
+        !! where igropt is outside {1,2,3}, the growth rate silently carried over FROM THE
+        !! PREVIOUSLY SIMULATED CHANNEL.
+        !!
+        !! That made in-stream chlorophyll-a depend on the order channels are visited --
+        !! a latent defect in the serial engine, not a parallel one: it is why the OpenMP
+        !! wavefront could not reproduce serial bit-for-bit even with every race removed
+        !! (each thread carries its own persistent copy, so "the previous channel" differs).
+        !! Zero is the only order-independent choice and is what the cap intends: at
+        !! saturation there is no further algal growth.
+        gra = 0.
         if (algcon < 5000.) then
           select case (ch_nut(jnut)%igropt)
           case (1)

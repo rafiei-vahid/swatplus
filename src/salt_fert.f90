@@ -21,6 +21,9 @@
       real, intent (in) :: frt_kg         !kg/ha          |amount of fertilizer applied
       integer, intent (in) :: fertop      !               | 
       character(len=16) :: fert_type = ""
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(fert_type)
       real :: xx !               |surface application fraction 
       integer :: l !none           |counter 
 

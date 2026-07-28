@@ -51,8 +51,21 @@
       
         !! adjust precip and temperature for elevation using lapse rates
         w = wst(iwst)%weat
-        if (bsn_cc%lapse == 1) call cli_lapse
-        wst(iwst)%weat = w
+        !! swatplus_perf: the write-back of the shared weather record was REMOVED,
+        !! and so was the per-object "call cli_lapse". w is threadprivate and cli_lapse
+        !! does not modify it (it only writes ob(:)%plaps/tlaps), so the write-back
+        !! stored a value it had just read. It was not harmless in parallel:
+        !! weather_daily has ALLOCATABLE components, so intrinsic assignment
+        !! deallocates/reallocates, and up to 185 objects share one weather station --
+        !! concurrent writers raced in the ALLOCATOR, not over values.
+        !!
+        !! cli_lapse itself writes ob(1:sp_ob%objs)%plaps/%tlaps -- EVERY object, from
+        !! inside the parallel region, while hru_control reads them. It is a pure
+        !! function of static elevations (ob%elev, wgn/pcp/tmp%elev, bsn_prm%plaps and
+        !! %tlaps), none of which change during simulation, so the single call at
+        !! init (main.f90) already fixes the values and every later call recomputed
+        !! them identically. Deleting it is value-identical and removes a
+        !! basin-wide write-write race.
       
         !! set water body pointer to res
         wbody => res(jres)

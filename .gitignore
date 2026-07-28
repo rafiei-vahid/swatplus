@@ -115,3 +115,8 @@ ford.md
 /refdata/Osu_1hru/aquifer_aa.txt
 [Tt]mp/
 /workdata
+
+# local experiment artifacts (engine variants, run outputs, python cache)
+build_*/
+scratch/
+__pycache__/

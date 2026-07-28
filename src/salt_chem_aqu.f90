@@ -52,6 +52,9 @@
       real :: Sol_CaSO4_p(1000) = 0.
       real :: Sol_MgSO4_p(1000) = 0.
       real :: Sol_NaCl_p(1000) = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(Sol_CaCO3_p, Sol_MgCO3_p, Sol_CaSO4_p, Sol_MgSO4_p, Sol_NaCl_p)
       real :: I_Prep_in
       real :: I_diff
       real :: SkipedIEX

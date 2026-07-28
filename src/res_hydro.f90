@@ -52,7 +52,14 @@
       real :: I_mon !m3         |Monthly inflow
       real :: d_mon !m3         |Monthly demand
       real :: beta              = 0.10                                        !none       |Environmental flow req coefficient
-      real :: target_rel        = 0.                                          !m3         |Target release
+      real :: target_rel        = 0.
+!! swatplus_perf OpenMP: these locals carry an INITIALIZER, which gives them the SAVE
+!! attribute (F2018 8.5.16) and therefore ONE static copy shared by every thread. They
+!! are written then read inside a single call, so concurrent reservoir/wetland objects
+!! clobbered each other's release decision. threadprivate keeps the save semantics and
+!! serial results identical while giving each thread its own copy. No flag fixes this
+!! class -- -auto/-recursive/-qopenmp all exclude SAVEd variables by definition.
+!$omp threadprivate(action, er, beta, target_rel)                                          !m3         |Target release
 
 
       !! Jose T 2025 |  HYPE model for HP method

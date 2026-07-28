@@ -30,6 +30,9 @@
       real :: cssum2
       real :: cssum3
       real :: cs_basin(87) = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(cs_basin)
 
       !basin-wide constituent mass balance ------------------------------------------------------------------------------------------------
 

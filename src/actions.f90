@@ -93,6 +93,8 @@
       character(len=1) :: action = ""      !         |
       character(len=40) :: lu_prev = ""    !         |
       character(len=40) :: snow_prev = ""  !         |
+!! initialized locals => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(action, lu_prev, snow_prev)
 
       do iac = 1, d_tbl%acts
         action = "n"

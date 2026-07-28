@@ -15,6 +15,13 @@
       integer, dimension(:,:), allocatable :: hru_wave_obj       !(level,k) -> object (icmd) index of k-th HRU
       logical :: hru_wave_ready = .false.
 
+      !! ISOLATION EXPERIMENT support (SWATPLUS_HRU_SERIAL=1): per-level flag, true when
+      !! the level contains at least one HRU object. Used by command.f90 to run those
+      !! levels on the master thread while non-HRU levels stay parallel, isolating
+      !! "HRU parallel" from "routing parallel". All .false. unless the env var is set,
+      !! so the shipped behaviour is untouched.
+      logical, dimension(:), allocatable :: obj_wave_has_hru
+
       !! Phase C full-DAG wave: ALL command objects (hru/ru/channel/res/aqu/...) bucketed
       !! by cmd_order level. Same-level objects are mutually independent -> run concurrently.
       integer :: obj_nwave = 0                                   !number of object levels (max cmd_order)
@@ -27,9 +34,12 @@
 !!    Compute ob(:)%cmd_order = longest path from a headwater leaf (fixpoint over the
 !!    DAG), then bucket HRU-type objects by level. Called once after connectivity is
 !!    final; safe to call again (idempotent) - it reallocates.
-      use hydrograph_module, only : ob, sp_ob, sp_ob1
+      use hydrograph_module, only : ob, sp_ob, sp_ob1, ru_def, ru_elem
       implicit none
       integer :: ic, in, iob, newlev, lev, k, maxcnt, npass
+      integer :: iru_l, ise_l, ie
+      integer :: env_st
+      character(len=8) :: hru_ser_env
       logical :: changed
 
       if (sp_ob%objs <= 0) return
@@ -45,16 +55,52 @@
         npass = npass + 1
         ic = sp_ob1%objs
         do while (ic /= 0)
-          if (ob(ic)%rcv_tot == 0) then
-            newlev = 1
-          else
-            newlev = 1
-            do in = 1, ob(ic)%rcv_tot
-              iob = ob(ic)%obj_in(in)
-              if (iob >= 1 .and. iob <= sp_ob%objs) then
-                if (ob(iob)%cmd_order + 1 > newlev) newlev = ob(iob)%cmd_order + 1
+          newlev = 1
+          do in = 1, ob(ic)%rcv_tot
+            iob = ob(ic)%obj_in(in)
+            if (iob >= 1 .and. iob <= sp_ob%objs) then
+              if (ob(iob)%cmd_order + 1 > newlev) newlev = ob(iob)%cmd_order + 1
+            end if
+          end do
+
+          !! ------------------------------------------------------------------
+          !! A routing unit consumes its element HRUs' daily hydrographs
+          !! (ru_control: iob = ru_elem(ru_def(iru)%num(ielem))%obj, then
+          !! ht1 = ob(iob)%hd(...)), but that coupling lives in ru_def/ru_elem --
+          !! a MEMBERSHIP table, not a .con record -- so it never appears in
+          !! obj_in and rcv_tot is 0. Ordering by flow edges alone therefore put
+          !! every element-only ru on level 1 beside the very HRUs it reads.
+          !!
+          !! Stock SWAT+ guards this in hyd_connect (".. subbasin has to be in
+          !! parallel order after elements in the subbasin"); rewriting the level
+          !! assignment as a longest-path fixpoint dropped the guard, and the
+          !! wavefront then read one-day-stale hydrographs -- ~95% median daily
+          !! error on the event-driven constituents (orgn/sedp/nh3) while flow and
+          !! no3, being baseflow-dominated and autocorrelated, moved only ~2%.
+          !!
+          !! Take the max over the ELEMENT objects too. This is stronger than the
+          !! stock "iorder = 1" floor, which only forces level >= 2 and would break
+          !! if an element were itself above level 1.
+          if (ob(ic)%typ == "ru") then
+            iru_l = ob(ic)%num
+            if (iru_l >= 1 .and. allocated(ru_def)) then
+              if (iru_l <= size(ru_def)) then
+                if (allocated(ru_def(iru_l)%num)) then
+                  do ie = 1, ru_def(iru_l)%num_tot
+                    ise_l = ru_def(iru_l)%num(ie)
+                    if (ise_l >= 1 .and. allocated(ru_elem)) then
+                      if (ise_l <= size(ru_elem)) then
+                        iob = ru_elem(ise_l)%obj
+                        if (iob >= 1 .and. iob <= sp_ob%objs) then
+                          if (ob(iob)%cmd_order + 1 > newlev)                     &
+                            newlev = ob(iob)%cmd_order + 1
+                        end if
+                      end if
+                    end if
+                  end do
+                end if
               end if
-            end do
+            end if
           end if
           if (newlev /= ob(ic)%cmd_order) then
             ob(ic)%cmd_order = newlev
@@ -125,6 +171,22 @@
         end do
         if (allocated(obj_wave_obj)) deallocate (obj_wave_obj)
         allocate (obj_wave_obj(obj_nwave, maxcnt)); obj_wave_obj = 0
+
+        !! ISOLATION EXPERIMENT: mark levels containing at least one HRU. Populated ONLY
+        !! when SWATPLUS_HRU_SERIAL=1, so the flag stays all-.false. and the shipped
+        !! scheduling is bit-for-bit unchanged in normal operation.
+        if (allocated(obj_wave_has_hru)) deallocate (obj_wave_has_hru)
+        allocate (obj_wave_has_hru(obj_nwave)); obj_wave_has_hru = .false.
+        hru_ser_env = " "
+        call get_environment_variable ("SWATPLUS_HRU_SERIAL", hru_ser_env, status=env_st)
+        if (env_st == 0 .and. (hru_ser_env(1:1) == "1" .or. hru_ser_env(1:1) == "y")) then
+          ic = sp_ob1%objs
+          do while (ic /= 0)
+            lev = ob(ic)%cmd_order
+            if (lev >= 1 .and. ob(ic)%typ == "hru") obj_wave_has_hru(lev) = .true.
+            ic = ob(ic)%cmd_next
+          end do
+        end if
         obj_wave_cnt = 0
         ic = sp_ob1%objs
         do while (ic /= 0)
@@ -160,5 +222,15 @@
 
       return
       end subroutine command_wave_build
+
+      logical function lev_is_hru (lev)
+      implicit none
+      integer, intent(in) :: lev
+      lev_is_hru = .false.
+      if (.not. allocated(obj_wave_has_hru)) return
+      if (lev < 1 .or. lev > size(obj_wave_has_hru)) return
+      lev_is_hru = obj_wave_has_hru(lev)
+      return
+      end function lev_is_hru
 
       end module command_wave_module

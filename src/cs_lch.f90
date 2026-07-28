@@ -39,6 +39,9 @@
       real :: cocs
       real :: cosurfcs
       real :: perccslyr(3) = 0.
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(perccslyr)
       real :: ssfcslyr
       real :: vcs
       real :: hru_area_m2

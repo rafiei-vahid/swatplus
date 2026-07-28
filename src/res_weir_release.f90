@@ -19,6 +19,8 @@
       real,  intent (in) :: weir_hgt  !m         |height of weir overflow crest from reservoir bottom
       integer,  intent (in) :: jres             !none      |hru number
       integer :: iweir = 1          !none      |weir ID 
+!! initialized local => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(iweir)
       integer :: nstep !none      |counter
       integer :: tstep !none      |hru number
       integer :: ic !none      |counter

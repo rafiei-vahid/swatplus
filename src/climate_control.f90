@@ -54,6 +54,9 @@
       real :: atri                !none          |daily value generated for distribution
       real :: xx
       character(len=1) :: out_bounds = 'n'
+!! initialized local => implicit SAVE => one static copy shared by all threads
+!! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
+!$omp threadprivate(out_bounds)
         
       !! Precipitation:
       call cli_precip_control (1)

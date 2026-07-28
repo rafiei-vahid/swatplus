@@ -28,7 +28,7 @@
 
       external :: actions, ch_rtmusk, ch_rtpath, ch_rtpest, ch_temp, ch_watqual4, conditions, gwflow_canal, &
                   gwflow_channel_exch, gwflow_floodplain, gwflow_satexcess, gwflow_tile, rcurv_interp_flo, &
-                  sd_channel_sediment3, wallo_control, cli_lapse, pfas_cha
+                  sd_channel_sediment3, wallo_control, pfas_cha
     
       integer :: isd_db !              |
       integer :: ipest !              |
@@ -49,6 +49,8 @@
       integer :: ipf                 !none          |PFAS compound counter
       real :: salt_conc(8) = 0.       !kg            |salt concentration in channel water
       real :: cs_conc(8) = 0.         !kg            |constituent concentration in channel water
+!! initialized locals => implicit SAVE => shared across threads (see res_hydro.f90)
+!$omp threadprivate(salt_conc, cs_conc)
       real :: conc_chng !              |change in concentration (and mass) in channel sol and org N and P
       real :: inflo_rate
       real :: aqu_inflo !m3            |aquifer inflow if using geomorphic baseflow
@@ -106,8 +108,21 @@
       
       !! adjust precip and temperature for elevation using lapse rates
       w = wst(iwst)%weat
-      if (bsn_cc%lapse == 1) call cli_lapse
-      wst(iwst)%weat = w
+      !! swatplus_perf: the write-back of the shared weather record was REMOVED,
+      !! and so was the per-object "call cli_lapse". w is threadprivate and cli_lapse
+      !! does not modify it (it only writes ob(:)%plaps/tlaps), so the write-back
+      !! stored a value it had just read. It was not harmless in parallel:
+      !! weather_daily has ALLOCATABLE components, so intrinsic assignment
+      !! deallocates/reallocates, and up to 185 objects share one weather station --
+      !! concurrent writers raced in the ALLOCATOR, not over values.
+      !!
+      !! cli_lapse itself writes ob(1:sp_ob%objs)%plaps/%tlaps -- EVERY object, from
+      !! inside the parallel region, while hru_control reads them. It is a pure
+      !! function of static elevations (ob%elev, wgn/pcp/tmp%elev, bsn_prm%plaps and
+      !! %tlaps), none of which change during simulation, so the single call at
+      !! init (main.f90) already fixes the values and every later call recomputed
+      !! them identically. Deleting it is value-identical and removes a
+      !! basin-wide write-write race.
       ht1%temp = 5.0 + 0.75 * wst(iwst)%weat%tave
       wtemp = 5.0 + 0.75 * wst(iwst)%weat%tave
 

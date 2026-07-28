@@ -5,7 +5,9 @@
 > [SWATGenX](https://swatgenx.com) platform: shared-memory (OpenMP) parallelism, a NetCDF output
 > backend, land-phase and in-stream **PFAS fate-and-transport**, and a daily two-way **SWAT+ ↔
 > MODFLOW 6** surface-water/groundwater coupling. Each addition is inert unless explicitly enabled, so
-> a stock SWAT+ model runs here with byte-identical results. The reentrancy work that enables safe
+> a stock SWAT+ model runs here unchanged. Results track upstream except where two
+> order-dependence defects were fixed (`gra` in `ch_watqual4`, `enratio` in `varinit`), which
+> shift in-stream CBOD and chlorophyll-a; both are reported upstream as swat-model/swatplus#242. The reentrancy work that enables safe
 > parallelism makes the engine **Intel `ifx`-only** for production-scale models (`gfortran` is fine for
 > small serial runs).
 
@@ -56,9 +58,9 @@ The acceleration methodology and validation standard are described in a manuscri
 ## What this engine adds over upstream SWAT+
 
 1. **Shared-memory (OpenMP) parallelism.** A wavefront over the daily object dependency graph, with
-   per-thread "current-object" state, gives multi-core speedup on a single model. The **HRU land phase
-   is byte-identical** in parallel; channel routing is a separate opt-in mode because its parallel
-   wavefront reorders in-stream summation (see *Running*). This required an engine-wide reentrancy
+   per-thread "current-object" state, gives multi-core speedup on a single model. **Both parallel modes are
+   byte-identical** to a serial run of the same binary -- the HRU land phase alone, and the full
+   wavefront that parallelizes channel routing as well (see *Running*). This required an engine-wide reentrancy
    refactor (below). Build option `SWATPLUS_OPENMP=ON`; threads via `OMP_NUM_THREADS`.
 
 2. **NetCDF output backend.** Per-stream NetCDF-4 output (`*_day.nc`, …) when `cdfout = y` in
@@ -112,11 +114,11 @@ mode; **the default is fully serial and byte-identical**:
 |---|---|---|
 | Serial (default) | `OMP_NUM_THREADS=1` | byte-identical reference results |
 | HRU-parallel | `OMP_NUM_THREADS=N` + `SWATPLUS_ROUTING_SERIAL=1` | **byte-identical**, multi-core speedup |
-| Fully parallel | `OMP_NUM_THREADS=N` + `SWATPLUS_ROUTING_SERIAL=0` | fastest; channel routing carries an N>1 round-off — opt-in |
+| Fully parallel | `OMP_NUM_THREADS=N` + `SWATPLUS_ROUTING_SERIAL=0` | **byte-identical**, fastest |
 
 - `OMP_NUM_THREADS` sets the **HRU land-phase** thread count; the HRU phase is byte-identical in parallel.
-- `SWATPLUS_ROUTING_SERIAL=1` keeps channel routing in serial command order (byte-identical); `=0` enables
-  the parallel routing wavefront, which reorders in-stream summation and is **not** bit-reproducible at N>1.
+- `SWATPLUS_ROUTING_SERIAL=1` keeps channel routing in serial command order; `=0` enables the parallel
+  routing wavefront. Both are byte-identical to serial; the flag is a speed and cross-check choice only.
 - **PFAS** activates when the model directory carries the PFAS inputs (`pfas.dat` / `pfas_calib.dat`); otherwise dormant.
 - **MODFLOW 6 coupling** activates when `mf6.con` is present (and the MODFLOW 6 shared library is on the
   library path); otherwise the run is plain SWAT+.
@@ -127,7 +129,7 @@ same modes as a convenience CLI (serial by default):
 ```bash
 swatplus                                              # serial, byte-identical (default)
 swatplus -n 4 -hru-parallel on                        # HRU parallel, routing serial (byte-identical)
-swatplus -n 8 -hru-parallel on -routing-parallel on   # both parallel (round-off; use with care)
+swatplus -n 8 -hru-parallel on -routing-parallel on   # both parallel (byte-identical, fastest)
 ```
 
 ## Correctness & reproducibility standard
@@ -137,9 +139,9 @@ The acceleration and coupling preserve the science to a documented, automatable 
 - **Byte-parity & thread-count invariance.** Bit-for-bit identical output is the target, and output
   independence from `OMP_NUM_THREADS` doubles as a data-race detector; `N=1` reproduces the original
   serial order exactly.
-- **Documented model-equivalence.** Where a parallel reduction reorders a summation, aggregates may
-  differ at the last ULP (≤ 1e-3 absolute, ~1e-7 relative); flow, sediment, water balance, and PFAS
-  stay byte-identical.
+- **Bitwise equivalence, not tolerance.** Every variable of every output file matches the serial run
+  exactly, in both parallel modes -- verified across a five-basin fleet, 1.63e10 compared values,
+  none differing. There is no ULP allowance to negotiate.
 - **Standing gate.** `swatplus_perf/scripts/byteid_rogue_pfas.sh` runs the full coupled SW+GW PFAS
   Rogue River model at `N=1` vs `N=4` and asserts this standard before any engine is promoted to
   production.

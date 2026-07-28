@@ -46,7 +46,11 @@ jobs:
         with:
           compiler: ${{ matrix.toolchain.compiler }}
           version: ${{ matrix.toolchain.version }}
-
+      - name: Install NetCDF-Fortran
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq libnetcdff-dev
       - name: Build SWAT+
         id: build_exe
         run: |

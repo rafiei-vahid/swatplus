@@ -271,25 +271,33 @@
             end do
           end if
                          
-          ! Call soil_nutcarb_write for specified output for hru_cb in print.prt
-          if (pco%cb_hru%d == "y") call soil_nutcarb_write(" d")
-          if (pco%cb_hru%d == "l") call soil_nutcarb_write("dl")
-          if (pco%cb_hru%m == "y" .and. time%end_mo == 1) call soil_nutcarb_write(" m")
-          if (pco%cb_hru%m == "l" .and. time%end_mo == 1) call soil_nutcarb_write("ml")
-          if (pco%cb_hru%y == "y" .and. time%end_yr == 1) call soil_nutcarb_write(" y") 
-          if (pco%cb_hru%y == "l" .and. time%end_yr == 1) call soil_nutcarb_write("yl") 
+        end do      ! hru loop
 
-          ! Call soil_carbvar_write for specified output for hru_cb_vars in print.prt
-          if (bsn_cc%cswat == 1) then
-            if (pco%cb_vars_hru%d == "y") call soil_carbvar_write(" d")
-            if (pco%cb_vars_hru%d == "l") call soil_carbvar_write("dl")
-            if (pco%cb_vars_hru%m == "y" .and. time%end_mo == 1) call soil_carbvar_write(" m")
-            if (pco%cb_vars_hru%m == "l" .and. time%end_mo == 1) call soil_carbvar_write("ml")
-            if (pco%cb_vars_hru%y == "y" .and. time%end_yr == 1) call soil_carbvar_write(" y")
-            if (pco%cb_vars_hru%y == "l" .and. time%end_yr == 1) call soil_carbvar_write("yl")
-          endif
-        
-        end do      ! hru loop  
+        !! soil_nutcarb_write and soil_carbvar_write both iterate every HRU internally, so they
+        !! must be called once per output event -- not once per HRU inside the loop above, which
+        !! duplicated every row sp_ob%hru times. On the 13-HRU Ames_sub1 reference scenario that
+        !! turned ~100 MB of carbon output into 57 GB and made the run I/O-bound.
+        !! Port of upstream 27b38e4 ("Fix legacy carbon output writing duplicate rows per HRU"),
+        !! applied to the pre-refactor writer names this tree still uses.
+
+        ! Call soil_nutcarb_write for specified output for hru_cb in print.prt
+        if (pco%cb_hru%d == "y") call soil_nutcarb_write(" d")
+        if (pco%cb_hru%d == "l") call soil_nutcarb_write("dl")
+        if (pco%cb_hru%m == "y" .and. time%end_mo == 1) call soil_nutcarb_write(" m")
+        if (pco%cb_hru%m == "l" .and. time%end_mo == 1) call soil_nutcarb_write("ml")
+        if (pco%cb_hru%y == "y" .and. time%end_yr == 1) call soil_nutcarb_write(" y")
+        if (pco%cb_hru%y == "l" .and. time%end_yr == 1) call soil_nutcarb_write("yl")
+
+        ! Call soil_carbvar_write for specified output for hru_cb_vars in print.prt
+        if (bsn_cc%cswat == 1) then
+          if (pco%cb_vars_hru%d == "y") call soil_carbvar_write(" d")
+          if (pco%cb_vars_hru%d == "l") call soil_carbvar_write("dl")
+          if (pco%cb_vars_hru%m == "y" .and. time%end_mo == 1) call soil_carbvar_write(" m")
+          if (pco%cb_vars_hru%m == "l" .and. time%end_mo == 1) call soil_carbvar_write("ml")
+          if (pco%cb_vars_hru%y == "y" .and. time%end_yr == 1) call soil_carbvar_write(" y")
+          if (pco%cb_vars_hru%y == "l" .and. time%end_yr == 1) call soil_carbvar_write("yl")
+        endif
+
         !! swatplus_perf: netcdf (hru flush)
         if (pco%cdfout == "y") then
           call nc_flush_daily_hru()

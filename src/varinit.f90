@@ -59,7 +59,8 @@
         bioday, bsprev, canev, ep_day, ep_max, es_day, fertn, fertp, grazn, grazp,      &
         hhsedy, inflpcp, latqrunon, ls_overq, lyrtile, qp_cms,                          &
         pet_day, qday, qtile, sepday, snoev, snofall, snomlt,                           &
-        sw_excess, ubnrunoff, ubntss, uno3d, usle, usle_ei, voltot, vpd, fixn 
+        sw_excess, ubnrunoff, ubntss, uno3d, usle, usle_ei, voltot, vpd, fixn,        &
+        enratio 
       use soil_module
       use hydrograph_module
       
@@ -68,7 +69,24 @@
       integer :: j !none          |HRU number
       integer :: ly !none          |counter
       real :: crk !mm H2O        |percolation due to crack flow
-      real :: enratio !none          |enrichment ratio calculated for day in HRU
+!!    swatplus_perf: "real :: enratio" USED TO BE DECLARED HERE, shadowing the module
+!!    variable of the same name in hru_module. varinit's whole job is to reset the HRU's
+!!    daily state -- its own header lists enratio among the variables it initializes --
+!!    but the local declaration meant "enratio = 0." below zeroed a local and left the
+!!    real one untouched. The module enratio is written ONLY by pest_enrsb, which runs
+!!    only when surfq > 0 .and. qp_cms > 1.e-6 .and. precip_eff > 0, so on every other
+!!    HRU-day it silently retained THE PREVIOUS HRU's enrichment ratio.
+!!
+!!    Its one live consumer is swr_subwq (org_c -> cbodu -> doxq), so the symptom was
+!!    exactly channel CBOD and dissolved oxygen depending on HRU visitation order -- the
+!!    last thing standing between the OpenMP engine and bit-identity with serial, since
+!!    enratio is threadprivate and each thread therefore carries its own chain of
+!!    leftovers. Like the ch_watqual4 "gra" carry-over, this is a defect in SERIAL
+!!    SWAT+ that parallelism merely exposed; the shadowing is present verbatim upstream.
+!!
+!!    enratio now comes from hru_module (see the use list above) so the reset lands on
+!!    the real variable. Note etday/crk/over_flow/sedprev are shadowed the same way, but
+!!    etday is written unconditionally in hru_control and the others are unused here.
       real :: etday !mm H2O        |actual amount of evapotranspiration that 
                                 !              |occurs on day in HRU
       real :: over_flow !              |

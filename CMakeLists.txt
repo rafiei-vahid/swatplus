@@ -258,7 +258,13 @@ find_package(Python3 QUIET)
 set(spcheck "${PROJECT_SOURCE_DIR}/test/spcheck.py")
 set(exe_path "${PROJECT_BINARY_DIR}/${SWATPLUS_EXE}")
 set(test_dir "${PROJECT_BINARY_DIR}/data")
-set(ref_dir  "${PROJECT_SOURCE_DIR}/data")
+# This fork keeps the reference datasets in refdata/, because data/ is where a run's own inputs
+# get staged. Accept either, so the tests work in both this layout and upstream's.
+if(EXISTS "${PROJECT_SOURCE_DIR}/data/Ames_sub1")
+  set(ref_dir "${PROJECT_SOURCE_DIR}/data")
+else()
+  set(ref_dir "${PROJECT_SOURCE_DIR}/refdata")
+endif()
 
 # error tolerances
 set(rerr "0.01")

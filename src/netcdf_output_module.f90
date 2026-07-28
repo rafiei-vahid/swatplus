@@ -279,6 +279,22 @@
         write(9000,*) "HRU                       ", trim(path)
       end subroutine nc_stream_open
 
+!!    Write the obj_id/gis_id coordinate variables that every open path fills in memory.
+!!    Only nc_stream_set_hru_meta used to do this, so channel/sd_channel/aquifer/basin
+!!    streams shipped with both id variables left at _FillValue. Anything that aligns two
+!!    runs by object id therefore had nothing to align on and silently fell back to an
+!!    index-wise comparison -- which is exactly the false positive the alignment exists to
+!!    prevent. Found 2026-07-28 while diffing wavefront vs serial output.
+      subroutine nc_stream_put_ids(s)
+        type(nc_stream), intent(inout) :: s
+        real :: rid(s%nobj), gid(s%nobj)
+        if (.not. s%on) return
+        rid = real(s%obj_id)
+        gid = real(s%gis_id)
+        call nc_put_var_1d_r32_slice(s%ncid, s%vid_oid, rid, 1)
+        call nc_put_var_1d_r32_slice(s%ncid, s%vid_gid, gid, 1)
+      end subroutine nc_stream_put_ids
+
       subroutine nc_stream_set_hru_meta(s)
         type(nc_stream), intent(inout) :: s
         integer :: j, iob
@@ -446,6 +462,7 @@
         end do
         call nc_stream_open(s, trim(fname)//".nc", 1, vn(1:nvar), tchunk)
         s%obj_id(1) = 1; s%gis_id(1) = 1; s%oname(1) = bsn%name
+        call nc_stream_put_ids(s)
       end subroutine nc_open_basin_singleton
 
       subroutine nc_open_lsu_stream(s, fname, n, vn, flag, tchunk)
@@ -502,6 +519,7 @@
           s%gis_id(iaq) = ob(iob)%gis_id
           s%oname(iaq) = ob(iob)%name
         end do
+        call nc_stream_put_ids(s)
       end subroutine nc_open_aquifer
 
       subroutine nc_open_channel(s, suffix, flag)
@@ -522,6 +540,7 @@
           s%gis_id(ich) = ob(iob)%gis_id
           s%oname(ich) = ob(iob)%name
         end do
+        call nc_stream_put_ids(s)
       end subroutine nc_open_channel
 
       subroutine nc_open_sd_channel(s, suffix, flag)
@@ -551,6 +570,7 @@
           s%gis_id(islot) = ob(iob)%gis_id
           s%oname(islot) = ob(iob)%name
         end do
+        call nc_stream_put_ids(s)
       end subroutine nc_open_sd_channel
 
       subroutine nc_open_hru_pw(s, suffix, flag)

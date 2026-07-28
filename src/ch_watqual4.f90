@@ -195,6 +195,22 @@
         fll = 0.92 * (wgn_pms(iwgn)%daylth / 24.) * fl_1
 
         !! calculate local algal growth rate
+        !! swatplus_perf: gra MUST be reset here. It is declared with an initializer, so
+        !! Fortran's implicit-SAVE rule (F2018 8.5.16) makes it persist across calls, and
+        !! it is read UNCONDITIONALLY at "factk = Theta(gra,...)" below -- but it is only
+        !! written inside this "algcon < 5000." guard, and inside a select case with no
+        !! case default. So on any channel-day where algal concentration reaches the 5000
+        !! cap (routine in low-flow channels: algcon = 1000*chla/ai0, and ai0 is 50), or
+        !! where igropt is outside {1,2,3}, the growth rate silently carried over FROM THE
+        !! PREVIOUSLY SIMULATED CHANNEL.
+        !!
+        !! That made in-stream chlorophyll-a depend on the order channels are visited --
+        !! a latent defect in the serial engine, not a parallel one: it is why the OpenMP
+        !! wavefront could not reproduce serial bit-for-bit even with every race removed
+        !! (each thread carries its own persistent copy, so "the previous channel" differs).
+        !! Zero is the only order-independent choice and is what the cap intends: at
+        !! saturation there is no further algal growth.
+        gra = 0.
         if (algcon < 5000.) then
           select case (ch_nut(jnut)%igropt)
           case (1)

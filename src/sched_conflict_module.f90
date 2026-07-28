@@ -26,19 +26,28 @@
 !!      LSU    channels writing lsu_wb_d(ilsu) (ch_temp:201/212/216), membership via
 !!             ob%obtyp_in == "ru"
 !!      CHSTOR recall objects writing ch_stor(ichan) (recall_nut/salt/cs)
-!!      WST    objects writing wst(iwst)%weat (sd_channel_control3:112, res_control:55)
+!!      WST    objects writing wst(iwst)%weat -- the write-back has since been REMOVED
+!!             from sd_channel_control3/res_control, so this domain should now report
+!!             zero multi-writer cells. Kept as a regression sentinel.
 !!      AQCH   aquifer->channel precedence via sd_ch(ich)%aqu_link (from aqu-cha.lin,
 !!             NOT a .con edge, so the flow graph cannot enforce it)
+!!      RUELEM routing-unit -> element-HRU precedence: ru_control reads each element's
+!!             ob(iob)%hd(...) through ru_def/ru_elem, a MEMBERSHIP table rather than a
+!!             .con record, so rcv_tot is 0 and flow-only ordering put every ru on
+!!             level 1 beside the HRUs it consumes. This is the domain that actually
+!!             broke the full wavefront (~95% median daily error on orgn/sedp/nh3);
+!!             the audit was blind to it until 2026-07-28 precisely because it had no
+!!             RUELEM domain -- see OVERLAP_DIAGNOSIS_2026-07-28.md.
 !!
 !!    Enabled by SWATPLUS_SCHED_AUDIT=1; writes conflict_audit.out and stops.
 !!    ------------------------------------------------------------------------------
       implicit none
 
-      integer, parameter :: NDOM = 5
+      integer, parameter :: NDOM = 6
       integer, parameter :: DOM_FPHRU = 1, DOM_LSU = 2, DOM_CHSTOR = 3,             &
-                            DOM_WST = 4, DOM_AQCH = 5
+                            DOM_WST = 4, DOM_AQCH = 5, DOM_RUELEM = 6
       character(len=6), dimension(NDOM), parameter :: DOM_NAME =                    &
-        (/ "FPHRU ", "LSU   ", "CHSTOR", "WST   ", "AQCH  " /)
+        (/ "FPHRU ", "LSU   ", "CHSTOR", "WST   ", "AQCH  ", "RUELEM" /)
 
       contains
 
@@ -115,10 +124,11 @@
 !!    O(k) not O(k^2)) and reports what that costs.
 !!    ------------------------------------------------------------------------------
       subroutine sched_conflict_report
-      use hydrograph_module, only : ob, sp_ob, sp_ob1
+      use hydrograph_module, only : ob, sp_ob, sp_ob1, ru_def, ru_elem
       use sd_channel_module, only : sd_ch
       implicit none
 
+      integer :: iru_a, ise_a, ie_a
       integer, allocatable :: rank(:), lev_flow(:), lev_ord(:)
       integer, allocatable :: wr_dom(:), wr_cell(:), wr_obj(:)
       integer, allocatable :: khist(:)
@@ -202,13 +212,42 @@
               end if
             end if
           end if
-          !! WST: channels and reservoirs write wst(iwst)%weat (allocatable components
-          !! => the race is in the allocator, not the values)
+          !! WST: channels and reservoirs USED TO write wst(iwst)%weat back (allocatable
+          !! components => the race was in the allocator, not the values). Both write-backs
+          !! are removed; the domain is still censused so a reintroduction shows up.
           if (ob(ic)%typ == "chandeg" .or. ob(ic)%typ == "res") then
             if (ob(ic)%wst >= 1) then
               nwr = nwr + 1
               if (i == 2) then
                 wr_dom(nwr) = DOM_WST; wr_cell(nwr) = ob(ic)%wst; wr_obj(nwr) = ic
+              end if
+            end if
+          end if
+          !! RUELEM: a routing unit reads each element HRU's daily hydrograph. Encoded
+          !! like AQCH -- cell = the PRODUCER object (the element), writer = the
+          !! CONSUMER (the ru) -- because it is a precedence constraint, not mutual
+          !! exclusion. Expanded from the live ru_def/ru_elem tables, never re-derived.
+          if (ob(ic)%typ == "ru") then
+            iru_a = ob(ic)%num
+            if (iru_a >= 1 .and. allocated(ru_def)) then
+              if (iru_a <= size(ru_def)) then
+                if (allocated(ru_def(iru_a)%num)) then
+                  do ie_a = 1, ru_def(iru_a)%num_tot
+                    ise_a = ru_def(iru_a)%num(ie_a)
+                    if (ise_a >= 1 .and. allocated(ru_elem)) then
+                      if (ise_a <= size(ru_elem)) then
+                        if (ru_elem(ise_a)%obj >= 1) then
+                          nwr = nwr + 1
+                          if (i == 2) then
+                            wr_dom(nwr) = DOM_RUELEM
+                            wr_cell(nwr) = ru_elem(ise_a)%obj
+                            wr_obj(nwr) = ic
+                          end if
+                        end if
+                      end if
+                    end if
+                  end do
+                end if
               end if
             end if
           end if
@@ -348,9 +387,10 @@
       end subroutine sched_ord_levels
 
 
-!!    Build the chain edges. AQCH is a precedence domain (aquifer -> channel), not a
-!!    mutual-conflict domain, so it is skipped here and handled as a real edge when the
-!!    scheduler is built; the audit counts it separately.
+!!    Build the chain edges. AQCH and RUELEM are precedence domains (aquifer -> channel,
+!!    element-HRU -> routing unit), not mutual-conflict domains, so they are skipped here
+!!    and handled as real edges when the scheduler is built; the audit counts them
+!!    separately. RUELEM is now enforced directly in command_wave_module's level fixpoint.
       subroutine sched_chain_edges (wr_dom, wr_cell, wr_obj, nwr, rank, pred, npred, &
                                     nobj, maxpred)
       implicit none
@@ -363,7 +403,7 @@
 
       allocate (grp(nwr))
       do d = 1, NDOM
-        if (d == DOM_AQCH) cycle
+        if (d == DOM_AQCH .or. d == DOM_RUELEM) cycle
         !! gather writers of each cell of this domain, cell by cell
         do i = 1, nwr
           if (wr_dom(i) /= d) cycle

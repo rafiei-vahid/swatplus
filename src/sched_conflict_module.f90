@@ -44,6 +44,7 @@
       implicit none
 
       integer, parameter :: NDOM = 6
+      integer :: sched_pred_dropped = 0
       integer, parameter :: DOM_FPHRU = 1, DOM_LSU = 2, DOM_CHSTOR = 3,             &
                             DOM_WST = 4, DOM_AQCH = 5, DOM_RUELEM = 6
       character(len=6), dimension(NDOM), parameter :: DOM_NAME =                    &
@@ -212,17 +213,14 @@
               end if
             end if
           end if
-          !! WST: channels and reservoirs USED TO write wst(iwst)%weat back (allocatable
-          !! components => the race was in the allocator, not the values). Both write-backs
-          !! are removed; the domain is still censused so a reintroduction shows up.
-          if (ob(ic)%typ == "chandeg" .or. ob(ic)%typ == "res") then
-            if (ob(ic)%wst >= 1) then
-              nwr = nwr + 1
-              if (i == 2) then
-                wr_dom(nwr) = DOM_WST; wr_cell(nwr) = ob(ic)%wst; wr_obj(nwr) = ic
-              end if
-            end if
-          end if
+          !! WST: NO LONGER POPULATED. This domain censused "wst(iwst)%weat = w", the
+          !! write-back of the shared weather record from sd_channel_control3 and
+          !! res_control. Both write-backs have been deleted, so there is no write left to
+          !! order and recording the objects that merely SHARE a station overstated the
+          !! conflict graph badly -- 45 multi-writer cells and 22,239 pairs on basin
+          !! 02297310, which alone accounted for most of the gap between S8_flow and
+          !! S8_ord. The domain id is kept so the report keeps a stable column layout and
+          !! so the block can be restored verbatim if the write-back ever comes back.
           !! RUELEM: a routing unit reads each element HRU's daily hydrograph. Encoded
           !! like AQCH -- cell = the PRODUCER object (the element), writer = the
           !! CONSUMER (the ru) -- because it is a precedence constraint, not mutual
@@ -288,6 +286,7 @@
         write (IU,'(a,f8.4)') "S8_ratio", (real(t1_o)/real(t8_o)) /                 &
                                           (real(t1_f)/real(t8_f))
       end if
+      write (IU,'(a,i0)') "pred_edges_dropped ", sched_pred_dropped
       close (IU)
 
       deallocate (rank, lev_flow, lev_ord, cellw)
@@ -343,7 +342,10 @@
       integer, intent(in) :: nwr, nobj
       integer, dimension(:), intent(out) :: lev
       integer, allocatable :: pred(:,:), npred(:)
-      integer, parameter :: MAXPRED = 64
+      !! A routing unit gets one predecessor per element HRU, so this has to comfortably
+      !! exceed the largest ru element count -- at 64 the edges were silently dropped and the
+      !! reported cost of ordering came out too low. Overflows are counted and reported.
+      integer, parameter :: MAXPRED = 1024
       integer :: i, j, ic, in, iob, newlev, npass, p
       logical :: changed
 
@@ -387,10 +389,20 @@
       end subroutine sched_ord_levels
 
 
-!!    Build the chain edges. AQCH and RUELEM are precedence domains (aquifer -> channel,
-!!    element-HRU -> routing unit), not mutual-conflict domains, so they are skipped here
-!!    and handled as real edges when the scheduler is built; the audit counts them
-!!    separately. RUELEM is now enforced directly in command_wave_module's level fixpoint.
+!!    Build the chain edges.
+!!
+!!    Mutual-conflict domains get the transitive reduction: writers of a cell are ordered by
+!!    serial rank and chained w(i) -> w(i+1), giving the identical constraint at O(k) instead
+!!    of O(k^2) edges. Orientation by serial rank keeps G_flow U C_ord acyclic, since the rank
+!!    is a linear extension of the flow graph.
+!!
+!!    AQCH and RUELEM are PRECEDENCE domains, not mutual-conflict ones: the cell is the
+!!    producer (an aquifer, an element HRU) and the writer field is the consumer (a channel, a
+!!    routing unit). They get one real edge each, producer -> consumer. RUELEM is the coupling
+!!    that command_wave_module now enforces in its own level fixpoint, so emitting it here is
+!!    what makes G_ord the schedule the engine actually runs rather than a hypothetical one.
+!!    Previously both were skipped, which silently left the reported cost of ordering
+!!    understated for AQCH and undefined for RUELEM.
       subroutine sched_chain_edges (wr_dom, wr_cell, wr_obj, nwr, rank, pred, npred, &
                                     nobj, maxpred)
       implicit none
@@ -402,6 +414,20 @@
       integer :: d, i, j, n, a, b, tmp
 
       allocate (grp(nwr))
+
+      !! precedence domains: one edge per record, producer(cell) -> consumer(obj)
+      do i = 1, nwr
+        if (wr_dom(i) /= DOM_AQCH .and. wr_dom(i) /= DOM_RUELEM) cycle
+        a = wr_cell(i); b = wr_obj(i)
+        if (a < 1 .or. a > nobj .or. b < 1 .or. b > nobj) cycle
+        if (npred(b) < maxpred) then
+          npred(b) = npred(b) + 1
+          pred(b, npred(b)) = a
+        else
+          sched_pred_dropped = sched_pred_dropped + 1
+        end if
+      end do
+
       do d = 1, NDOM
         if (d == DOM_AQCH .or. d == DOM_RUELEM) cycle
         !! gather writers of each cell of this domain, cell by cell

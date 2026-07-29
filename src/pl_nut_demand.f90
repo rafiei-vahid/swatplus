@@ -52,9 +52,16 @@
 
       j = ihru
       
-      uno3d(ipl) = 0.
+      !! Reset the WHOLE demand arrays, not one element indexed by a stale ipl. ipl is only
+      !! assigned by the loop below, so on entry it still holds npl+1 from the previous HRU
+      !! this thread processed -- so these lines were zeroing an unused slot and leaving the
+      !! slots actually in use carrying the previous HRU's demand. pl_nupd/pl_pupd refresh
+      !! uno3d(ipl)/uapd(ipl) only for plants that are growing and not dormant, so a dormant
+      !! plant kept another HRU's nitrogen and phosphorus demand. Same read-before-write class
+      !! as gra (ch_watqual4) and enratio (varinit); present in upstream cb442f7 unchanged.
+      uno3d = 0.
       uno3d_tot = 0.
-      uapd(ipl) = 0.
+      uapd = 0.
       uapd_tot = 0.
       do ipl = 1, pcom(j)%npl
         idp = pcom(j)%plcur(ipl)%idplt

@@ -134,7 +134,7 @@
       !! (from the previous day's MF6 solve).  Replaces the native SWAT+
       !! aquifer return flow so baseflow is not double counted.
       if (mf6_baseflow_active()) then
-        aqu_inflo = real(mf6_channel_baseflow(ob(icmd)%gis_id))   !m3/day, +ve=gain
+        aqu_inflo = real(mf6_channel_baseflow(int(ob(icmd)%gis_id)))   !m3/day, +ve=gain
         chsd_d(ich)%aqu_in = aqu_inflo / 86400.
         chsd_d(ich)%aqu_in_mm = aqu_inflo / (10. * ob(icmd)%area_ha)
         if (ht1%flo > 1.e-6 .and. aqu_inflo > 0.) then
@@ -147,7 +147,7 @@
         if (mf6_pfas_disch_active() .and. npfas > 0 .and. cs_db%num_tot > 0) then
           ipf = mf6_pfas_compound()
           if (ipf >= 1 .and. ipf <= npfas) &
-            hcs1%pfas(ipf) = hcs1%pfas(ipf) + real(mf6_channel_pfas(ob(icmd)%gis_id))
+            hcs1%pfas(ipf) = hcs1%pfas(ipf) + real(mf6_channel_pfas(int(ob(icmd)%gis_id)))
         end if
       !! if connected to aquifer - add flow (native; skipped when MF6 active)
       else if (sd_ch(ich)%aqu_link > 0) then

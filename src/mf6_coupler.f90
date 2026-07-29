@@ -151,7 +151,9 @@
       subroutine mf6_coupler_init
       !! Detect mf6.con, dlopen libmf6.so (RTLD_LOCAL), resolve BMI entry
       !! points, initialize MF6 inside its workspace.
-      use ifport, only : chdir
+#if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+      use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
+#endif
       implicit none
       integer :: iu, istat, ios
       logical :: have_con
@@ -362,7 +364,9 @@
       !! M1: step flow when due and confirm MF6 time advances.
       !! M2 will push recharge before the flow step; M3 will pull
       !! baseflow + PFAS after it and trigger transport at gwt_cadence.
-      use ifport, only : chdir
+#if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+      use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
+#endif
       implicit none
       integer :: istat, ios
       logical :: halt_save(5)
@@ -572,7 +576,9 @@
 
       !! ================================================================
       subroutine mf6_coupler_finalize
-      use ifport, only : chdir
+#if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+      use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
+#endif
       implicit none
       integer :: istat, ios
       logical :: halt_save(5)
@@ -713,7 +719,9 @@
       end function resolve_dbl
 
       integer function getcwd_safe(path)
-      use ifport, only : getcwd
+#if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
+      use ifport, only : getcwd          !! gfortran provides GETCWD as a GNU intrinsic
+#endif
       character(len=*), intent(out) :: path
       getcwd_safe = getcwd(path)
       end function getcwd_safe

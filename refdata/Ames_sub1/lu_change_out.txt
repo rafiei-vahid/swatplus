@@ -1,2 +1,2 @@
- demo                      SWAT+ 2026-07-28        MODULAR Rev 2026.pfas-coupling-v1.0-17-g817dd8c        
+ demo                      SWAT+ 2026-07-30        MODULAR Rev 2026.pfas-coupling-v1.0-38-gbcb882c        
           hru       year         mon         day     operation   lu_before         lu_after

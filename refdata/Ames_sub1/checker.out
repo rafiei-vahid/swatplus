@@ -1,4 +1,4 @@
- demo                      SWAT+ 2026-07-28        MODULAR Rev 2026.pfas-coupling-v1.0-17-g817dd8c        
+ demo                      SWAT+ 2026-07-30        MODULAR Rev 2026.pfas-coupling-v1.0-38-gbcb882c        
                                         zmx       usle_k       sumfc       sumul      usle_p     usle_ls        esco        epco     cn3_swf       perco     latq_co   tiledrain 
  sname           hydgrp                 (mm)                    (mm)        (mm)                                                                                     0=notile;1=tile;
 soil_01-h1      B                  2000.0000      0.0000    361.5003    616.0899      1.0000      0.3638      0.9500      1.0000      0.0000      0.5000      0.0100           0

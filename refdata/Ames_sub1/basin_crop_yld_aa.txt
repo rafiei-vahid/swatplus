@@ -1,4 +1,4 @@
- demo                      SWAT+ 2026-07-28        MODULAR Rev 2026.pfas-coupling-v1.0-17-g817dd8c        
+ demo                      SWAT+ 2026-07-30        MODULAR Rev 2026.pfas-coupling-v1.0-38-gbcb882c        
        year      plant_no   plant_name       harv_area(ha)     yld(t)          yld(t/ha)      
-        2020           1 corn                                       11.57108       2.581697      0.2231164    
+        2020           1 corn                                       11.57108       2.581734      0.2231196    
         2020           2 soyb                                      0.0000000E+00  0.0000000E+00  0.0000000E+00

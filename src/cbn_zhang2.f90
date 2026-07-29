@@ -102,99 +102,95 @@
                 !of structural litter [xlslf = exp(-3* lslf) (parton et al., 1993, 1994)]
        !prmt_51 !coef adjusts microbial activity function in top soil layer (0.1_1.)
        
-       integer :: j !                     |number of hru
-       integer :: k !none                 |counte
-       integer :: kk !                     |
-       real :: lmnta !                     |      
-       real :: min_n_ppm !                     |
-       real :: min_n !                     |
+       integer :: j  !                     |number of hru
+       integer :: k  !none                 |counte
+       integer :: kk  !                     |
+       real :: lmnta  !                     |      
+       real :: min_n_ppm  !                     |
+       real :: min_n  !                     |
        integer :: cf_lyr         !                     |which layer of coefs to use in carbon_coef.cbn
        real :: soil_lyr_thickness !mm
-       real :: sol_mass !                     |
-       real :: sol_min_n !                     |
-       real :: fc !mm H2O               |amount of water available to plants in soil layer at field capacity (fc - wp),Index:(layer,HRU)
-       real :: wc !none                 |scaling factor for soil water impact on daily
-       real :: sat !                     |
-       real :: void !                     |
-       real :: stemp !celsius              |soil layer temperature
-       real :: x3 !none                 |amount of c transformed from passive, slow, metabolic, and non-lignin structural pools to microbial pool
-       real :: lscta !                     |
-       real :: lslcta !                     |
-       real :: lslncta !                     |
-       real :: lsnta !                     |
-       real :: lmcta !                     |
-       real :: nf !                     |
-       real :: a1 !                     |
-       real :: asx !                     |
-       real :: apx !                     |
-       real :: df1 !                     |
-       real :: df2 !                     |
-       real :: snmn !
-       real :: df3 !                     |
-       real :: df4 !                     |
-       real :: df5 !                     |
-       real :: df6 !                     |
-       real :: add !                     |
-       real :: adf1 !                     |
-       real :: adf2 !                     |
-       real :: adf3 !                     |
-       real :: adf4 !                     |
-       real :: adf5 !                     |
-       real :: tot !                     |
-       real :: pn1 !                     |
-       real :: pn2 !                     |
-       real :: pn3 !                     |
-       real :: pn4 !                     |
-       real :: pn5 !                     |
-       real :: pn6 !                     |
-       real :: pn7 !                     |
-       real :: pn8 !                     |
-       real :: pn9 !                     |
-       real :: cpn1 !                     |
-       real :: cpn2 !                     |
-       real :: cpn3 !                     |
-       real :: cpn4 !                     |
-       real :: cpn5 !                     |
-       real :: wmin !                     |
-       real :: trnn !                     |
-       real :: wdn !kg N/ha              |amount of nitrogen lost from nitrate pool in
-       real :: deltawn !                     |
-       real :: deltabmc !                     |
-       real :: snta !                     |
-       real :: rlr !                     |
-       real :: xbm !                     |
-       real :: bmcta !                     |
-       real :: bmnta !                     |
-       real :: hscta !                     |
-       real :: hsnta !                     |
-       real :: hpcta !                     |
-       real :: hpnta !                     |
+       real :: sol_mass  !                     |
+       real :: sol_min_n  !                     |
+       real :: fc  !mm H2O               |amount of water available to plants in soil layer at field capacity (fc - wp),Index:(layer,HRU)
+       real :: wc  !none                 |scaling factor for soil water impact on daily
+       real :: sat  !                     |
+       real :: void  !                     |
+       real :: stemp  !celsius              |soil layer temperature
+       real :: x3  !none                 |amount of c transformed from passive, slow, metabolic, and non-lignin structural pools to microbial pool
+       real :: lscta  !                     |
+       real :: lslcta  !                     |
+       real :: lslncta  !                     |
+       real :: lsnta  !                     |
+       real :: lmcta  !                     |
+       real :: nf  !                     |
+       real :: a1  !                     |
+       real :: asx  !                     |
+       real :: apx  !                     |
+       real :: df1  !                     |
+       real :: df2  !                     |
+       real :: snmn  !
+       real :: df3  !                     |
+       real :: df4  !                     |
+       real :: df5  !                     |
+       real :: df6  !                     |
+       real :: add  !                     |
+       real :: adf1  !                     |
+       real :: adf2  !                     |
+       real :: adf3  !                     |
+       real :: adf4  !                     |
+       real :: adf5  !                     |
+       real :: tot  !                     |
+       real :: pn1  !                     |
+       real :: pn2  !                     |
+       real :: pn3  !                     |
+       real :: pn4  !                     |
+       real :: pn5  !                     |
+       real :: pn6  !                     |
+       real :: pn7  !                     |
+       real :: pn8  !                     |
+       real :: pn9  !                     |
+       real :: cpn1  !                     |
+       real :: cpn2  !                     |
+       real :: cpn3  !                     |
+       real :: cpn4  !                     |
+       real :: cpn5  !                     |
+       real :: wmin  !                     |
+       real :: trnn  !                     |
+       real :: wdn  !kg N/ha              |amount of nitrogen lost from nitrate pool in
+       real :: deltawn  !                     |
+       real :: deltabmc  !                     |
+       real :: snta  !                     |
+       real :: rlr  !                     |
+       real :: xbm  !                     |
+       real :: bmcta  !                     |
+       real :: bmnta  !                     |
+       real :: hscta  !                     |
+       real :: hsnta  !                     |
+       real :: hpcta  !                     |
+       real :: hpnta  !                     |
        real :: fcgd              !                     |
-       real :: rsdn_pct !                     |
-       real :: sum !                     |
-       real :: sum1 !                     |potential n supply resulting from the transformation of structural litter; calc as lsntp-(pn1+pn2) if lsntp > (pn1+pn2), otherwise = 0 (kg n ha-1 day-1)
-       real :: sum2 !                     |
-       real :: sum3 !                     |
-       real :: sum4 !                     |
-       real :: sum5 !                     |
-       real :: reduc !none                 |fraction of water uptake by plants achieved
-       real :: rnmn !                     |
-       real :: hmp_rate !                     |
-       real :: hmp !kg P/ha              |amount of phosphorus moving from the organic
-       real :: decr !                     |
-       real :: rmp !kg P/ha              |amount of phosphorus moving from fresh organic
-       real :: rto !none                 |cloud cover factor
-       real :: rspc !                     |
-       real :: xx !varies    |variable to hold calculation results
-       real :: xx1 !                     | intermediate variable in watf == 2 calculations for water factor (sut)
-       real :: xx2 !                     | intermediate variable in watf == 2 calculations for water factor (sut)
-       real :: w1 !                     | intermediate variable in watf == 2 calculations for water factor (sut)
-       real :: w2 !                     | intermediate variable in watf == 2 calculations for water factor (sut)
-       real :: svoid !                     | the amount voids in soil layer after accounting for water content.
-       logical :: ufc !Use File Coefficients (ufc) from carbon_coef.cbn file
-
-       ufc = carbon_coef_file
-
+       real :: rsdn_pct  !                     |
+       real :: sum  !                     |
+       real :: sum1  !                     |potential n supply resulting from the transformation of structural litter; calc as lsntp-(pn1+pn2) if lsntp > (pn1+pn2), otherwise = 0 (kg n ha-1 day-1)
+       real :: sum2  !                     |
+       real :: sum3  !                     |
+       real :: sum4  !                     |
+       real :: sum5  !                     |
+       real :: reduc  !none                 |fraction of water uptake by plants achieved
+       real :: rnmn  !                     |
+       real :: hmp_rate  !                     |
+       real :: hmp  !kg P/ha              |amount of phosphorus moving from the organic
+       real :: decr  !                     |
+       real :: rmp  !kg P/ha              |amount of phosphorus moving from fresh organic
+       real :: rto  !none                 |cloud cover factor
+       real :: rspc  !                     |
+       real :: xx  !varies    |variable to hold calculation results
+       real :: xx1  !                     | intermediate variable in watf == 2 calculations for water factor (sut)
+       real :: xx2  !                     | intermediate variable in watf == 2 calculations for water factor (sut)
+       real :: w1  !                     | intermediate variable in watf == 2 calculations for water factor (sut)
+       real :: w2  !                     | intermediate variable in watf == 2 calculations for water factor (sut)
+       real :: svoid  !                     | the amount voids in soil layer after accounting for water content.
        !! initialize local variables
        deltawn = 0.
        deltabmc = 0.   
@@ -437,26 +433,8 @@
           !lignin content in structural litter (fraction)          
           rlr = min(0.8, soil1(j)%lig(k)%m / (soil1(j)%str(k)%m + 1.e-5))  
 
-          !carbdb%hs_rate=prmt(47) !century slow humus transformation rate d^-1(0.00041_0.00068) original value = 0.000548,
-          !if (.not. ufc) carbdb(1)%hs_rate = 5.4799998e-04
-          
-          !carbdb%hp_rate=prmt(48) !century passive humus transformation rate d^-1(0.0000082_0.000015) original value = 0.000012 
-          !if (.not. ufc) carbdb(1)%hp_rate = 1.2000000e-05
-
-          ! set nitrogen carbon ratios for upper layer
+          !! set nitrogen carbon ratios for upper layer
           if (k == 1) then
-            !carbdb%hs_rate=prmt(47) !century slow humus transformation rate d^-1(0.00041_0.00068) original value = 0.000548,
-            if (.not. ufc) carbdb(cf_lyr)%hs_rate = 5.4799998e-04
-            !carbdb%hp_rate=prmt(48) !century passive humus transformation rate d^-1(0.0000082_0.000015) original value = 0.000012 
-            if (.not. ufc) carbdb(cf_lyr)%hp_rate = 1.2000000e-05
-            if (.not. ufc) carbdb(cf_lyr)%microb_top_rate = .0164
-            if (.not. ufc) carbdb(cf_lyr)%microb_rate = .0164
-            if (.not. ufc) carbdb(cf_lyr)%meta_rate = .0405
-            if (.not. ufc) carbdb(cf_lyr)%str_rate = .0107
-            if (.not. ufc) org_allo(cf_lyr)%a1co2 = .55
-            if (.not. ufc) org_allo(cf_lyr)%asco2 = .55
-            if (.not. ufc) org_allo(cf_lyr)%apco2 = .55
-            if (.not. ufc) org_allo(cf_lyr)%abco2 = .55
             org_ratio%nchp = .1
             xbm = 1.
             ! org_con%cs = org_con%cs * carbdb(cf_lyr)%microb_top_rate
@@ -476,19 +454,9 @@
               org_ratio%nchs = org_ratio%ncbm / (5. * org_ratio%ncbm + 1.)
               org_allo(cf_lyr)%abp = .003 + .00032 * soil(j)%phys(k)%clay
             end if    
-          else    !  if (k == 1)  
-            ! set nitrogen carbon ratios for lower layers
+          else    !! if (k == 1)
+            !! set nitrogen carbon ratios for lower layers
             org_allo(cf_lyr)%abco2 = 0.17 + 0.0068 * soil(j)%phys(k)%sand
-            !carbdb%hs_rate=prmt(47) !century slow humus transformation rate d^-1(0.00041_0.00068) original value = 0.000548,
-            if (.not. ufc) carbdb(cf_lyr)%hs_rate = 5.4799998e-04
-            !carbdb%hp_rate=prmt(48) !century passive humus transformation rate d^-1(0.0000082_0.000015) original value = 0.000012 
-            if (.not. ufc) carbdb(cf_lyr)%hp_rate = 1.2000000e-05
-            if (.not. ufc) carbdb(cf_lyr)%microb_rate = .02
-            if (.not. ufc) carbdb(cf_lyr)%meta_rate = .0507
-            if (.not. ufc) carbdb(cf_lyr)%str_rate = .0132
-            if (.not. ufc) org_allo(cf_lyr)%a1co2 = .55
-            if (.not. ufc) org_allo(cf_lyr)%asco2 = .55
-            if (.not. ufc) org_allo(cf_lyr)%apco2 = .55
             xbm = .25 + .0075 * soil(j)%phys(k)%sand
              min_n_ppm = 1000. * sol_min_n / (sol_mass / 1000)
             if (min_n_ppm > 7.15) then
@@ -503,8 +471,6 @@
             org_allo(cf_lyr)%abp = .003 + .00032 * soil(j)%phys(k)%clay
           end if    !  if (k == 1)        
 
-          !coef in century eq allocating slow to passive humus(0.001_0.05) original value = 0.003,
-              if (.not. ufc) carbdb(cf_lyr)%hs_hp = 5.0000001e-02
               org_allo(cf_lyr)%asp = max(.001, carbdb(cf_lyr)%hs_hp - .00009 * soil(j)%phys(k)%clay)
               
         !     potential transformations structural litter
@@ -911,14 +877,15 @@
               
               !!update c and n of different som pools
               !!=========================================
-              !soil1(j)%str(k)%c = max(1.e-10, soil1(j)%str(k)%c - lscta)   ! instead of this, should be the sum lignon and non lignin c
-              soil1(j)%lig(k)%c = max(1.e-10, soil1(j)%lig(k)%c - lslcta)
-              ! soil1(j)%lig(k)%n = max(1.e-10, soil1(j)%lig(k)%n - lslncta)
-              soil1(j)%nonlig(k)%c = max(1.e-10, soil1(j)%lig(k)%c - lslncta)
-              soil1(j)%str(k)%c = soil1(j)%nonlig(k)%c +  soil1(j)%lig(k)%c
-                            
-              soil1(j)%lig(k)%m = max(1.e-10, soil1(j)%lig(k)%m - lslcta / .42)
-              soil1(j)%nonlig(k)%m = max(1.e-10, soil1(j)%lig(k)%m - lslncta / .42)
+              !! nonlig was being derived from the just-decremented
+              !! lig pool (e.g. `nonlig%c = lig%c - lslncta`), corrupting the non-lignin pool daily
+              !! and propagating to str via the line that sums them. Corrected to use the nonlig pool itself.
+              soil1(j)%lig(k)%c    = max(1.e-10, soil1(j)%lig(k)%c    - lslcta)
+              soil1(j)%nonlig(k)%c = max(1.e-10, soil1(j)%nonlig(k)%c - lslncta)
+              soil1(j)%str(k)%c    = soil1(j)%nonlig(k)%c +  soil1(j)%lig(k)%c
+
+              soil1(j)%lig(k)%m    = max(1.e-10, soil1(j)%lig(k)%m    - lslcta  / .42)
+              soil1(j)%nonlig(k)%m = max(1.e-10, soil1(j)%nonlig(k)%m - lslncta / .42)
           
               soil1(j)%str(k)%m = max(1.e-10, soil1(j)%str(k)%m - lscta / .42)
               
@@ -999,8 +966,10 @@
               soil1(j)%org_tran_lr(k) = org_tran  
               
               ! Save the the org_flux for each layer and a total per day
-              soil1(j)%org_flx_lr(k) = org_flux     
-              soil1(j)%org_flx_tot = soil1(j)%org_flx_tot + soil1(j)%org_flx_lr(k) 
+              soil1(j)%org_flx_lr(k) = org_flux
+              soil1(j)%org_flx_tot = soil1(j)%org_flx_tot + soil1(j)%org_flx_lr(k)
+              !! cumulative flux accumulator for hru_cflux_stat_aa file
+              soil1(j)%org_flx_cum_lr(k) = soil1(j)%org_flx_cum_lr(k) + org_flux
               
               !!update other variables used in swat
               !!==================================

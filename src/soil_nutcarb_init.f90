@@ -17,8 +17,8 @@
       integer, intent (in)  :: isol     !none       |unused soil (hru) number
       integer :: nly
       integer :: ly
-      integer :: isolt = 0              !counter    |soil plant initialization file pointer
-      integer :: isol_pl = 0            !counter    |soil nutrient initialization pointer (nutrients.sol)
+      integer :: isolt  !counter    |soil plant initialization file pointer
+      integer :: isol_pl  !counter    |soil nutrient initialization pointer (nutrients.sol)
       real :: wt1 !kg/ha      |weight of the soil layer
       real :: dep_frac !0-1        |fraction of surface concentration at depth
       real :: frac_hum_active !0-1        |fraction of humus in active pool - old SWAT
@@ -142,14 +142,10 @@
           soil1(ihru)%hsta(ly)%p = soil1(ihru)%hsta(ly)%c / solt_db(isolt)%hum_c_p
         end if
         
-        if (bsn_cc%cswat == 1 ) then
-          !!initialize CENTURY organic pools - set soil humus fractions for CENTURY from DSSAT
-          if (org_frac%frac_seq < 1.0) then
-            org_frac%frac_not_seq = 1.0 - org_frac%frac_seq
-          else
-            org_frac%frac_not_seq = 1.e-6
-          endif
-            
+        if (bsn_cc%cswat == 2 ) then
+          !! initialize CENTURY organic pools - set soil humus fractions for CENTURY from DSSAT
+          !! frac_not_seq is the residue/litter share derived from the user-supplied init_seq (carbon.bsn)
+          org_frac%frac_not_seq = 1.0 - org_frac%frac_seq
 
           !!initialize passive humus pool
           soil1(ihru)%hp(ly)%m = org_frac%frac_seq * org_frac%frac_hum_passive * soil1(ihru)%tot(ly)%m

@@ -5,9 +5,9 @@
 
        implicit none
            
-       character (len=80) :: titldum = ""
-       character (len=15) :: name = ""
-       character (len=256) :: out_path_value = ""
+       character (len=80) :: titldum
+       character (len=15) :: name
+       character (len=256) :: out_path_value
        character (len=512) :: line_buffer
        integer :: eof
        integer :: idx
@@ -24,8 +24,18 @@
       do i = 1, 31
          read (107,*,iostat=eof) name, in_sim  
          if (eof < 0) exit
-         read (107,*,iostat=eof) name, in_basin
+         !! The basin line is read as TEXT, not straight into in_basin, so that a file.cio
+         !! written before carbon.bsn existed still loads. in_basin gained a third field
+         !! (carbon_bsn) upstream; a list-directed read of the whole derived type demands
+         !! three tokens, so a two-token line silently consumes the FIRST TOKEN OF THE NEXT
+         !! LINE. Every following filename then shifts by one and no database is read -- the
+         !! symptom is an unrelated "array bound 0" crash much later (hru_db, urbdb, ru_elem).
+         !! Every model written by SWAT+ Editor 3.0.8, which is what SWATGenX pins, has the
+         !! two-token form. Parsing tokens keeps both vintages working and needs no editor
+         !! upgrade; carbon_bsn keeps its default when the token is absent.
+         read (107,'(a)',iostat=eof) line_buffer
          if (eof < 0) exit
+         call cio_basin_line (line_buffer)
          read (107,*,iostat=eof) name, in_cli
          if (eof < 0) exit
          read (107,*,iostat=eof) name, in_con
@@ -112,4 +122,40 @@
        call init_output_path(out_path_value)
             
        return
+
+      contains
+
+      subroutine cio_basin_line (line)
+      !! Assign in_basin from the tokens actually present on the basin line of file.cio.
+      !! Layout: <name> <codes_bas> <parms_bas> [carbon_bsn]
+      !! A missing carbon_bsn leaves the component at its default ("carbon.bsn"), which is
+      !! correct: carbon_bsn_read returns immediately unless cswat == 2, so a model with
+      !! carbon off never touches the file whether or not file.cio names it.
+      character(len=*), intent(in) :: line
+      character(len=256) :: tok(8)
+      integer :: ntok, pos, i0, n
+
+      tok = ""
+      ntok = 0
+      pos = 1
+      n = len_trim(line)
+      do
+        do while (pos <= n .and. line(pos:pos) == " ")
+          pos = pos + 1
+        end do
+        if (pos > n .or. ntok >= size(tok)) exit
+        i0 = pos
+        do while (pos <= n .and. line(pos:pos) /= " ")
+          pos = pos + 1
+        end do
+        ntok = ntok + 1
+        tok(ntok) = line(i0:pos-1)
+      end do
+
+      !! tok(1) is the row label ("basin"); the filenames follow.
+      if (ntok >= 2) in_basin%codes_bas  = trim(tok(2))
+      if (ntok >= 3) in_basin%parms_bas  = trim(tok(3))
+      if (ntok >= 4) in_basin%carbon_bsn = trim(tok(4))
+      end subroutine cio_basin_line
+
       end subroutine readcio_read  

@@ -40,39 +40,35 @@
       
       implicit none 
 
-      integer :: j !none          |HRU number
-      integer :: k !none          |counter (soil layer)
-      integer :: kk !none          |soil layer used to compute soil water and
+      integer :: j  !none          |HRU number
+      integer :: k  !none          |counter (soil layer)
+      integer :: kk  !none          |soil layer used to compute soil water and
                             !              |soil temperature factors
       integer :: idp
-      real :: rmn1 !kg N/ha       |amount of nitrogen moving from fresh organic
+      real :: rmn1  !kg N/ha       |amount of nitrogen moving from fresh organic
                             !              |to nitrate(80%) and active organic(20%)
                             !              |pools in layer
-      real :: rmp !              |to labile(80%) and organic(20%) pools in layer
-      real :: xx !varies        |variable to hold intermediate calculation result
-      real :: csf !none          |combined temperature/soil water factor
-      real :: rwn !kg N/ha       |amount of nitrogen moving from active organic
+      real :: rmp  !              |to labile(80%) and organic(20%) pools in layer
+      real :: xx  !varies        |variable to hold intermediate calculation result
+      real :: csf  !none          |combined temperature/soil water factor
+      real :: rwn  !kg N/ha       |amount of nitrogen moving from active organic
                             !              |to stable organic pool in layer
-      real :: hmn !kg N/ha       |amount of nitrogen moving from active organic
+      real :: hmn  !kg N/ha       |amount of nitrogen moving from active organic
                             !              |nitrogen pool to nitrate pool in layer
-      real :: hmp !kg P/ha       |amount of phosphorus moving from the organic
+      real :: hmp  !kg P/ha       |amount of phosphorus moving from the organic
                             !              |pool to the labile pool in layer
-      real :: cnr !              |carbon nitrogen ratio
-      real :: cnrf !              |carbon nitrogen ratio factor 
-      real :: cpr !              |carbon phosphorus ratio
-      real :: cprf !              |carbon phosphorus ratio factor
-      real :: ca !              |
-      real :: decr !              |
+      real :: cnr  !              |carbon nitrogen ratio
+      real :: cnrf  !              |carbon nitrogen ratio factor 
+      real :: cpr  !              |carbon phosphorus ratio
+      real :: cprf  !              |carbon phosphorus ratio factor
+      real :: ca  !              |
+      real :: decr  !              |
       !real :: rdc = 0.      !              |
-      real :: wdn !kg N/ha       |amount of nitrogen lost from nitrate pool in
+      real :: wdn  !kg N/ha       |amount of nitrogen lost from nitrate pool in
                             !              |layer due to denitrification
-      real :: cdg !none          |soil temperature factor
-      real :: sut !none          |soil water factor
-      real :: nactfr !none          |nitrogen active pool fraction. The fraction
-                            !              |of organic nitrogen in the active pool. 
-
+      real :: cdg  !none          |soil temperature factor
+      real :: sut  !none          |soil water factor
       j = ihru
-      nactfr = .02
       !zero transformations for summing layers
       hnb_d(j)%act_nit_n = 0.
       hnb_d(j)%org_lab_p = 0.
@@ -107,8 +103,8 @@
           if (xx > 1.e6) xx = 1.e6
           csf = Sqrt(xx)
 
-          !! compute flow from active to stable pools- maintain fraction of active (nactfr)
-          rwn = .1e-4 * ((soil1(j)%hact(k)%n * (1. / nactfr - 1.) - soil1(j)%hsta(k)%n))
+          !! compute flow from active to stable pools - maintain fraction of active (n_act_frac)
+          rwn = .1e-4 * ((soil1(j)%hact(k)%n * (1. / n_act_frac - 1.) - soil1(j)%hsta(k)%n))
           if (rwn > 0.) then
             rwn = Min(rwn, soil1(j)%hact(k)%n)
           else

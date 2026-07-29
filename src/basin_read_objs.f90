@@ -14,8 +14,8 @@
       
       implicit none
       
-      character (len=80) :: titldum = ""!            |title of file
-      character (len=80) :: header = "" !            |header
+      character (len=80) :: titldum  !            |title of file
+      character (len=80) :: header  !            |header
       integer :: eof !            |end of file
       integer :: nriv !            |number of gwflow river cells
       integer :: riv_id !            |id of gwflow river cell
@@ -46,10 +46,10 @@
       if(bsn_cc%gwflow == 1 ) then
         !search for gwflow.rivcells file; if present, then proceed with gwflow being
         !active, and read in the number of river cells (= number of objects)
-        inquire(file='gwflow.chancells',exist=i_exist)
+        inquire(file='chancell.gw',exist=i_exist)
         if(i_exist) then
           if(sp_ob%gwflow == 0) then
-            open(107,file='gwflow.chancells')
+            open(107,file='chancell.gw')
             read(107,*,iostat=eof) header
             if(eof == 0) then
             read(107,*,iostat=eof)

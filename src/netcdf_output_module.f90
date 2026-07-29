@@ -42,7 +42,7 @@
       public :: nc_flush_aa_basin, nc_flush_aa_lsu, nc_flush_aa_aqu, nc_flush_aa_sd
 
       integer, parameter :: nwb = 42, nnb = 19, nls = 13, npw = 25
-      integer, parameter :: nhsc = 15, nhrc = 6, nhpc = 6, nhscf = 13
+      integer, parameter :: nhsc = 9, nhrc = 6, nhpc = 6, nhscf = 13
       integer, parameter :: naqu = 18
       integer, parameter :: nchnsd = 73
       integer, parameter :: nch = 59
@@ -152,10 +152,12 @@
       subroutine hsc_pack(x, arr)
         type(carbon_soil_gain_losses), intent(in) :: x
         real, intent(out) :: arr(nhsc)
-        arr(1)=x%sed_c; arr(2)=x%surq_c; arr(3)=x%surq_doc; arr(4)=x%surq_dic
-        arr(5)=x%latq_c; arr(6)=x%latq_doc; arr(7)=x%latq_dic; arr(8)=x%perc_c
-        arr(9)=x%perc_doc; arr(10)=x%perc_dic; arr(11)=x%rsd_decay_c
-        arr(12)=x%man_app_c; arr(13)=x%man_graz_c; arr(14)=x%rsp_c; arr(15)=x%emit_c
+        !! upstream bc7755a dropped the DOC/DIC split from carbon_soil_gain_losses:
+        !! surq_doc/surq_dic/latq_doc/latq_dic/perc_doc/perc_dic are gone, leaving the
+        !! totals surq_c/latq_c/perc_c. Packer follows the type, so nhsc is 15 -> 9.
+        arr(1)=x%sed_c; arr(2)=x%surq_c; arr(3)=x%latq_c; arr(4)=x%perc_c
+        arr(5)=x%rsd_decay_c; arr(6)=x%man_app_c; arr(7)=x%man_graz_c
+        arr(8)=x%rsp_c; arr(9)=x%emit_c
       end subroutine hsc_pack
 
       subroutine hrc_pack(x, arr)

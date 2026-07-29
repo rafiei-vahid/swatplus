@@ -16,14 +16,14 @@
 
       implicit none
 
-      character(len=18) :: pond_name = ''     !       |constructed pond name
+      character(len=18) :: pond_name  !       |constructed pond name
       integer :: r !       |counter for number of recharge ponds
-	    integer :: k = 0                       !       |counter for the number of cells connected to the recharge pond
-	    integer :: s = 0						 !       |solute counter
-	    integer :: year = 0
+	    integer :: k  !       |counter for the number of cells connected to the recharge pond
+	    integer :: s  !       |solute counter
+	    integer :: year
       integer :: day
       integer :: month
-	    integer :: chan_id = 0                 !       |channel id
+	    integer :: chan_id  !       |channel id
       integer :: rec_id !       |point source if (canal diversion)
       integer :: cell_id !       |cell id
       integer :: iwst !       |weather station id
@@ -42,9 +42,9 @@
       real :: pond_volume !m3     |pond volume before recharge occurs
       real :: sol_conc !g/m3   |solute concentration in the source water
       real :: sol_mass !kg     |solute mass removed from the source added --> added to recharge pond
-      real :: div_mass(20) = 0.              !kg     |solute mass added to the recharge pond
-      real :: rech_mass(20) = 0.             !kg     |solute mass leaching from the pond to the water table
-      real :: rech_mass_cell(20) = 0.        !g      |solute mass leaching from the pond to an individual cell
+      real :: div_mass(20)  !kg     |solute mass added to the recharge pond
+      real :: rech_mass(20)  !kg     |solute mass leaching from the pond to the water table
+      real :: rech_mass_cell(20)  !g      |solute mass leaching from the pond to an individual cell
 
 
 
@@ -52,8 +52,14 @@
       !only proceed if the recharge pond flag has been activated ----------------------------------------------------------------
       if (gw_pond_flag == 1) then
 
-			  !read the diverted volumes (m3) for the current day -----------------------------------------------------------
-			  read(in_ponds,*) year,month,day,(gw_pond_info(r)%div,r=1,gw_npond)
+			  !read the diverted volumes (m3) for the current day (from pond_div.gw, if provided) ----------------------------
+			  if (gw_pond_div_flag == 1) then
+				  read(in_ponds,*) year,month,day,(gw_pond_info(r)%div,r=1,gw_npond)
+			  else
+				  do r=1,gw_npond
+					  gw_pond_info(r)%div = 0.
+				  enddo
+			  endif
 
         !loop through the recharge ponds ------------------------------------------------------------------------------
 			  do r=1,gw_npond

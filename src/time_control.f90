@@ -54,36 +54,36 @@
       use water_body_module
       use water_allocation_module
       !use reservoir_data_module
-      use mf6_coupler
-
+      
       implicit none
       
       external :: actions, aqu_pest_output_init, basin_sw_init, calsoft_ave_output, calsoft_sum_output, &
                   cli_atmodep_time_control, cli_precip_control, climate_control, command, conditions, &
                   mallo_control, xmon, sim_initday, wallo_control, mgt_newtillmix_cswat0
 
-      integer :: j !none          |counter
-      integer :: julian_day !none          |counter
-      integer :: id !              |
-      integer :: isched !              |
+      integer :: j  !none          |counter
+      integer :: julian_day  !none          |counter
+      integer :: id  !              |
+      integer :: isched  !              |
       !integer :: ich = 0             !none          |counter
-      integer :: idp !              |
+      integer :: idp  !              |
       integer :: iplt
-      integer :: iupd !none          |counter
-      integer :: ipest !none          |counter
-      integer :: date_time(8) = 0    !              | 
+      integer :: iupd  !none          |counter
+      integer :: ipest  !none          |counter
+      integer :: date_time(8)  !              | 
       character*10 b(3)              !              |
-      real :: crop_yld_t_ha !t/ha          |annual and ave annual basin crop yields
+      real :: crop_yld_t_ha  !t/ha          |annual and ave annual basin crop yields
       real :: sw_init
       real :: sno_init
-      integer :: iob !              |
+      integer :: iob  !              |
       integer :: iord
-      integer :: curyr !              |
-      integer :: mo !              |
-      integer :: day_mo !              |
+      integer :: curyr  !              |
+      integer :: mo  !              |
+      integer :: day_mo  !              |
       integer :: imallo
       integer :: ires
-      
+      real :: rnum  !none          |channel count per stream order (>= 1 to avoid 0/0)
+
       time%yrc = time%yrc_start
       
       !! generate precip for the first day - %precip_next
@@ -99,9 +99,6 @@
       time%mo = mo
       time%day_mo = day_mo
       call cli_precip_control (0)
-
-      !! SWAT+ <-> MODFLOW 6 daily coupler: init if mf6.con present (no-op otherwise)
-      call mf6_coupler_init
 
       do curyr = 1, time%nbyr
     !!!!!  uncomment next three lines for RELEASE version only (Srin/Karim)
@@ -250,11 +247,8 @@
             end do
           end if
           
-          call command              !! command loop
-
-          !! SWAT+ <-> MODFLOW 6: advance groundwater one coupling step (no-op if inactive)
-          call mf6_coupler_step
-
+          call command              !! command loop 
+          
           ! reset base0 heat units and yr_skip at end of year for southern hemisphere
           ! near winter solstace (winter solstice is around June 22)
           if (time%day == 181) then
@@ -286,8 +280,6 @@
           if (time%yrs > pco%nyskip) then
             crop_yld_t_ha = bsn_crop_yld(iplt)%yield / (bsn_crop_yld(iplt)%area_ha + 1.e-6)
             if (pco%crop_yld == "y" .or. pco%crop_yld == "b") then
-              !! fort-leak-fix
-              if (pco%cdfout /= "y") &
               write (5100,*) time%yrc, iplt, plts_bsn(iplt), bsn_crop_yld(iplt)%area_ha,          &
                                                   bsn_crop_yld(iplt)%yield, crop_yld_t_ha
             end if
@@ -300,8 +292,6 @@
             bsn_crop_yld_aa(iplt)%area_ha = bsn_crop_yld_aa(iplt)%area_ha / time%yrs_prt
             bsn_crop_yld_aa(iplt)%yield = bsn_crop_yld_aa(iplt)%yield / time%yrs_prt
             if (pco%crop_yld == "y" .or. pco%crop_yld == "b") then
-              !! fort-leak-fix
-              if (pco%cdfout /= "y") &
               write (5101,*) time%yrc, iplt, plts_bsn(iplt), bsn_crop_yld_aa(iplt)%area_ha,   &
                                                 bsn_crop_yld_aa(iplt)%yield, crop_yld_t_ha
             end if
@@ -413,27 +403,26 @@
         
         iob = sp_ob1%chandeg + ich - 1
         !! ch_budget.txt
-        if (pco%cdfout /= "y") &   !! fort-leak-fix (debug ch_budget dump; avoid fort.8000)
         write (8000,*) ich, ob(iob)%name, ob(iob)%area_ha, sd_ch(ich)%chw,  &
                 ch_morph(ich)%w_yr, sd_ch(ich)%chd, ch_morph(ich)%d_yr,      &
                                                       ch_morph(ich)%fp_mm
       end do
       
       !! average and write by stream order
+      !! use max(num,1) as divisor: orders with no channels have zero numerators,
+      !! so 0/1 = 0. avoids vectorized 0.0/0.0 that traps under ifx -fpe0
       if (sp_ob%chandeg > 0) then
         do iord = 1, 12
-          if (ch_morph_ord(iord)%num > 0) then
-            ch_morph_ord(iord)%w_yr = ch_morph_ord(iord)%w_yr / ch_morph_ord(iord)%num
-            ch_morph_ord(iord)%d_yr = ch_morph_ord(iord)%d_yr / ch_morph_ord(iord)%num
-            ch_morph_ord(iord)%fp_mm = ch_morph_ord(iord)%fp_mm / ch_morph_ord(iord)%num
-          end if
+          rnum = real(max(ch_morph_ord(iord)%num, 1))
+          ch_morph_ord(iord)%w_yr = ch_morph_ord(iord)%w_yr / rnum
+          ch_morph_ord(iord)%d_yr = ch_morph_ord(iord)%d_yr / rnum
+          ch_morph_ord(iord)%fp_mm = ch_morph_ord(iord)%fp_mm / rnum
         end do
       end if
       
       !! write ch_order_sed.txt
       if (sp_ob%chandeg > 0) then
         do iord = 1, 12
-          if (pco%cdfout /= "y") &   !! fort-leak-fix (debug ch_order dump; avoid fort.8001)
           write (8001,*) iord, ch_morph_ord(iord)%num, ch_morph_ord(iord)%ebank_t,     &
             ch_morph_ord(iord)%w_yr, ch_morph_ord(iord)%fp_t, ch_morph_ord(iord)%fp_mm
         end do

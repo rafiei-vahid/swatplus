@@ -31,8 +31,8 @@
       real :: gw_head !m      |current groundwater head in cell
       real :: Q !m3/day |water exchange flow rate in floodplain, calculated by Darcy's Law
       real :: chan_volume !m3     |water volume in channel before groundwater exchange occurs
-      real :: chan_csol(100) = 0.        !g/m3   |solute concentration in channel water
-      real :: solmass(100) = 0.          !g      |solute mass transferred
+      real :: chan_csol(100)  !g/m3   |solute concentration in channel water
+      real :: solmass(100)  !g      |solute mass transferred
       real :: heat_flux !J      |heat in water transfer
       real :: chan_heat !J      |heat in channel water
 
@@ -40,8 +40,8 @@
       !record starting channel volume (m3)
       chan_volume = ch_stor(chan_id)%flo
 
-      !only proceed if floodplain option is activated
-      if(gw_fp_flag == 1) then
+      !only proceed if floodplain option is activated and connection info is loaded
+      if(gw_fp_flag == 1 .and. allocated(gw_fpln_info)) then
 
         !loop through the cells connected to the current channel
         do k=1,gw_fpln_info(chan_id)%ncon

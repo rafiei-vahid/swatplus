@@ -25,18 +25,18 @@
     integer, intent (in) :: jj        !none           |HRU number
     logical, intent(in)  :: bio_mix_event !note       |True if this is a biological mixing event
     real, intent (inout) :: emix         !none           |mixing efficiency 
-    integer :: l = 0                  !none           |counter 
-    integer :: m1 = 0                 !none           |array location (see definition of ndays)
-    integer :: m2 = 0                 !               |
+    integer :: l  !none           |counter 
+    integer :: m1  !none           |array location (see definition of ndays)
+    integer :: m2  !               |
     real :: dtil                      !mm             |depth of mixing
-    real :: XX = 0.                   !varies         |variable to hold calculation results
-    real :: zz = 0.                   !               |
-    real :: yy = 0.                   !               |
-    real :: xx1 = 0.                  !               | 
-    real :: xx2 = 0.                  !               | 
-    real :: csdr = 0.                 !               | 
-    real :: consf = 0.                !               |Moisture consolidation factor 
-    real :: frac_mixed = 0.       !               |fraction of soil layer not mixed.
+    real :: XX  !varies         |variable to hold calculation results
+    real :: zz  !               |
+    real :: yy  !               |
+    real :: xx1  !               | 
+    real :: xx2  !               | 
+    real :: csdr  !               | 
+    real :: consf  !               |Moisture consolidation factor 
+    real :: frac_mixed  !               |fraction of soil layer not mixed.
     
       do l = 1, soil(jj)%nly
             
@@ -57,11 +57,11 @@
         xx = 0.
         ! zz = 3. + (8. - 3.)*exp(-5.5*soil(jj)%phys(l)%clay/100.) <- original equation.
         if (bio_mix_event) then
-          zz = zz_bmix_coef_a + (zz_bmix_coef_b)*exp(zz_bmix_coef_c*soil(jj)%phys(l)%clay/100.)
+          zz = bmix_a + (bmix_b)*exp(bmix_c*soil(jj)%phys(l)%clay/100.)
           yy = 0.0 !Setting this to zero so biomix does NOT accumulate from one day to the next.
         else
           ! zz = 3. + (15. - 3.)*exp(-5.5*soil(jj)%phys(l)%clay/100.) <- original equation.
-          zz = zz_emix_coef_a + (zz_emix_coef_b)*exp(zz_emix_coef_c*soil(jj)%phys(l)%clay/100.)
+          zz = tillmix_a + (tillmix_b)*exp(tillmix_c*soil(jj)%phys(l)%clay/100.)
           yy = soil(jj)%ly(l)%tillagef_tillmix / zz
         endif
         m1 = 1

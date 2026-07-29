@@ -9,13 +9,17 @@
       
       implicit none
       
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
-      integer :: eof !           |end of file
-      integer :: imax !none       |determine max number for array (imax) and total number in file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
+      integer :: eof  !           |end of file
+      integer :: imax  !none       |determine max number for array (imax) and total number in file
       logical :: i_exist              !none       |check to determine if file exists
-      integer :: ires !none       |counter 
-      integer :: dum1 !none       |
+      integer :: ires  !none       |counter
+      integer :: dum1  !none       |
+      integer :: hru_idx  !none       |HRU index parsed from wetland name (e.g. wet019 -> 19)
+      integer :: idig  !none       |position of first digit in wetland name
+      character(len=20) :: wet_name  !none    |wetland name read from gwflow.wetland
+      real :: thick_val  !m          |wetland bed thickness read from gwflow.wetland
 
       eof = 0
       imax = 0
@@ -65,20 +69,28 @@
       endif
   
       !rtb: if gwflow, then read wetland bottom sediment thickness from gwflow.wetland
+      !file format (SWAT+ editor v3.1.4+): 2 header lines, then rows of <wet_name> <thickness>
+      !where wet_name is like "wet019" and the trailing digits are the HRU index
       if (bsn_cc%gwflow == 1 .and. gw_wet_flag == 1) then
         inquire(file='gwflow.wetland',exist=i_exist)
         if(i_exist) then
           write(out_gw,*) '          found gwflow.wetland; use wetland specified bed thickness'
           open(in_wet_cell,file='gwflow.wetland')
-          read(in_wet_cell,*) header
-          read(in_wet_cell,*) header
-          read(in_wet_cell,*) header
-          read(in_wet_cell,*) header
-          !read in wetland bed thickness (m)
-          read(in_wet_cell,*) header
-          do ires=1,imax
-            read(in_wet_cell,*) dum1,wet_thick(ires)
+          read(in_wet_cell,*,iostat=eof) header  !title line
+          read(in_wet_cell,*,iostat=eof) header  !blank or secondary header
+          do
+            read(in_wet_cell,*,iostat=eof) wet_name, thick_val
+            if (eof /= 0) exit
+            idig = scan(wet_name, '0123456789')
+            if (idig > 0) then
+              read(wet_name(idig:), *, iostat=eof) hru_idx
+              if (eof == 0 .and. hru_idx >= 1 .and. hru_idx <= size(wet_thick)) then
+                wet_thick(hru_idx) = thick_val
+              endif
+            endif
+            eof = 0
           enddo
+          close(in_wet_cell)
         endif
       endif
       

@@ -9,8 +9,8 @@
       
       external :: search
       integer :: ic !none       |plant counter
-      character (len=80) :: titldum = ""  !           |title of file
-      character (len=80) :: header = ""   !           |header of file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file
       integer :: mpl !           | 
@@ -26,7 +26,7 @@
         allocate (pldb(0:0))
         allocate (plcp(0:0))
         allocate (pl_class(0:0))
-        if (bsn_cc%cswat == 1) allocate (cswat_1_part_fracs(0:0))
+        if (bsn_cc%cswat == 2) allocate (cswat_1_part_fracs(0:0))
       else
       do
         open (104,file=in_parmdb%plants_plt)
@@ -42,7 +42,7 @@
         allocate (pldb(0:imax))
         allocate (plcp(0:imax))
         allocate (pl_class(0:imax))
-        if (bsn_cc%cswat == 1) allocate (cswat_1_part_fracs(0:imax))
+        if (bsn_cc%cswat == 2) allocate (cswat_1_part_fracs(0:imax))
         
         rewind (104)
         read (104,*,iostat=eof) titldum
@@ -58,7 +58,7 @@
           end if
           if (eof < 0) exit
           pldb(ic)%mat_yrs = Max (1, pldb(ic)%mat_yrs)
-          if (bsn_cc%cswat == 1) then
+          if (bsn_cc%cswat == 2) then
             cswat_1_part_fracs(ic)%lig_frac_blg = pldb(ic)%res_part_fracs%lig_frac
             cswat_1_part_fracs(ic)%lig_frac_abg = pldb(ic)%res_part_fracs%str_frac
             cswat_1_part_fracs(ic)%str_frac_blg = cswat_1_part_fracs(ic)%lig_frac_blg / .80 

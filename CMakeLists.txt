@@ -126,11 +126,16 @@ if (UNIX)
           link_libraries("-static")
         endif()
     elseif(CMAKE_Fortran_COMPILER_ID MATCHES GNU)
-        set(fdialect        "-cpp -ffree-line-length-none -fbacktrace")
-        set(fdebug          "-Wall")
+        # -fcheck=all / -ffpe-trap / -fsignaling-nans are DEBUG diagnostics — they belong in
+        # fdebug, not fdialect (which is applied to every config, including Release). With them in
+        # Release the binary aborts (EXC_BAD_INSTRUCTION/SIGILL) when optimized system math
+        # routines such as expf() internally raise benign FP flags. Keep only the dialect and the
+        # semantic/numeric flags (-finit-local-zero, -frounding-math, …) on by default.
+        set(fdialect        "-cpp -fimplicit-none -ffree-line-length-none -fbacktrace -finit-local-zero -fno-unsafe-math-optimizations -frounding-math")
+        set(fdebug          "-Wall -fcheck=all -ffpe-trap=invalid,zero,overflow,underflow -fsignaling-nans")
         set(frelease        "-O")
         set(FFC             "gnu")
-        
+
         if(NOT APPLE)
             # Check if the OS is not Arch Linux or is not based on Arch Linux and is not Fedpra based
             # For non-Arch and non-FedoraLinux based systems using gfortran (GNU), set the link_library static flag to build a static executable.")
@@ -140,6 +145,13 @@ if (UNIX)
                      "${os_id}" STREQUAL "fedora" ))
                 link_libraries("-static")
             endif()
+        else()
+            # macOS cannot statically link libSystem (Apple ships no static libc), so a fully
+            # static binary like the Linux build isn't possible. Instead, statically link the
+            # gfortran/quadmath/gcc runtimes so the executable no longer depends on Homebrew's
+            # gcc dylibs (libgfortran.5.dylib, libquadmath.0.dylib); only /usr/lib/libSystem
+            # remains dynamic. This makes it portable across Macs without `brew install gcc`.
+            link_libraries("-static-libgfortran" "-static-libquadmath" "-static-libgcc")
         endif()
     endif()
 

@@ -9,12 +9,16 @@
       character (len=80) :: titldum = ""!           |title of file
       character (len=80) :: header = "" !           |header of file
       integer :: eof !           |end of file
-      integer :: imax !none       |determine max number for array (imax) and total number in file
+      integer :: imax = 0 !none       |determine max number for array (imax) and total number in file
       logical :: i_exist              !none       |check to determine if file exists
       integer :: iu !none       |counter 
            
       inquire (file=in_parmdb%urban_urb, exist=i_exist)
       if (.not. i_exist .or. in_parmdb%urban_urb == "null") then
+          !! no urban database: keep imax defined, since db_mx%urban = imax below
+          !! runs whether or not this branch was taken. Without it plant_init loops
+          !! to a garbage bound over an unallocated urbdb.
+          imax = 0
           allocate (urbdb(0:0))
       else
       do

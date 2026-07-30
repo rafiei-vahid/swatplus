@@ -35,8 +35,8 @@
       logical             :: i_exist
       integer             :: layer_id
       integer             :: max_lyr
-      integer             :: rows_read = 0
-      character (len=32)  :: carbon_lyr = ""  ! per-layer file, derived from carbon.bsn
+      integer             :: rows_read
+      character (len=32)  :: carbon_lyr  ! per-layer file, derived from carbon.bsn
       integer             :: idot
       real                :: r_hp_rate, r_hs_rate, r_microb_rate
       real                :: r_meta_rate, r_str_rate, r_microb_top_rate, r_hs_hp
@@ -122,6 +122,7 @@
       read (107, '(a)', iostat=eof) header
 
       max_lyr = size(carbdb)
+      rows_read = 0        !! accumulator below; zero here, not in the declaration
 
       do
         read (107, *, iostat=eof)                                  &

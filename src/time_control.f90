@@ -53,8 +53,13 @@
       use output_ls_pesticide_module
       use water_body_module
       use water_allocation_module
+      !! SWAT+ <-> MODFLOW 6 coupler. The bcb882c upstream merge took upstream's
+      !! time_control.f90 verbatim and silently dropped this use + both call sites; the
+      !! engine then ran coupled models as plain SWAT+ while a stale mf6/pfas.lst made the
+      !! ship gate's mass-balance check look green. Caught by Tier 2 flow-vs-golden.
+      use mf6_coupler
       !use reservoir_data_module
-      
+
       implicit none
       
       external :: actions, aqu_pest_output_init, basin_sw_init, calsoft_ave_output, calsoft_sum_output, &
@@ -99,6 +104,9 @@
       time%mo = mo
       time%day_mo = day_mo
       call cli_precip_control (0)
+
+      !! SWAT+ <-> MODFLOW 6 daily coupler: init if mf6.con present (no-op otherwise)
+      call mf6_coupler_init
 
       do curyr = 1, time%nbyr
     !!!!!  uncomment next three lines for RELEASE version only (Srin/Karim)
@@ -247,8 +255,11 @@
             end do
           end if
           
-          call command              !! command loop 
-          
+          call command              !! command loop
+
+          !! SWAT+ <-> MODFLOW 6: advance groundwater one coupling step (no-op if inactive)
+          call mf6_coupler_step
+
           ! reset base0 heat units and yr_skip at end of year for southern hemisphere
           ! near winter solstace (winter solstice is around June 22)
           if (time%day == 181) then

@@ -6,10 +6,10 @@
 > backend, land-phase and in-stream **PFAS fate-and-transport**, and a daily two-way **SWAT+ ↔
 > MODFLOW 6** surface-water/groundwater coupling. Each addition is inert unless explicitly enabled, so
 > a stock SWAT+ model runs here unchanged. Results track upstream except where two
-> order-dependence defects were fixed (`gra` in `ch_watqual4`, `enratio` in `varinit`), which
-> shift in-stream CBOD and chlorophyll-a; both are reported upstream as swat-model/swatplus#242. The reentrancy work that enables safe
-> parallelism makes the engine **Intel `ifx`-only** for production-scale models (`gfortran` is fine for
-> small serial runs).
+> order-dependence defects were fixed -- `gra` (`ch_watqual4`) and `enratio` (`varinit`), which shift
+> in-stream CBOD and chlorophyll-a and are reported upstream as swat-model/swatplus#242, and
+> `pl_nut_demand` (a stale `ipl` index), which shifts six phosphorus variables. Production-scale runs use **Intel `ifx`**;
+> `gfortran` builds the engine but is not the production toolchain.
 
 The **Soil and Water Assessment Tool Plus** — [SWAT+](https://swatplus.gitbook.io/docs) — is an
 open-source watershed model jointly developed by the USDA Agricultural Research Service
@@ -27,31 +27,34 @@ This fork is the **SWATGenX parallel SWAT+ engine**. It parallelizes **both** ph
 simulation loop, which is the part usually considered impossible to split:
 
 - **HRU land phase** — OpenMP across HRUs with per-thread object state. Results are
-  **byte-identical** to serial SWAT+ at any thread count.
+  **byte-identical** to a serial run of the same binary, at any thread count.
 - **Channel / stream routing** — an opt-in **wavefront over the full daily object dependency graph**
   (channels, reservoirs, aquifers, recall points), so independent reaches route concurrently while
   upstream→downstream order is preserved.
 
 Measured on a dedicated AWS c8a (32 physical cores) node with a production river-basin model
-(one-simulated-year benchmark, daily channel output; numbers from the manuscript below):
+(one-simulated-year benchmark, daily channel output; source data in
+`publication/engine-acceleration/repro/results/crosshw_c8a.csv`):
 
 | Metric | Value |
 |---|---|
 | Peak thread speedup, full routing wavefront | **5.33× at 24 threads** (still climbing) |
-| Byte-identical mode (HRU-parallel, routing serial) | 2.81× at 16 threads |
+| HRU-parallel mode, routing serial | 2.81× at 16 threads |
 | Single-thread serial engineering gain vs stock SWAT+ | 1.67–2.47× (machine-dependent) |
 | **End-to-end vs stock serial SWAT+** | **7.14× at 24 threads** (≈27 s per simulated year) |
 
-**Honest caveats.** Production-scale builds require **Intel `ifx`** (the reentrancy refactor is
-`ifx`-only at scale). The parallel routing wavefront reorders in-stream summations, so **N>1 routing
-carries a documented floating-point round-off** (~1e-7 relative on channel aggregates) and is
-opt-in; **HRU-parallel mode is byte-identical** and, together with fully-serial, is the production
-default on [SWATGenX](https://swatgenx.com).
+**Honest caveats.** Production builds use **Intel `ifx`**; `gfortran` compiles the engine but is
+not what SWATGenX runs at scale. **Both parallel modes are byte-identical** to serial -- the earlier
+statement that the routing wavefront carried an unavoidable round-off was wrong and is retracted; the
+disagreement was three order-dependence defects, since fixed. Carbon (`cswat = 2`) is **not yet
+supported in parallel**: upstream's carbon routines are not reentrant, so enable carbon only at
+`OMP_NUM_THREADS=1`. Results differ from upstream SWAT+ by design -- see *Relationship to upstream*.
 
 Benchmarks, figures, and the full write-up:
 **[swatgenx.com/swat-plus-parallel-engine](https://swatgenx.com/swat-plus-parallel-engine)**.
-The acceleration methodology and validation standard are described in a manuscript submitted to
-*Geoscientific Model Development* (2026, under review).
+The acceleration methodology and the bitwise validation standard are written up at that page,
+with a walkthrough of the routing wavefront and the measured scaling on YouTube:
+**[youtu.be/ltFvXS6ISGY](https://youtu.be/ltFvXS6ISGY)**.
 
 ---
 
@@ -102,8 +105,10 @@ cmake -S . -B build/ifx -DCMAKE_BUILD_TYPE=Release \
 cmake --build build/ifx -j"$(nproc)"
 ```
 
-A stock SWAT+ build (`gfortran`, no options) still compiles and runs small serial models; the
-`ifx`/OpenMP/NetCDF build is what SWATGenX runs in production.
+`gfortran` builds the full engine (verified on Linux and Apple Silicon); the `ifx`/OpenMP/NetCDF
+build is what SWATGenX runs in production. Note upstream's CMakeLists passes `-finit-local-zero` on
+the `gfortran` path, which zeroes uninitialized locals -- useful for stability, but it also masks
+read-before-write defects that the `ifx` build will still hit.
 
 ## Running
 
@@ -142,6 +147,11 @@ The acceleration and coupling preserve the science to a documented, automatable 
 - **Bitwise equivalence, not tolerance.** Every variable of every output file matches the serial run
   exactly, in both parallel modes -- verified across a five-basin fleet, 1.63e10 compared values,
   none differing. There is no ULP allowance to negotiate.
+- **What that fleet does and does not cover.** Those basins were chosen for reservoir and wetland
+  density, to stress the defect class known at the time. They are all SWATGenX-generated with carbon
+  disabled, so they do not exercise carbon (`cswat = 2`), which is not reentrant and is unsupported
+  in parallel. A fourth order-dependence defect (`pl_nut_demand`, stale `ipl`) was later found by an
+  independent build on a second toolchain, not by this gate -- the gate is necessary, not sufficient.
 - **Standing gate.** `swatplus_perf/scripts/byteid_rogue_pfas.sh` runs the full coupled SW+GW PFAS
   Rogue River model at `N=1` vs `N=4` and asserts this standard before any engine is promoted to
   production.
@@ -150,8 +160,16 @@ The acceleration and coupling preserve the science to a documented, automatable 
 
 This engine is a **respectful extension of, not a replacement for, SWAT+**. It is built on
 `swat-model/swatplus`, keeps the upstream science intact, and tracks upstream so that its scientific
-updates can be incorporated. Several of the underlying improvements are general-purpose, and we have
-contributed fixes back to the SWAT+ project. The larger capabilities here — the reentrancy/OpenMP
+updates can be incorporated -- `main` currently carries all upstream commits.
+
+**It is not bug-for-bug identical to upstream, by design.** Requiring a parallel run to match a
+serial run bit for bit forces order-dependence defects to be fixed, and fixing them changes results:
+`gra` (`ch_watqual4`) and `enratio` (`varinit`) shift in-stream chlorophyll-a and CBOD, and
+`pl_nut_demand` shifts six phosphorus variables. Those two goals -- bitwise parallel/serial agreement
+and bit-for-bit agreement with the sequential original -- are mutually exclusive. Calibrated
+parameters, phosphorus especially, will not transfer unchanged. Several of the underlying improvements are general-purpose and have been
+reported upstream (swat-model/swatplus#242 documents three order-dependence defects found by
+requiring bitwise agreement); none have been merged upstream yet. The larger capabilities here — the reentrancy/OpenMP
 refactor, the NetCDF backend, and the PFAS and MODFLOW 6 modules — are maintained as a research engine
 line that advances SWAT+ toward high-resolution and coupled contaminant-transport applications, and we
 welcome collaboration with the SWAT+ developer community on bringing these advances to the wider model.
@@ -175,10 +193,12 @@ The other branches are the development history and upstream-contribution lines:
 
 ## Citing
 
-If you use this engine, please cite SWAT+ (USDA-ARS / Texas A&M) together with the SWATGenX
-publications describing the acceleration, the PFAS fate-and-transport implementation, and the SWAT+ ↔
-MODFLOW 6 coupling — the acceleration manuscript is under review at *Geoscientific Model
-Development* (2026). See [swatgenx.com](https://swatgenx.com) for the current reference list.
+If you use this engine, please cite SWAT+ (USDA-ARS / Texas A&M) alongside the SWATGenX write-ups
+covering the acceleration, the PFAS fate-and-transport implementation, and the SWAT+ ↔ MODFLOW 6
+coupling. The method and benchmarks are documented at
+**[swatgenx.com/swat-plus-parallel-engine](https://swatgenx.com/swat-plus-parallel-engine)** and
+explained in [this video](https://youtu.be/ltFvXS6ISGY). See
+[swatgenx.com](https://swatgenx.com) for the current reference list.
 
 ## Directory structure & upstream docs
 

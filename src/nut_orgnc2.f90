@@ -99,6 +99,11 @@
       c_vert = 0.
       c_microb = 0.
       c_sed = 0.
+      !! c_microb_sed belongs in this block and was missing from it. It is written only
+      !! inside "flo_tot > 1.E-10" AND "ero_fr > 0.", but read unconditionally below --
+      !! subtracted from soil1(j)%microb(1)%c and added to hsc_d(j)%sed_c. On any HRU-day
+      !! where either guard fails it would otherwise carry the previous call's value.
+      c_microb_sed = 0.
       soil1(j)%tot(1)%c = soil1(j)%hp(1)%c + soil1(j)%hs(1)%c + soil1(j)%meta(1)%c + soil1(j)%str(1)%c !Total organic carbon in layer 1
       ero_fr = MIN((sedyld(j)/hru(j)%area_ha) / (sol_mass / 1000.),.9) !fraction of soil erosion of total soil mass
       c_sed = ero_fr * soil1(j)%tot(1)%c

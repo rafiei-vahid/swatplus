@@ -372,6 +372,13 @@
       ! Solar radiation (Short wave radiation). The shade-factor is included in the Solar radiation calculation
       ! read shadefactor input file (has to be computed manually with python), if switched on (1) in temperature.cha, else the default is 0.5
 
+      !! ssff is read unconditionally by h_sr below, but with sf_on == 1 it is assigned only
+      !! when the loop finds an shf_db row matching this (jday, ilsu). A day or landscape unit
+      !! absent from the shade-factor table left it carrying the previous CHANNEL's value, so
+      !! short-wave radiation -- and hence water temperature -- depended on channel order.
+      !! Seed it with the basin default, which is what sf_on == 0 uses, so a missing row now
+      !! degrades to "no site-specific shading" instead of to the neighbouring reach's value.
+      ssff = w_temp(0)%ssff
       if (w_temp(0)%sf_on == 1) then
           do i = 1, size(shf_db)
               if (jday == 366) then !for leap year set SF to 0.5

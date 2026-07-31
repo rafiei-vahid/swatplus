@@ -172,6 +172,20 @@
       type (management_ops) :: mgt
       type (management_ops) :: mgt1
       type (management_ops), dimension(1) :: mgt2
+
+!! swatplus_perf OpenMP: `mgt` is the CURRENT scheduled management operation. Every HRU does
+!! `mgt = sched(isched)%mgt_ops(hru(j)%cur_op)` (mgt_operatn.f90:49, mgt_sched.f90:636) and then
+!! reads the fields back to apply that operation. Shared, concurrent HRUs overwrite each other's
+!! copy between the write and the read, so an HRU applies ANOTHER HRU's operation: on 2026-08-01
+!! HRU 554 applied 112 kg N (past_fert's Mar 1 rate) on Feb 15, where its own agrr_rot schedule
+!! specifies 75 kg. That is the parallel nondeterminism -- wrong fertilizer amounts propagating
+!! into soil N and out through the channels as no3.
+!!
+!! threadprivate is the correct fix and is byte-identity preserving: mgt carries no state across
+!! HRUs (it is set immediately before use within one HRU's operation processing), the type has no
+!! allocatable components, and isched/j are procedure locals. Each thread simply gets its own
+!! scratch copy, which is exactly the serial semantics.
+!$omp threadprivate(mgt)
       
       type management_schedule
         character(len=40) :: name = ""

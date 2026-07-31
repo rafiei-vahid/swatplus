@@ -106,6 +106,18 @@
           isubstep = 1
         end if
         
+        !! swatplus_perf: inflo MUST be defined on the no-inflow path. It is assigned only
+        !! inside the "ht1%flo > 1.e-6" block below, but read unconditionally at
+        !! "inflo_rate = inflo / 86400." after it -- so a channel-day with no inflow read
+        !! undefined memory. Upstream (cb442f7) declares "real :: inflo = 0.", which makes it
+        !! implicitly SAVEd (F2018 8.5.16) and hides the hole by reusing the previous
+        !! channel's value: order-dependent, but deterministic in serial. This fork drops such
+        !! initializers for OpenMP reentrancy, which turns the same hole into an UNINITIALIZED
+        !! read whose garbage differs per thread and per run. Confirmed by -init=snan trapping
+        !! at ch_rtmusk.f90:128 in BOTH serial and parallel (2026-07-31). Zero is the correct
+        !! and order-independent value: no inflow means no inflow rate.
+        !! Same class as scoef/frac (sd_channel_control3), gra (ch_watqual4), enratio (varinit).
+        inflo = 0.
         !! add inflow to total storage
         if (ht1%flo > 1.e-6) then
           if (sd_ch(jrch)%msk%nsteps > 1) then

@@ -319,9 +319,34 @@
       end if        ! ht1%flo > 0.
       
       !rtb hydrograph separation
+      !! swatplus_perf: scoef and frac MUST be defined before the branch below.
+      !!
+      !! Both are declared bare (no initializer) and the ELSE branch reads BOTH while
+      !! assigning NEITHER -- scoef at :342-348, frac at :356-362. So on any channel-day
+      !! with travel time <= the routing step, this routine used whatever the stack held.
+      !!
+      !! Upstream (cb442f7) declares them "= 0." which makes them implicitly SAVEd
+      !! (F2018 8.5.16), so the else branch silently reused the LAST channel that took the
+      !! if-branch -- order-dependent, but deterministic in serial. Our OpenMP sweep
+      !! (df07e3f "init all") stripped those initializers to remove the implicit SAVE, which
+      !! is correct for reentrancy but turned a stale-value read into an UNINITIALIZED read:
+      !! under threading each thread has its own stack, so the garbage differs per thread AND
+      !! per run. That is the nondeterminism -- two identical 2-thread runs of Myakka
+      !! nps_baseline differed from each other by 12,257 cells (2026-07-31). Confirmed by
+      !! -init=snan, which traps at :342 in BOTH serial and parallel.
+      !!
+      !! Same defect class as gra (ch_watqual4) and enratio (varinit): a value read on a path
+      !! nothing wrote. The order-independent choice is to compute the storage coefficient
+      !! unconditionally -- the Variable Storage Coefficient formula is valid for any travel
+      !! time, and as ttime -> 0 it tends to 1 (route essentially all inflow), which is exactly
+      !! what the else branch's "route all stored and frac of incoming" intends. frac is then
+      !! the complement (the share held back in channel storage), so mass is conserved on both
+      !! paths instead of depending on leftover memory.
+      scoef = 24. / (ch_rcurv(jrch)%in2%ttime + ch_rcurv(jrch)%out1%ttime + 24.)
+      scoef = max(0., min(1., scoef))
+      frac = 1. - scoef
       if (rttime > time%dtm / 60.) then      ! travel time > routing time step (hours)
         !! Variable Storage Coefficient method - sc=2*dt/(2*ttime+dt) - ttime=(in2+out1)/2
-        scoef = 24. / (ch_rcurv(jrch)%in2%ttime + ch_rcurv(jrch)%out1%ttime + 24.)
         !! travel time > timestep -- then all incoming is stored and frac of stored is routed
         hdsep2%flo_surq = scoef * ch_stor_hdsep(ich)%flo_surq
         hdsep2%flo_latq = scoef * ch_stor_hdsep(ich)%flo_latq

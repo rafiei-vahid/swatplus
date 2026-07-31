@@ -318,6 +318,19 @@
       
       end if        ! ht1%flo > 0.
       
+      !! swatplus_perf: ebtm_m, ebank_m and hc_sed are declared bare and NEVER assigned
+      !! anywhere in this routine, yet all three are stored into the channel-morphology
+      !! output at :514-516 (deg_btm_m, deg_bank_m, hc_sed). Upstream declares them "= 0.",
+      !! which makes them implicitly SAVEd, so the store silently carried whatever the last
+      !! channel that DID compute them left behind -- and when no channel computes them, the
+      !! value at allocation. Dropping the initializer for OpenMP reentrancy turns that into a
+      !! read of thread-local stack garbage: -init=snan traps at chsd_add (sd_channel_module
+      !! :638) accumulating hc_sed, at 4 threads AND serial. Zero is correct: these are
+      !! per-timestep erosion depths/masses, and "not computed this step" means none occurred.
+      ebtm_m = 0.
+      ebank_m = 0.
+      hc_sed = 0.
+
       !rtb hydrograph separation
       !! swatplus_perf: scoef and frac MUST be defined before the branch below.
       !!

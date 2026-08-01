@@ -40,13 +40,22 @@ Measured on a dedicated AWS c8a (32 physical cores) node with a production river
 |---|---|
 | Peak thread speedup, full routing wavefront | **5.33× at 24 threads** (still climbing) |
 | HRU-parallel mode, routing serial | 2.81× at 16 threads |
-| Single-thread serial engineering gain vs stock SWAT+ | 1.67–2.47× (machine-dependent) |
+| Single-thread serial engineering gain vs stock SWAT+ | 1.67–2.47× (machine-dependent, **serial-only build**) |
 | **End-to-end vs stock serial SWAT+** | **7.14× at 24 threads** (≈27 s per simulated year) |
+
+The serial-gain row is measured on a **serial-only** build. This engine is compiled with
+OpenMP, which costs **1.20–1.24×** at one thread against a serial-only build of the same core
+(measured twice on c8a: `crosshw_c8a.csv` R6 115.2 s vs R6FULL@1 143.1 s; `c8a_ladder_io_byteid.csv`
+141.5 s vs 170.2 s). The tax is near-fixed, so on small models a one-thread run of this binary is
+*slower* than stock — across seven watersheds it ran 0.70–0.92× of stock on the six under 30k HRUs
+and 1.24× on Peace. It is repaid immediately at more than one thread. See
+`publication/engine-acceleration/SERIAL_GAIN_SETTLED_2026-08-01.md`.
 
 **Honest caveats.** Production builds use **Intel `ifx`**; `gfortran` compiles the engine but is
 not what SWATGenX runs at scale. **Both parallel modes are byte-identical** to serial -- the earlier
 statement that the routing wavefront carried an unavoidable round-off was wrong and is retracted; the
-disagreement was three order-dependence defects, since fixed. Carbon (`cswat = 2`) is **not yet
+disagreement was five mechanisms carrying state between simulated objects -- three order-dependence
+defects and two genuine data races -- all since fixed. Carbon (`cswat = 2`) is **not yet
 supported in parallel**: upstream's carbon routines are not reentrant, so enable carbon only at
 `OMP_NUM_THREADS=1`. Results differ from upstream SWAT+ by design -- see *Relationship to upstream*.
 

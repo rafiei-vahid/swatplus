@@ -40,15 +40,22 @@ Measured on a dedicated AWS c8a (32 physical cores) node with a production river
 |---|---|
 | Peak thread speedup, full routing wavefront | **5.33× at 24 threads** (still climbing) |
 | HRU-parallel mode, routing serial | 2.81× at 16 threads |
-| Single-thread serial engineering gain vs stock SWAT+ | 1.67–2.47× (machine-dependent, **serial-only build**) |
-| **End-to-end vs stock serial SWAT+** | **7.14× at 24 threads** (≈27 s per simulated year) |
+| Single-thread serial engineering gain vs our baseline build | 1.67–2.47× (machine-dependent, **serial-only build**) |
+| **End-to-end vs our baseline build** | **7.14× at 24 threads** (≈27 s per simulated year) |
+
+**What "baseline" means in this table.** Both ratio rows are measured against `768f1d1`, this
+fork's first production rung, which **already carries the NetCDF backend and the `channel_sd`
+print filter** — together worth ~1.1× on wall time. They are not measured against unmodified
+upstream SWAT+; against that, the end-to-end figure is larger, near 8×. We quote 7.14× because it
+is directly measured (191.886 s → 26.8698 s in `crosshw_c8a.csv`), whereas the ~8× is a product of
+two separately measured factors, and a measurement is a stronger object than a composition.
 
 The serial-gain row is measured on a **serial-only** build. This engine is compiled with
 OpenMP, which costs **1.20–1.24×** at one thread against a serial-only build of the same core
 (measured twice on c8a: `crosshw_c8a.csv` R6 115.2 s vs R6FULL@1 143.1 s; `c8a_ladder_io_byteid.csv`
 141.5 s vs 170.2 s). The tax is near-fixed, so on small models a one-thread run of this binary is
-*slower* than stock — across seven watersheds it ran 0.70–0.92× of stock on the six under 30k HRUs
-and 1.24× on Peace. It is repaid immediately at more than one thread. See
+*slower* than the baseline — across seven watersheds it ran 0.70–0.92× of baseline on the six
+under 30k HRUs and 1.24× on Peace. It is repaid immediately at more than one thread. See
 `publication/engine-acceleration/SERIAL_GAIN_SETTLED_2026-08-01.md`.
 
 **Honest caveats.** Production builds use **Intel `ifx`**; `gfortran` compiles the engine but is

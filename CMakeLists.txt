@@ -107,6 +107,13 @@ if(NOT TAG)
     # this happens when git is not installed or not in the path
       set(TAG "unknown")
     endif()
+
+    # TAG becomes part of the executable's target name, and CMake REJECTS a target name
+    # containing '/'. Our own release tags are namespaced (`ship/v1.0-48`), so an unsanitised
+    # `git describe` broke every build of this repo the moment such a tag was created
+    # (2026-08-01: "The target name swatplus-ship/v1.0-48-... is reserved or not valid").
+    # Replace path separators rather than constrain how humans may name tags.
+    string(REPLACE "/" "-" TAG "${TAG}")
 endif()
 
 

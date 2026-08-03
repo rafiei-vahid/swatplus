@@ -377,7 +377,7 @@
     contains
 
       !! add mineral n
-      function nmin_add (nmin_m1, nmin_m2) result (nmin_m3)
+      pure function nmin_add (nmin_m1, nmin_m2) result (nmin_m3)
         type (mineral_nitrogen), intent (in) :: nmin_m1
         type (mineral_nitrogen), intent (in) :: nmin_m2
         type (mineral_nitrogen) :: nmin_m3
@@ -386,7 +386,7 @@
       end function nmin_add
       
       !! multiply mineral n by a constant
-      function nmin_mult_const (const, nmin_m1) result (nmin_m2)
+      pure function nmin_mult_const (const, nmin_m1) result (nmin_m2)
         real, intent (in) :: const
         type (mineral_nitrogen), intent (in) :: nmin_m1
         type (mineral_nitrogen) :: nmin_m2
@@ -394,7 +394,7 @@
         nmin_m2%nh4 = const * nmin_m1%nh4
       end function nmin_mult_const
                           
-      function pmin_add (pmin_m1, pmin_m2) result (pmin_m3)
+      pure function pmin_add (pmin_m1, pmin_m2) result (pmin_m3)
         type (mineral_phosphorus), intent (in) :: pmin_m1
         type (mineral_phosphorus), intent (in) :: pmin_m2
         type (mineral_phosphorus) :: pmin_m3
@@ -405,7 +405,7 @@
       end function pmin_add
 
       !! multiply mineral n by a constant
-      function pmin_mult_const (const, pmin_m1) result (pmin_m2)
+      pure function pmin_mult_const (const, pmin_m1) result (pmin_m2)
         real, intent (in) :: const
         type (mineral_phosphorus), intent (in) :: pmin_m1
         type (mineral_phosphorus) :: pmin_m2
@@ -416,7 +416,7 @@
       end function pmin_mult_const
                           
       !! add organic mass
-      function om_add1 (o_m1, o_m2) result (o_m3)
+      pure function om_add1 (o_m1, o_m2) result (o_m3)
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass), intent (in) :: o_m2
         type (organic_mass) :: o_m3
@@ -427,7 +427,7 @@
       end function om_add1
             
       !! subtract organic mass
-      function om_subtract (o_m1, o_m2) result (o_m3)
+      pure function om_subtract (o_m1, o_m2) result (o_m3)
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass), intent (in) :: o_m2
         type (organic_mass) :: o_m3
@@ -438,7 +438,7 @@
       end function om_subtract
                            
       !! multiply organic mass by a constant
-      function om_mult_const (const, o_m1) result (o_m2)
+      pure function om_mult_const (const, o_m1) result (o_m2)
         real, intent (in) :: const
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass) :: o_m2
@@ -449,7 +449,7 @@
       end function om_mult_const
                           
       !! divide organic mass by a constant
-      function om_divide (o_m1, const) result (o_m2)
+      pure function om_divide (o_m1, const) result (o_m2)
         type (organic_mass), intent (in) :: o_m1
         real, intent (in) :: const 
         type (organic_mass) :: o_m2
@@ -460,7 +460,7 @@
       end function om_divide
       
       !! add org_flux
-      function org_flux_add1 (org_flux1, org_flux2) result (org_flux3)
+      pure function org_flux_add1 (org_flux1, org_flux2) result (org_flux3)
         type (organic_flux), intent (in) :: org_flux1
         type (organic_flux), intent (in) :: org_flux2
         type (organic_flux) :: org_flux3

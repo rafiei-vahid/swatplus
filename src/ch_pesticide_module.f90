@@ -79,7 +79,7 @@
              
       contains
 
-      function chpest_add(cho1, cho2) result (cho3)
+      pure function chpest_add(cho1, cho2) result (cho3)
         type (ch_pesticide_processes),  intent (in) :: cho1
         type (ch_pesticide_processes),  intent (in) :: cho2
         type (ch_pesticide_processes) :: cho3
@@ -99,7 +99,7 @@
         cho3%benthic = cho1%benthic + cho2%benthic
       end function chpest_add
       
-      function chpest_div (ch1, const) result (ch2)
+      pure function chpest_div (ch1, const) result (ch2)
         type (ch_pesticide_processes), intent (in) :: ch1
         real, intent (in) :: const
         type (ch_pesticide_processes) :: ch2
@@ -119,7 +119,7 @@
           ch2%benthic = ch1%benthic / const
       end function chpest_div
       
-      function chpest_ave (ch1, const) result (ch2)
+      pure function chpest_ave (ch1, const) result (ch2)
         type (ch_pesticide_processes), intent (in) :: ch1
         real, intent (in) :: const
         type (ch_pesticide_processes) :: ch2

@@ -86,6 +86,13 @@
       real :: chg_par                      !variable |new parameter value
       real :: yield
       real :: sumpst = 0. 
+!$omp threadprivate(sumpst)   !swatplus_perf 2026-08-03: `sumpst = sumpst + 1` (below) is a
+      !! read-modify-write into a variable whose initializer gives it implicit SAVE, hence
+      !! static storage shared by every OpenMP worker. ThreadSanitizer named actions.f90
+      !! from inside command.f90's HRU-parallel region. The initializer cannot simply be
+      !! stripped: it is the only thing defining sumpst before the increment reads it, and
+      !! the build carries -fpe0, so an uninitialized real could trap on a signalling NaN.
+      !! sumpst is never READ anywhere else, so per-thread copies change no result.
       real :: rock
       real :: p_factor
       real :: cn_prev

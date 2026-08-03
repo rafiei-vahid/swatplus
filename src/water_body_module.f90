@@ -58,7 +58,7 @@
       contains
       
      !! routines for water body module
-      function watbod_add (wbod1, wbod2) result (wbod3)
+      pure function watbod_add (wbod1, wbod2) result (wbod3)
         type (water_body), intent (in) :: wbod1
         type (water_body), intent (in) :: wbod2
         type (water_body) :: wbod3
@@ -73,7 +73,7 @@
         !wbod3%secci = wbod1%secci + wbod2%secci
       end function watbod_add
       
-      function watbod_div (wbod1,const) result (wbod2)
+      pure function watbod_div (wbod1,const) result (wbod2)
         type (water_body), intent (in) :: wbod1
         real, intent (in) :: const
         type (water_body) :: wbod2
@@ -88,7 +88,7 @@
         !wbod2%secci = wbod1%secci
       end function watbod_div
             
-      function watbod_ave (wbod1,const) result (wbod2)
+      pure function watbod_ave (wbod1,const) result (wbod2)
         type (water_body), intent (in) :: wbod1
         real, intent (in) :: const
         type (water_body) :: wbod2

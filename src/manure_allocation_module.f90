@@ -130,7 +130,7 @@
       contains
 
       !! routines for hydrograph module
-      function mallout_add (mallo1, mallo2) result (mallo3)
+      pure function mallout_add (mallo1, mallo2) result (mallo3)
         type (source_manure_output), intent (in) :: mallo1
         type (source_manure_output), intent (in) :: mallo2
         type (source_manure_output) :: mallo3
@@ -139,7 +139,7 @@
         mallo3%withdr = mallo1%withdr + mallo2%withdr
       end function mallout_add
 
-      function mallo_div_const (mallo1, const) result (mallo2)
+      pure function mallo_div_const (mallo1, const) result (mallo2)
         type (source_manure_output), intent (in) :: mallo1
         real, intent (in) :: const
         type (source_manure_output) :: mallo2

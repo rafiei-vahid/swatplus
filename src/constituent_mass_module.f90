@@ -619,7 +619,7 @@
 
       contains
       
-      function hydcsout_add (hydcs1, hydcs2) result (hydcs3)
+      pure function hydcsout_add (hydcs1, hydcs2) result (hydcs3)
         type (constituent_mass), intent (in) :: hydcs1
         type (constituent_mass), intent (in) :: hydcs2
         type (constituent_mass) :: hydcs3
@@ -659,7 +659,7 @@
       return
       end function hydcsout_add
       
-      function hydcsout_mult_const (const, hydcs1) result (hydcs2)
+      pure function hydcsout_mult_const (const, hydcs1) result (hydcs2)
         type (constituent_mass), intent (in) :: hydcs1
         type (constituent_mass) :: hydcs2
         real, intent (in) :: const

@@ -65,7 +65,7 @@
         
       contains
 
-      function hruout_saltbal_add (hru1, hru2) result (hru3)
+      pure function hruout_saltbal_add (hru1, hru2) result (hru3)
         type (salt_balance), intent (in) :: hru1
         type (salt_balance), intent (in) :: hru2
         type (salt_balance) :: hru3
@@ -78,7 +78,7 @@
         hru3%irrig = hru1%irrig + hru2%irrig
       end function hruout_saltbal_add
 
-      function hruout_saltbal_div (hru1,const) result (hru2)
+      pure function hruout_saltbal_div (hru1,const) result (hru2)
         type (salt_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (salt_balance) :: hru2
@@ -91,7 +91,7 @@
         hru2%irrig = hru1%irrig / const
       end function hruout_saltbal_div
       
-      function hruout_saltbal_ave (hru1,const) result (hru2)
+      pure function hruout_saltbal_ave (hru1,const) result (hru2)
         type (salt_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (salt_balance) :: hru2   

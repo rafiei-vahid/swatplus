@@ -69,7 +69,7 @@
       contains
 !! routines for swatdeg_hru module
 
-      function aqupest_add(aqu1, aqu2) result (aqu3)
+      pure function aqupest_add(aqu1, aqu2) result (aqu3)
         type (aqu_pesticide_processes),  intent (in) :: aqu1
         type (aqu_pesticide_processes),  intent (in) :: aqu2
         type (aqu_pesticide_processes) :: aqu3
@@ -84,7 +84,7 @@
         aqu3%stor_final = aqu1%stor_final
       end function aqupest_add
       
-      function aqupest_add_all(aqu1, aqu2) result (aqu3)
+      pure function aqupest_add_all(aqu1, aqu2) result (aqu3)
         type (aqu_pesticide_processes),  intent (in) :: aqu1
         type (aqu_pesticide_processes),  intent (in) :: aqu2
         type (aqu_pesticide_processes) :: aqu3
@@ -99,7 +99,7 @@
         aqu3%stor_final = aqu1%stor_final + aqu2%stor_final
       end function aqupest_add_all
             
-      function aqupest_div (aqu1, const) result (aqu2)
+      pure function aqupest_div (aqu1, const) result (aqu2)
         type (aqu_pesticide_processes), intent (in) :: aqu1
         real, intent (in) :: const
         type (aqu_pesticide_processes) :: aqu2
@@ -114,7 +114,7 @@
           aqu2%stor_final = aqu1%stor_final
       end function aqupest_div
       
-      function aqupest_ave (aqu1, const) result (aqu2)
+      pure function aqupest_ave (aqu1, const) result (aqu2)
         type (aqu_pesticide_processes), intent (in) :: aqu1
         real, intent (in) :: const
         type (aqu_pesticide_processes) :: aqu2

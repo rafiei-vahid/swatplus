@@ -98,7 +98,7 @@
 
       contains
 
-      function chpfas_add(c1, c2) result (c3)
+      pure function chpfas_add(c1, c2) result (c3)
         type (pfas_cha_processes), intent (in) :: c1, c2
         type (pfas_cha_processes) :: c3
         c3%tot_in  = c1%tot_in  + c2%tot_in
@@ -112,7 +112,7 @@
         c3%benthic = c1%benthic + c2%benthic
       end function chpfas_add
 
-      function chpfas_div(c1, const) result (c2)
+      pure function chpfas_div(c1, const) result (c2)
         type (pfas_cha_processes), intent (in) :: c1
         real, intent (in) :: const
         type (pfas_cha_processes) :: c2
@@ -127,7 +127,7 @@
         c2%benthic = c1%benthic / const
       end function chpfas_div
 
-      function chpfas_ave(c1, const) result (c2)
+      pure function chpfas_ave(c1, const) result (c2)
         type (pfas_cha_processes), intent (in) :: c1
         real, intent (in) :: const
         type (pfas_cha_processes) :: c2

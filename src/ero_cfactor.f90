@@ -48,7 +48,11 @@
       
       j = ihru
 
-      bsn_cc%cfac = 1
+      !! `bsn_cc%cfac = 1` stood here and has moved to basin_read_cc.f90. It ran on every HRU
+      !! on every day inside the HRU-parallel region, so all worker threads wrote this single
+      !! address at once (TSan: 14 reports, both accesses at this line). The value written was
+      !! identical from every thread, so results were unaffected -- this is a race removal, not
+      !! a behaviour change, and the test below still sees cfac == 1 exactly as before.
       !! HRU sediment calculations
       if (bsn_cc%cfac == 0) then
         !! old method using minimum c factor (average of each plant in community)

@@ -548,7 +548,7 @@
       contains
 !! routines for swatdeg_hru module
 
-      function chsednut_add(cho1,cho2) result (cho3)
+      pure function chsednut_add(cho1,cho2) result (cho3)
       type (channel_sediment_budget_output),  intent (in) :: cho1
       type (channel_sediment_budget_output),  intent (in) :: cho2
       type (channel_sediment_budget_output) :: cho3
@@ -584,7 +584,7 @@
         cho3%solp_orgp = cho1%solp_orgp + cho2%solp_orgp
       end function
        
-      function chsednut_div (cho1,const) result (cho2)
+      pure function chsednut_div (cho1,const) result (cho2)
         type (channel_sediment_budget_output), intent (in) :: cho1
         real, intent (in) :: const
         type (channel_sediment_budget_output) :: cho2
@@ -620,7 +620,7 @@
         cho2%solp_orgp = cho1%solp_orgp / const
       end function chsednut_div
       
-      function chsd_add(cho1,cho2) result (cho3)
+      pure function chsd_add(cho1,cho2) result (cho3)
       type (sd_ch_output),  intent (in) :: cho1
       type (sd_ch_output),  intent (in) :: cho2
       type (sd_ch_output) :: cho3
@@ -652,7 +652,7 @@
        cho3%velav_bf = cho1%velav_bf + cho2%velav_bf
       end function chsd_add
        
-      function chsd_div (ch1,const) result (ch2)
+      pure function chsd_div (ch1,const) result (ch2)
         type (sd_ch_output), intent (in) :: ch1
         real, intent (in) :: const
         type (sd_ch_output) :: ch2
@@ -684,7 +684,7 @@
         ch2%velav_bf = ch1%velav_bf / const
       end function chsd_div
       
-      function chsd_ave (ch1,const) result (ch2)
+      pure function chsd_ave (ch1,const) result (ch2)
         type (sd_ch_output), intent (in) :: ch1
         real, intent (in) :: const
         type (sd_ch_output) :: ch2
@@ -716,7 +716,7 @@
         ch2%velav_bf = ch1%velav_bf
       end function chsd_ave
            
-      function chsd_mult (const, chn1) result (chn2)
+      pure function chsd_mult (const, chn1) result (chn2)
         type (sd_ch_output), intent (in) :: chn1
         real, intent (in) :: const
         type (sd_ch_output) :: chn2
@@ -750,7 +750,7 @@
                   
       !! this function multiplies the rating curve by a ratio
       !! used when interpolating flow rates in flood routing
-      function chrc_mult (rc1, const) result (rc2)
+      pure function chrc_mult (rc1, const) result (rc2)
         type (channel_rating_curve_parameters), intent (in) :: rc1
         real, intent (in) :: const
         type (channel_rating_curve_parameters) :: rc2

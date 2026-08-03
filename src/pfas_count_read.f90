@@ -28,7 +28,7 @@
       character (len=80) :: titldum  !! title line
       character (len=80) :: header  !! header line
       integer :: eof  !! end-of-file flag
-      integer :: imax = 0                  !! compound-record count
+      integer :: imax  !! compound-record count
       integer :: id  !! PFAS id read from a record
       logical :: i_exist  !! file-existence flag
 

@@ -930,7 +930,7 @@
   
       contains
 
-      function hruout_waterbal_add (hru1, hru2) result (hru3)
+      pure function hruout_waterbal_add (hru1, hru2) result (hru3)
         type (output_waterbal), intent (in) :: hru1
         type (output_waterbal), intent (in) :: hru2
         type (output_waterbal) :: hru3
@@ -978,7 +978,7 @@
         hru3%wet_stor = hru1%wet_stor + hru2%wet_stor
       end function hruout_waterbal_add
       
-      function hruout_nutbal_add (hru1, hru2) result (hru3)
+      pure function hruout_nutbal_add (hru1, hru2) result (hru3)
         type (output_nutbal), intent (in) :: hru1
         type (output_nutbal), intent (in) :: hru2
         type (output_nutbal) :: hru3
@@ -1003,7 +1003,7 @@
         hru3%gwsoilp = hru1%gwsoilp + hru2%gwsoilp
       end function hruout_nutbal_add
 
-      function hruout_losses_add (hru1, hru2) result (hru3)
+      pure function hruout_losses_add (hru1, hru2) result (hru3)
         type (output_losses), intent (in) :: hru1
         type (output_losses), intent (in) :: hru2
         type (output_losses) :: hru3
@@ -1022,7 +1022,7 @@
       end function hruout_losses_add
  
 !***************************new
-      function hruout_nut_cycling_add (hru1, hru2) result (hru3)
+      pure function hruout_nut_cycling_add (hru1, hru2) result (hru3)
         type (output_nutcarb_cycling), intent (in) :: hru1
         type (output_nutcarb_cycling), intent (in) :: hru2
         type (output_nutcarb_cycling) :: hru3
@@ -1036,7 +1036,7 @@
         hru3%rsd_laborg_p = hru1%rsd_laborg_p + hru2%rsd_laborg_p
       end function hruout_nut_cycling_add
       
-      function hruout_nut_cycling_mult (hru1,const) result (hru2)
+      pure function hruout_nut_cycling_mult (hru1,const) result (hru2)
         type (output_nutcarb_cycling), intent (in) :: hru1
         real, intent (in) :: const
         type (output_nutcarb_cycling) :: hru2     
@@ -1050,7 +1050,7 @@
         hru2%rsd_laborg_p = hru1%rsd_laborg_p * const
       end function hruout_nut_cycling_mult
              
-      function hruout_nut_cycling_div (hru1,const) result (hru2)
+      pure function hruout_nut_cycling_div (hru1,const) result (hru2)
         type (output_nutcarb_cycling), intent (in) :: hru1
         real, intent (in) :: const
         type (output_nutcarb_cycling) :: hru2     
@@ -1064,7 +1064,7 @@
         hru2%rsd_laborg_p = hru1%rsd_laborg_p / const
       end function hruout_nut_cycling_div
              
-      function hruout_plantweather_add (hru1, hru2) result (hru3)
+      pure function hruout_plantweather_add (hru1, hru2) result (hru3)
         type (output_plantweather), intent (in) :: hru1
         type (output_plantweather), intent (in) :: hru2
         type (output_plantweather) :: hru3
@@ -1094,7 +1094,7 @@
         hru3%c_gro = hru1%c_gro + hru2%c_gro
       end function hruout_plantweather_add
 
-      function hruout_waterbal_div (hru1,const) result (hru2)
+      pure function hruout_waterbal_div (hru1,const) result (hru2)
         type (output_waterbal), intent (in) :: hru1
         real, intent (in) :: const
         type (output_waterbal) :: hru2
@@ -1138,7 +1138,7 @@
         hru2%wet_stor = hru1%wet_stor
       end function hruout_waterbal_div
       
-      function hruout_waterbal_ave (hru1,const) result (hru2)
+      pure function hruout_waterbal_ave (hru1,const) result (hru2)
         type (output_waterbal), intent (in) :: hru1
         real, intent (in) :: const
         type (output_waterbal) :: hru2   
@@ -1186,7 +1186,7 @@
         hru2%wet_stor = hru1%wet_stor / const
       end function hruout_waterbal_ave
 
-      function hruout_waterbal_mult (hru1,const) result (hru2)
+      pure function hruout_waterbal_mult (hru1,const) result (hru2)
         type (output_waterbal), intent (in) :: hru1
         real, intent (in) :: const
         type (output_waterbal) :: hru2
@@ -1230,7 +1230,7 @@
         hru2%wet_stor = hru1%wet_stor * const
       end function hruout_waterbal_mult
       
-      function hruout_nutbal_div (hru1,const) result (hru2)
+      pure function hruout_nutbal_div (hru1,const) result (hru2)
         type (output_nutbal), intent (in) :: hru1
         real, intent (in) :: const
         type (output_nutbal) :: hru2
@@ -1255,7 +1255,7 @@
         hru2%gwsoilp = hru1%gwsoilp / const
       end function hruout_nutbal_div
             
-      function hruout_nutbal_mult (hru1,const) result (hru2)
+      pure function hruout_nutbal_mult (hru1,const) result (hru2)
         type (output_nutbal), intent (in) :: hru1
         real, intent (in) :: const
         type (output_nutbal) :: hru2
@@ -1288,7 +1288,7 @@
         hru2%gwsoilp = hru1%gwsoilp * const
       end function hruout_nutbal_mult
       
-      function hruout_losses_div (hru1,const) result (hru2)
+      pure function hruout_losses_div (hru1,const) result (hru2)
         type (output_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (output_losses) :: hru2
@@ -1306,7 +1306,7 @@
         hru2%satexn = hru1%satexn / const !rtb gwflow
       end function hruout_losses_div
             
-      function hruout_losses_mult (hru1,const) result (hru2)
+      pure function hruout_losses_mult (hru1,const) result (hru2)
         type (output_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (output_losses) :: hru2
@@ -1324,7 +1324,7 @@
         hru2%satexn = hru1%satexn * const
       end function hruout_losses_mult
       
-      function hruout_plantweather_div (hru1,const) result (hru2)
+      pure function hruout_plantweather_div (hru1,const) result (hru2)
         type (output_plantweather), intent (in) :: hru1
         real, intent (in) :: const
         type (output_plantweather) :: hru2
@@ -1355,7 +1355,7 @@
         hru2%c_gro = hru1%c_gro
       end function hruout_plantweather_div
                   
-      function hruout_plantweather_ave (hru1,const) result (hru2)
+      pure function hruout_plantweather_ave (hru1,const) result (hru2)
         type (output_plantweather), intent (in) :: hru1
         real, intent (in) :: const
         type (output_plantweather) :: hru2
@@ -1386,7 +1386,7 @@
         hru2%c_gro = hru1%c_gro / const
       end function hruout_plantweather_ave
                           
-      function hruout_plantweather_mult (hru1,const) result (hru2)
+      pure function hruout_plantweather_mult (hru1,const) result (hru2)
         type (output_plantweather), intent (in) :: hru1
         real, intent (in) :: const
         type (output_plantweather) :: hru2

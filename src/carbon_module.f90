@@ -373,7 +373,7 @@
         
       contains
 
-      function carbon_soil_flux__add (hru1, hru2) result (hru3)
+      pure function carbon_soil_flux__add (hru1, hru2) result (hru3)
         type (carbon_soil_transformations), intent (in) :: hru1
         type (carbon_soil_transformations), intent (in) :: hru2
         type (carbon_soil_transformations) :: hru3
@@ -392,7 +392,7 @@
         hru3%co2_hp = hru1%co2_hp + hru2%co2_hp
        end function carbon_soil_flux__add
        
-      function carbon_soil_flux_mult (hru1,const) result (hru2)
+      pure function carbon_soil_flux_mult (hru1,const) result (hru2)
         type (carbon_soil_transformations), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_soil_transformations) :: hru2
@@ -411,7 +411,7 @@
         hru2%co2_hp = hru1%co2_hp * const
       end function carbon_soil_flux_mult
       
-      function carbon_soil_flux_div (hru1,const) result (hru2)
+      pure function carbon_soil_flux_div (hru1,const) result (hru2)
         type (carbon_soil_transformations), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_soil_transformations) :: hru2
@@ -430,7 +430,7 @@
         hru2%co2_hp = hru1%co2_hp / const
       end function carbon_soil_flux_div
       
-      function carbon_soil_gl__add (hru1, hru2) result (hru3)
+      pure function carbon_soil_gl__add (hru1, hru2) result (hru3)
         type (carbon_soil_gain_losses), intent (in) :: hru1
         type (carbon_soil_gain_losses), intent (in) :: hru2
         type (carbon_soil_gain_losses) :: hru3
@@ -445,7 +445,7 @@
         hru3%emit_c = hru1%emit_c + hru2%emit_c
        end function carbon_soil_gl__add
        
-      function carbon_soil_gl_mult (hru1,const) result (hru2)
+      pure function carbon_soil_gl_mult (hru1,const) result (hru2)
         type (carbon_soil_gain_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_soil_gain_losses) :: hru2
@@ -460,7 +460,7 @@
         hru2%emit_c = hru1%emit_c * const
       end function carbon_soil_gl_mult
       
-      function carbon_soil_gl_div (hru1,const) result (hru2)
+      pure function carbon_soil_gl_div (hru1,const) result (hru2)
         type (carbon_soil_gain_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_soil_gain_losses) :: hru2
@@ -475,7 +475,7 @@
         hru2%emit_c = hru1%emit_c / const
       end function carbon_soil_gl_div
       
-      function carbon_residue_gl__add (hru1, hru2) result (hru3)
+      pure function carbon_residue_gl__add (hru1, hru2) result (hru3)
         type (carbon_residue_gain_losses), intent (in) :: hru1
         type (carbon_residue_gain_losses), intent (in) :: hru2
         type (carbon_residue_gain_losses) :: hru3
@@ -487,7 +487,7 @@
         hru3%emit_c = hru1%emit_c + hru2%emit_c
        end function carbon_residue_gl__add
        
-      function carbon_residue_gl_mult (hru1,const) result (hru2)
+      pure function carbon_residue_gl_mult (hru1,const) result (hru2)
         type (carbon_residue_gain_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_residue_gain_losses) :: hru2
@@ -499,7 +499,7 @@
         hru2%emit_c = hru1%emit_c * const
       end function carbon_residue_gl_mult
       
-      function carbon_residue_gl_div (hru1,const) result (hru2)
+      pure function carbon_residue_gl_div (hru1,const) result (hru2)
         real, intent (in) :: const
         type (carbon_residue_gain_losses), intent (in) :: hru1
         type (carbon_residue_gain_losses) :: hru2
@@ -511,7 +511,7 @@
         hru2%emit_c = hru1%emit_c * const
       end function carbon_residue_gl_div
       
-      function carbon_plant_gl__add (hru1, hru2) result (hru3)
+      pure function carbon_plant_gl__add (hru1, hru2) result (hru3)
         type (carbon_plant_gain_losses), intent (in) :: hru1
         type (carbon_plant_gain_losses), intent (in) :: hru2
         type (carbon_plant_gain_losses) :: hru3
@@ -523,7 +523,7 @@
         hru3%emit_c = hru1%emit_c + hru2%emit_c
        end function carbon_plant_gl__add
        
-      function carbon_plant_gl_mult (hru1,const) result (hru2)
+      pure function carbon_plant_gl_mult (hru1,const) result (hru2)
         type (carbon_plant_gain_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_plant_gain_losses) :: hru2
@@ -535,7 +535,7 @@
         hru2%emit_c = hru1%emit_c * const
       end function carbon_plant_gl_mult
       
-      function carbon_plant_gl_div (hru1,const) result (hru2)
+      pure function carbon_plant_gl_div (hru1,const) result (hru2)
         type (carbon_plant_gain_losses), intent (in) :: hru1
         real, intent (in) :: const
         type (carbon_plant_gain_losses) :: hru2

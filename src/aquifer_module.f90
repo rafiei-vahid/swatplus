@@ -171,7 +171,7 @@
       end interface
       contains
             
-      function aqu_add(aqo1,aqo2) result (aqo3)
+      pure function aqu_add(aqo1,aqo2) result (aqo3)
       type (aquifer_dynamic),  intent (in) :: aqo1
       type (aquifer_dynamic),  intent (in) :: aqo2
       type (aquifer_dynamic) :: aqo3
@@ -194,7 +194,7 @@
        aqo3%flo_ls = aqo1%flo_ls + aqo2%flo_ls
       end function aqu_add
       
-      function aqu_div (aq1,const) result (aq2)
+      pure function aqu_div (aq1,const) result (aq2)
         type (aquifer_dynamic), intent (in) :: aq1
         real, intent (in) :: const
         type (aquifer_dynamic) :: aq2
@@ -217,7 +217,7 @@
         aq2%flo_ls = aq1%flo_ls / const
       end function aqu_div
         
-      function aqu_mult (aq1,const) result (aq2)
+      pure function aqu_mult (aq1,const) result (aq2)
         type (aquifer_dynamic), intent (in) :: aq1
         real, intent (in) :: const
         type (aquifer_dynamic) :: aq2

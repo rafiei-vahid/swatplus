@@ -90,7 +90,7 @@
         
       contains
 
-      function hruout_pestbal_add (hru1, hru2) result (hru3)
+      pure function hruout_pestbal_add (hru1, hru2) result (hru3)
         type (pesticide_balance), intent (in) :: hru1
         type (pesticide_balance), intent (in) :: hru2
         type (pesticide_balance) :: hru3
@@ -112,7 +112,7 @@
         hru3%in_plant = hru1%in_plant + hru2%in_plant
       end function hruout_pestbal_add
 
-      function hruout_pestbal_mult (hru1,const) result (hru2)
+      pure function hruout_pestbal_mult (hru1,const) result (hru2)
         type (pesticide_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (pesticide_balance) :: hru2
@@ -134,7 +134,7 @@
         hru2%in_plant = hru1%in_plant
       end function hruout_pestbal_mult
       
-      function hruout_pestbal_div (hru1,const) result (hru2)
+      pure function hruout_pestbal_div (hru1,const) result (hru2)
         type (pesticide_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (pesticide_balance) :: hru2
@@ -156,7 +156,7 @@
         hru2%in_plant = hru1%in_plant
       end function hruout_pestbal_div
       
-      function hruout_pestbal_ave (hru1,const) result (hru2)
+      pure function hruout_pestbal_ave (hru1,const) result (hru2)
         type (pesticide_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (pesticide_balance) :: hru2   

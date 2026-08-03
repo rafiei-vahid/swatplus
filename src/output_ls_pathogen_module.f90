@@ -71,7 +71,7 @@
              
       contains
 
-      function hruout_pathbal_add (hru1, hru2) result (hru3)
+      pure function hruout_pathbal_add (hru1, hru2) result (hru3)
         type (pathogen_balance), intent (in) :: hru1
         type (pathogen_balance), intent (in) :: hru2
         type (pathogen_balance) :: hru3
@@ -86,7 +86,7 @@
         hru3%die_off = hru1%die_off + hru2%die_off
       end function hruout_pathbal_add
 
-      function hruout_pathbal_div (hru1,const) result (hru2)
+      pure function hruout_pathbal_div (hru1,const) result (hru2)
         type (pathogen_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (pathogen_balance) :: hru2
@@ -101,7 +101,7 @@
         hru2%die_off = hru1%die_off / const
       end function hruout_pathbal_div
       
-      function hruout_pathbal_ave (hru1,const) result (hru2)
+      pure function hruout_pathbal_ave (hru1,const) result (hru2)
         type (pathogen_balance), intent (in) :: hru1
         real, intent (in) :: const
         type (pathogen_balance) :: hru2   

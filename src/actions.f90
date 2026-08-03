@@ -254,8 +254,8 @@
               irrig(j)%water%flo = rto * aqu_d(iob)%stor                ! organics in irrigation water
               aqu_d(iob)%stor = rto1 * aqu_d(iob)%stor                  ! remainder stays in aquifer
               if (cs_db%num_cs > 0) then
-                cs_irr(iob) = rto * cs_aqu(iob)                           ! constituents in irrigation water
-                cs_aqu(iob) = rto1 * cs_aqu(iob)                          ! remainder stays in aquifer
+                call hydcs_set (cs_irr(iob), rto, cs_aqu(iob))! constituents in irrigation water
+                call hydcs_scale (cs_aqu(iob), rto1)! remainder stays in aquifer
               end if
               
             case ("cha", "sdc")
@@ -272,8 +272,8 @@
               rto1 = (1. - rto)
               irrig(j)%water = rto * ch_stor(iob)                       ! organics in irrigation water
               ch_stor(iob) = rto1 * ch_stor(iob)                        ! remainder stays in channel
-              cs_irr(iob) = rto * ch_water(iob)                         ! constituents in irrigation water
-              ch_water(iob) = rto1 * ch_water(iob)                      ! remainder stays in channel
+              call hydcs_set (cs_irr(iob), rto, ch_water(iob))! constituents in irrigation water
+              call hydcs_scale (ch_water(iob), rto1)! remainder stays in channel
               
             case ("res")
               if (res(iob)%flo > irrig(j)%demand) then

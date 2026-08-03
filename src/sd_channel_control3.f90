@@ -313,7 +313,7 @@
       
         !salt, constituent mass
         if(cs_db%num_salts > 0 .or. cs_db%num_cs > 0) then
-          hcs3 = hcs2 + ch_water(ich) !incoming + storage
+          call hydcs_sum (hcs3, hcs2, ch_water(ich)) !incoming + storage
         end if
       
       end if        ! ht1%flo > 0.

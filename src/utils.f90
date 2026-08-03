@@ -327,7 +327,7 @@ subroutine split_line(line2, fields2, nfields, delim, maxsplit)
     !
     ! USAGE EXAMPLES:
     !
-    !   character(len=1000) :: line
+        character(len=MAX_LINE_LEN)   :: line  ! character string used to read in lines from data table
     !   character(len=50)   :: fields(100)
     !   integer             :: nf
     !

@@ -33,7 +33,7 @@
       integer :: id
       real    :: amix  !! shared aquatic mixing velocity
       real    :: load  !! daily PFAS/pesticide load into reach (kg)
-      real    :: pv(9), fv(9), dmax, gmax, grel
+      real    :: pv(9), fv(9), dmax, gmax, grel = 0.
       real    :: mw_g = 500.13        !! g/mol (PFOS); pfasdb%mw = mw_g/1000
 
       !! ---- matched routing parameters (pesticide units == pfas units) ----

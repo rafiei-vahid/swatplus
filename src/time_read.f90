@@ -7,8 +7,8 @@
       
       external :: xmon
        
-       character (len=80) :: titldum = "" !           |title of file
-       character (len=500) :: header = "" !           |header of file       
+       character (len=80) :: titldum  !           |title of file
+       character (len=500) :: header  !           |header of file       
        integer :: eof !           |end of file
        integer :: mo !           |
        integer :: day_mo !           |

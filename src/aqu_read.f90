@@ -7,8 +7,8 @@
        
        implicit none
       
-       character (len=500) :: header = ""
-       character (len=80) :: titldum = ""
+       character (len=500) :: header
+       character (len=80) :: titldum
        integer :: eof !                |end of file
        integer :: i !none            |counter
        integer :: imax !                |maximum count

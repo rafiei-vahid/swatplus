@@ -11,8 +11,8 @@
       
       implicit none
       
-      character (len=4) :: salt_ion = ""!           |
-      character (len=15) :: station_name = ""!       |
+      character (len=4) :: salt_ion  !           |
+      character (len=15) :: station_name  !       |
       integer :: eof !           |end of file
       integer :: iadep !           |counter
       integer :: imo !           |counter

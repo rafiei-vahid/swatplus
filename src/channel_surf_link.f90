@@ -8,7 +8,7 @@
       
       implicit none
       
-      character (len=3) :: iobtyp = ""!none          |object type
+      character (len=3) :: iobtyp  !none          |object type
       integer :: ics !none          |counter 
       integer :: ii !none          |counter 
       integer :: i !units         |description  

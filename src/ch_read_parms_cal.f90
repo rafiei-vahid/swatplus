@@ -5,8 +5,8 @@
       
       implicit none
        
-      character (len=80) :: titldum = "" !             |title of file
-      character (len=80) :: header = ""  !             |header of file
+      character (len=80) :: titldum  !             |title of file
+      character (len=80) :: header  !             |header of file
       integer :: eof !             |end of file
       logical :: i_exist               !             |check to determine if file exists
       integer :: mchp !             |ending of loop

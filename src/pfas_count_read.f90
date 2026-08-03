@@ -25,12 +25,12 @@
 
       implicit none
 
-      character (len=80) :: titldum = ""   !! title line
-      character (len=80) :: header = ""    !! header line
-      integer :: eof = 0                   !! end-of-file flag
+      character (len=80) :: titldum  !! title line
+      character (len=80) :: header  !! header line
+      integer :: eof  !! end-of-file flag
       integer :: imax = 0                  !! compound-record count
-      integer :: id = 0                    !! PFAS id read from a record
-      logical :: i_exist = .false.         !! file-existence flag
+      integer :: id  !! PFAS id read from a record
+      logical :: i_exist  !! file-existence flag
 
       npfas = 0
       inquire (file="pfas.dat", exist=i_exist)

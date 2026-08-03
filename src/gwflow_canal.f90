@@ -37,8 +37,8 @@
       real :: canal_bed !m      |canal bed elevation in the cell
       real :: head_diff !m      |head difference between canal stage and groundwater head
       real :: Q !m3/day |water exchange flow rate, calculated by Darcy's Law
-      real :: chan_csol(100) = 0.             !g/m3   |solute concentration in channel water
-      real :: solmass(100) = 0.               !g      |solute mass transferred
+      real :: chan_csol(100)  !g/m3   |solute concentration in channel water
+      real :: solmass(100)  !g      |solute mass transferred
       real :: conc_nh3
       real :: conc_no2
       real :: conc_dox

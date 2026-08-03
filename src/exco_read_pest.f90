@@ -9,8 +9,8 @@
 
       implicit none
  
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
       integer :: eof
       integer :: imax
       integer :: ob1

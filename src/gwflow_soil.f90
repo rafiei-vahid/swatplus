@@ -22,7 +22,7 @@
       real :: vadose_z !m          |thickness of cell vadose zone
       real :: poly_area !m2     |area of cell within the HRU
       real :: solmass(100) = 0.          !g      |solute mass transferred from cell
-      real :: water_depth(100) = 0.      !m      |depth of groundwater in each soil layer
+      real :: water_depth(100)  !m      |depth of groundwater in each soil layer
       real :: water_depth_tot !m      |total depth of groundwater in the soil profile
       real :: sol_thick !m      |thickness of soil layer
       real :: layer_fraction !       |fraction of saturated soil profile within the layer

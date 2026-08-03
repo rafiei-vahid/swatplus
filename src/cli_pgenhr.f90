@@ -52,9 +52,9 @@
       real :: dur !hours         |duration of storm during day
       real :: pkrain !mm H2O        |volume of rain at time of peak rainfall
       real :: rtp !min           |time of peak rainfall rate
-      real :: xk1 = 0.                      !none          |1st constant in dimensionless exponential
+      real :: xk1  !none          |1st constant in dimensionless exponential
                                             !              |rainfall distribution
-      real :: xk2 = 0.                      !none          |2nd constant in dimensionless exponential
+      real :: xk2  !none          |2nd constant in dimensionless exponential
                                             !              |rainfall distribution
       real :: xkp1 !hr            |1st constant in exponential rainfall
                                             !              |distribution

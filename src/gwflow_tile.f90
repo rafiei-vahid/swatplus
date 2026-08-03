@@ -21,7 +21,7 @@
       real :: tile_elev !m      |elevation of tile drain
       real :: head_diff !m      |head difference between groundwater head and tile drain
       real :: Q !m3/day |tile drainage outflow rate, calculated by Darcy's Law
-      real :: solmass(100) = 0.          !g      |solute mass transferred from groundwater to channel, via tile
+      real :: solmass(100)  !g      |solute mass transferred from groundwater to channel, via tile
       real :: heat_flux !J      |heat in tile drainage
       real :: chan_heat !J      |heat in channel water
 

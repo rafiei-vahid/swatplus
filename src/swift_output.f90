@@ -31,9 +31,9 @@
       integer :: iob
       integer :: i ! loop counter
       integer, parameter :: ifile = 14              ! number of SWAT input files to copy to SWIFT folder
-      character(len=100) :: folderPath = ""
-      character(len=100) :: command = ""
-      character(len=25)  :: file_list(ifile) = "" ! list of SWAT input files to copy to SWIFT folder
+      character(len=100) :: folderPath
+      character(len=100) :: command
+      character(len=25)  :: file_list(ifile)  ! list of SWAT input files to copy to SWIFT folder
       logical :: i_exist
       
       ! SWIFT file formats

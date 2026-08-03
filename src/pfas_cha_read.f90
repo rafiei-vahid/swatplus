@@ -76,22 +76,22 @@
 
       implicit none
 
-      character (len=80) :: titldum = ""   !!        |title line of file
-      character (len=80) :: header = ""    !!        |header line of file
-      integer :: eof = 0                   !!        |end-of-file flag
-      integer :: imax = 0                  !! none   |count of compounds overridden from file
-      integer :: id = 0                    !! none   |PFAS id read from a record
-      integer :: ipf = 0                   !! none   |sequential PFAS counter
-      integer :: jpf = 0                   !! none   |database PFAS index
-      integer :: ich = 0                   !! none   |channel counter
-      integer :: iob = 0                   !! none   |spatial-object counter
-      integer :: ihyd = 0                  !! none   |hydrograph counter
-      integer :: nhyds = 0                 !! none   |number of hyds on an object
-      logical :: i_exist = .false.         !! none   |file-existence flag
-      real :: water_ppt = 0.               !! ng/L   |initial water conc (scratch)
-      real :: benthic_ppt = 0.             !! ng/g   |initial benthic conc (scratch)
-      real :: bedmass = 0.                 !! kg     |active-bed sediment mass
-      real :: por = 0.                     !! none   |porosity of bottom sediments
+      character (len=80) :: titldum  !!        |title line of file
+      character (len=80) :: header  !!        |header line of file
+      integer :: eof  !!        |end-of-file flag
+      integer :: imax  !! none   |count of compounds overridden from file
+      integer :: id  !! none   |PFAS id read from a record
+      integer :: ipf  !! none   |sequential PFAS counter
+      integer :: jpf  !! none   |database PFAS index
+      integer :: ich  !! none   |channel counter
+      integer :: iob  !! none   |spatial-object counter
+      integer :: ihyd  !! none   |hydrograph counter
+      integer :: nhyds  !! none   |number of hyds on an object
+      logical :: i_exist  !! none   |file-existence flag
+      real :: water_ppt  !! ng/L   |initial water conc (scratch)
+      real :: benthic_ppt  !! ng/g   |initial benthic conc (scratch)
+      real :: bedmass  !! kg     |active-bed sediment mass
+      real :: por  !! none   |porosity of bottom sediments
       type (pfas_cha_db) :: dbrec          !!        |scratch param record
 
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~

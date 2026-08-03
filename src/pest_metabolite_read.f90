@@ -8,9 +8,9 @@
       
       implicit none
 
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
-      character (len=16) :: parent_name = ""
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
+      character (len=16) :: parent_name
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file
       logical :: i_exist              !none       |check to determine if file exists

@@ -28,9 +28,9 @@
       external :: define_unit_elements
 
       !integer, dimension (:), allocatable :: elem_cnt1   !           |  
-      character (len=80) :: titldum = ""                  !           |title of file
-      character (len=80) :: header = ""                   !           |header of file
-      character (len=10) :: range = ""                    !           |real conditional variable range
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
+      character (len=10) :: range  !           |real conditional variable range
       integer :: eof !           |end of file  
       integer :: imax !none       |determine max number for array (imax) and total number in file
       integer :: nspu !           |

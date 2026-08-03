@@ -66,26 +66,26 @@
       real :: xx = 0 !kPa           |difference between vpd and vpthreshold
       real :: rbo = 0 !none          |net emissivity
       real :: rto = 0 !none          |cloud cover factor
-      real :: rn = 0 !MJ/m2         |net radiation
-      real :: uzz = 0 !m/s           |wind speed at height zz
-      real :: zz = 0 !cm            |height at which wind speed is determined
-      real :: zom = 0 !cm            |roughness length for momentum transfer
-      real :: zov = 0 !cm            |roughness length for vapor transfer
-      real :: rv = 0 !s/m           |aerodynamic resistance to sensible heat and
+      real :: rn  !MJ/m2         |net radiation
+      real :: uzz  !m/s           |wind speed at height zz
+      real :: zz  !cm            |height at which wind speed is determined
+      real :: zom  !cm            |roughness length for momentum transfer
+      real :: zov  !cm            |roughness length for vapor transfer
+      real :: rv  !s/m           |aerodynamic resistance to sensible heat and
                                    !              |vapor transfer
-      real :: rn_pet = 0 !MJ/m2         |net radiation for continuous crop cover
-      real :: fvpd = 0 !kPa           |amount of vapor pressure deficit over
+      real :: rn_pet  !MJ/m2         |net radiation for continuous crop cover
+      real :: fvpd  !kPa           |amount of vapor pressure deficit over
                                    !              |threshold value
-      real :: rc = 0 !s/m           |canopy resistance
-      real :: rho = 0 !MJ/(m3*kPa)   |K1*0.622*xl*rho/pb
-      real :: rout = 0 !MJ/m2         |outgoing radiation
-      real :: d = 0 !cm            |displacement height for plant type
-      real :: chz = 0 !cm            |vegetation height
-      real :: gsi_adj = 0 !              |
-      real :: pet_alpha = 0 !none          |alpha factor in Priestley-Taylor PET equation
+      real :: rc  !s/m           |canopy resistance
+      real :: rho  !MJ/(m3*kPa)   |K1*0.622*xl*rho/pb
+      real :: rout  !MJ/m2         |outgoing radiation
+      real :: d  !cm            |displacement height for plant type
+      real :: chz  !cm            |vegetation height
+      real :: gsi_adj  !              |
+      real :: pet_alpha  !none          |alpha factor in Priestley-Taylor PET equation
       real :: ee                   !              | 
-      real :: gsi_wav = 0 !              |
-      integer :: igrocom = 0 !              |
+      real :: gsi_wav  !              |
+      integer :: igrocom  !              |
 
 !     swatplus_perf reentrancy: et_pot runs per-HRU and concurrently under the wavefront. The
 !     engine-wide SAVE-strip made these scratch locals automatic+zeroed-per-call; one or more are

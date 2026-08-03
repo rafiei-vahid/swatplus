@@ -9,8 +9,8 @@
 
       implicit none
 
-      character (len=80) :: titldum = "" !          |title of file
-      character (len=80) :: header = ""  !          |header of file
+      character (len=80) :: titldum  !          |title of file
+      character (len=80) :: header  !          |header of file
       integer :: eof !          |end of file
       integer :: imax !units     |description
       integer :: ich_temp !none      |counter (renamed from ich to avoid module conflict)

@@ -8,8 +8,8 @@
       
       external :: define_unit_elements
 
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
       integer :: eof !           |end of file
       logical :: i_exist              !none       |check to determine if file exists
       integer :: imax !none       |end of loop

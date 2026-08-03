@@ -9,7 +9,7 @@
       implicit none 
       
       integer :: ics !none          |counter
-      character (len=3) :: iobtyp = ""  !none          |object type
+      character (len=3) :: iobtyp  !none          |object type
       integer :: ii !none          |counter 
       integer :: iihru !none          |hru counter 
       integer :: ihru_tot !none          |total number of hru in the flood plain   

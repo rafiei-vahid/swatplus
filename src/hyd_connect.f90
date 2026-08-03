@@ -20,8 +20,8 @@
 
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file
-      character (len=3) :: iob_out = "" !           !object type out
-      character (len=3) :: iobtyp = ""  !none       |object type
+      character (len=3) :: iob_out  !           !object type out
+      character (len=3) :: iobtyp  !none       |object type
       integer :: nspu !           |
       integer :: cmdno !           |
       integer :: idone !           | 

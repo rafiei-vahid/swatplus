@@ -77,27 +77,27 @@
 
       implicit none
 
-      character (len=80) :: titldum = ""   !!          |title line of file
-      character (len=80) :: header = ""    !!          |header line of file
-      integer :: eof = 0                   !!          |end-of-file flag
-      integer :: imax = 0                  !! none     |number of records in database file
-      integer :: ip = 0                    !! none     |database record counter
-      integer :: id = 0                    !! none     |PFAS id read from a record
-      integer :: ihru = 0                  !! none     |HRU counter
-      integer :: nhru = 0                  !! none     |number of HRUs
-      integer :: ly = 0                    !! none     |soil-layer counter
-      integer :: nly = 0                   !! none     |number of layers in current HRU
-      integer :: k = 0                     !! none     |PFAS slot counter
-      integer :: pfasid = 0                !! none     |PFAS id read from a soil record
-      integer :: nconta = 0                !! none     |contaminated-site count read from file
-      integer :: rdly = 0                  !! none     |layer count declared in the file header line
-      integer :: idd = 0                   !! none     |scratch HRU id from header line
-      integer :: mly = 0                   !! none     |min(rdly, nly) layers actually stored
-      character (len=20) :: c1 = ""        !! none     |scratch header token ("hru")
-      character (len=20) :: c2 = ""        !! none     |scratch header token ("nly")
-      logical :: i_exist = .false.         !! none     |file-existence flag
+      character (len=80) :: titldum  !!          |title line of file
+      character (len=80) :: header  !!          |header line of file
+      integer :: eof  !!          |end-of-file flag
+      integer :: imax  !! none     |number of records in database file
+      integer :: ip  !! none     |database record counter
+      integer :: id  !! none     |PFAS id read from a record
+      integer :: ihru  !! none     |HRU counter
+      integer :: nhru  !! none     |number of HRUs
+      integer :: ly  !! none     |soil-layer counter
+      integer :: nly  !! none     |number of layers in current HRU
+      integer :: k  !! none     |PFAS slot counter
+      integer :: pfasid  !! none     |PFAS id read from a soil record
+      integer :: nconta  !! none     |contaminated-site count read from file
+      integer :: rdly  !! none     |layer count declared in the file header line
+      integer :: idd  !! none     |scratch HRU id from header line
+      integer :: mly  !! none     |min(rdly, nly) layers actually stored
+      character (len=20) :: c1  !! none     |scratch header token ("hru")
+      character (len=20) :: c2  !! none     |scratch header token ("nly")
+      logical :: i_exist  !! none     |file-existence flag
       real, dimension(:), allocatable :: xx  !! varies |per-layer scratch read buffer
-      real :: enrtmp = 0.                  !! none     |enrichment scratch
+      real :: enrtmp  !! none     |enrichment scratch
       type (pfas_db) :: dbrec              !!          |scratch database record
 
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~

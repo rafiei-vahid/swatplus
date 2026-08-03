@@ -7,8 +7,8 @@
       
       implicit none
       
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
       integer :: eof
       integer :: imax
       integer :: i
@@ -84,10 +84,10 @@
       external :: search
       
       integer, intent(in) :: irec
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
-      character(len=16) :: ob_name = ""
-      character(len=8) :: ob_typ = ""
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
+      character(len=16) :: ob_name
+      character(len=8) :: ob_typ
       integer :: imax !none       |end of loop
       integer :: iyr !           |
       integer :: jday !           |
@@ -100,7 +100,7 @@
       integer :: iyrs !           | 
       integer :: iyr_prev !none       |previous year
       integer :: istep !           | 
-      integer :: ipestcom_db = 0      !none       !pointer to pestcom_db - fix*** ?? 
+      integer :: ipestcom_db  !none       !pointer to pestcom_db - fix*** ?? 
       integer :: ipc !none       |counter
       integer :: i !none       |counter
       integer :: ii !none       |counter

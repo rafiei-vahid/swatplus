@@ -24,7 +24,7 @@
       real :: clippst !kg pst/ha          |pesticide in clippings
       real :: yldpst !kg pst/ha          |pesticide removed in yield
       real :: hi_tot !kg/ha)/(kg/ha)     |total harvest index = hi_ovr * harveff
-      real :: hi_ovr = 0.               !kg/ha)/(kg/ha)     |harvest index target specified at harvest
+      real :: hi_ovr  !kg/ha)/(kg/ha)     |harvest index target specified at harvest
       real :: harveff !0-1                |harvest efficiency
       real :: clip !0-1                |1.-harveff
       real :: yld_rto !0-1            |yield to total biomass ratio

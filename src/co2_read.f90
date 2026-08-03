@@ -8,9 +8,9 @@
        
        implicit none
        
-       character (len=80) :: titldum = "" !             |title of file
-       character (len=80) :: header = ""  !             |header
-       character (len=1) :: done = ""
+       character (len=80) :: titldum  !             |title of file
+       character (len=80) :: header  !             |header
+       character (len=1) :: done
        integer :: eof !             |end of file
        logical :: i_exist               !             |check to determine if file exists
        integer :: iyr_start
@@ -21,12 +21,12 @@
        real :: co2_end
               
       type co2
-        integer :: iyr = 0
-        real :: co2 = 0.
+        integer :: iyr
+        real :: co2
       end type co2
     
       type co2_annual
-        integer :: yrs = 0
+        integer :: yrs
         type (co2), dimension(:), allocatable :: co2_yr
       end type co2_annual
       type (co2_annual) :: co2_inc

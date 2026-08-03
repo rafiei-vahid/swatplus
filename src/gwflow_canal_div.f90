@@ -23,10 +23,10 @@
       character(len=18) :: canal_name = ''   !       |constructed canal name
       integer :: s !       |counter of groundwater solutes
       integer :: cell_id !       |cell in connection with the canal
-	  integer :: irec = 0                    !       |recall ID for canal diversion
+	  integer :: irec  !       |recall ID for canal diversion
 	  integer :: sol_index = 0
-	  integer :: ics = 0
-	  integer :: isalt = 0
+	  integer :: ics
+	  integer :: isalt
 	  integer :: hru_id = 0
       integer :: canal_id
 			integer :: wetland = 0                 !       |wetland flag
@@ -43,7 +43,7 @@
       real :: canal_bed !m      |canal bed elevation in the cell
       real :: head_diff !m      |head difference between canal stage and groundwater head
       real :: Q !m3/day |water exchange flow rate, calculated by Darcy's Law
-      real :: solmass(100) = 0.               !g      |solute mass transferred
+      real :: solmass(100)  !g      |solute mass transferred
       real :: heat_flux !J      |heat in groundawter-canal exchange water
 			real :: canal_area = 0.								 !m2     |total area irrigated by canal
 			real :: irrig_depth = 0.                !mm     |depth of irrigation water for the HRUs irrigated by a canal

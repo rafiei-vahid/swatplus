@@ -5,7 +5,7 @@
 
       implicit none
       
-      character (len=80) :: title = ""
+      character (len=80) :: title
       integer :: max_table
       integer :: tnum_conds
       integer :: ii

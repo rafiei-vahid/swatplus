@@ -23,11 +23,11 @@
       real :: gw_volume_old !m3     |gw volume at start of flow step
       real :: gw_volume_new !m3     |gw volume at end of flow step
       real :: gw_volume_inter !m3     |interpolated gw volume at transport step
-      real :: mass_adv(100) = 0.          !g/day  |advective mass flux per solute
-      real :: mass_dsp(100) = 0.          !g/day  |dispersive mass flux per solute
-      real :: m_change(100) = 0.          !g      |mass change per solute
+      real :: mass_adv(100)  !g/day  |advective mass flux per solute
+      real :: mass_dsp(100)  !g/day  |dispersive mass flux per solute
+      real :: m_change(100)  !g      |mass change per solute
       real :: del_no_sorp !g      |mass change without sorption
-      real :: mass_sorb(100) = 0.         !g      |mass removed by sorption per solute
+      real :: mass_sorb(100)  !g      |mass removed by sorption per solute
       real :: mass_rct_local(100) = 0.    !g/day  |mass from reactions (unused local; module mass_rct used)
       real :: Q_cell !m3/day |lateral flow between cells
       real :: face_sat !m      |saturated thickness at cell interface

@@ -7,9 +7,9 @@
       
       implicit none
  
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
-      character (len=12) :: plant_name = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
+      character (len=12) :: plant_name
       integer :: iplant
       logical :: i_exist              !none       |check to determine if file exists
 

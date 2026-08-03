@@ -30,7 +30,7 @@
       real :: rd !mm          |current rooting depth of plant
       real :: rm !kg          |current root mass of plant
       real :: rm_layer !kg          |root mass in the soil layer
-      real    :: rm_fract(50) = 0.     !            |fraction of root mass in the soil layer
+      real    :: rm_fract(50)  !            |fraction of root mass in the soil layer
       real :: uptake_mass !kg/ha       |uptake mass in soil layer per unit area
       
       !HRU id

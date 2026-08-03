@@ -22,8 +22,8 @@
       character (len=40), allocatable :: nm(:)
       integer :: jj !none       |index-build counter
 
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file
       logical :: i_exist              !none       |check to determine if file exists

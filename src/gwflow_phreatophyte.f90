@@ -9,12 +9,12 @@
       implicit none
 
       integer :: k !       |cell counter (cells with phreatophytes)
-			integer :: i = 0                       !       |point counter (segments on depth-ET relationship)
-			integer :: cell_id = 0                 !       |cell id
+			integer :: i  !       |point counter (segments on depth-ET relationship)
+			integer :: cell_id  !       |cell id
       real :: wt_depth !m      |depth to water table, from the ground surface
       real :: ratio !       |ratio of water table depth to phreatophyte segment depth
-			real :: et_rate = 0.                    !m/day  |rate of phreatophyte transpiration from the grid cell
-			real :: et_Q = 0.                       !m3/day |volumetric flow rate of phyreatophyte transpiration from the grid cell
+			real :: et_rate  !m/day  |rate of phreatophyte transpiration from the grid cell
+			real :: et_Q  !m3/day |volumetric flow rate of phyreatophyte transpiration from the grid cell
 
 
 

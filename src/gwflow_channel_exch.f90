@@ -34,8 +34,8 @@
       real :: chan_volume !m3     |water volume in channel before groundwater exchange occurs
       real :: stor_change
       real :: sat_change
-      real :: chan_csol(100) = 0.        !g/m3   |solute concentration in channel water
-      real :: solmass(100) = 0.          !g      |solute mass transferred
+      real :: chan_csol(100)  !g/m3   |solute concentration in channel water
+      real :: solmass(100)  !g      |solute mass transferred
       real :: chan_heat !J      |current heat in channel
       real :: heat_flux !J/day  |heat transferred between groundwater and channel
       real :: chan_flow

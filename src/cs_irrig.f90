@@ -24,7 +24,7 @@
       integer, intent (inout) :: ihru       !HRU that receives irrigation water
       character*10 :: irrig_type  
       integer :: isrc !irrigation source counter
-      integer :: irrig_nsource !number of irrigation sources for the object
+      integer :: irrig_nsource = 0 !number of irrigation sources for the object
       integer :: irrig_ob !object number of irrigation source
       integer :: ires !reservoir ID
       integer :: iaq !aquifer ID

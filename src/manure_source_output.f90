@@ -7,7 +7,7 @@
       implicit none
       
       integer, intent (in) :: imallo        !             |
-      integer :: itrn
+      integer :: itrn = 0 
       integer :: isrc
 
       !! loop through and print each demand object

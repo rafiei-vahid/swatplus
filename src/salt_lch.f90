@@ -56,7 +56,7 @@
       integer :: jj
       integer :: isalt
       integer :: sol_index
-      integer :: gw_soil_flag
+      integer :: gw_soil_flag = 0 
       real :: cosalt
       real :: cosurfsalt
       real :: percsaltlyr(8) = 0.

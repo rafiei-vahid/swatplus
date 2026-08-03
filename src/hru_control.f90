@@ -92,7 +92,7 @@
       real :: sum_conc !rtb salt
       real :: sum_mass !rtb salt
       real :: sum_sorb !rtb salt
-      real :: saltcon !Jeong 2024
+      real :: saltcon = 0. !Jeong 2024
       real :: qsurf !Jeong 2024
       real :: sedppm !Jeong 2024
       

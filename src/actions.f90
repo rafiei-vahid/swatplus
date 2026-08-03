@@ -85,7 +85,7 @@
       real :: pest_kg !kg/ha    |amount of pesticide applied 
       real :: chg_par                      !variable |new parameter value
       real :: yield
-      real :: sumpst
+      real :: sumpst = 0. 
       real :: rock
       real :: p_factor
       real :: cn_prev

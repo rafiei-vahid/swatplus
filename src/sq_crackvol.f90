@@ -17,7 +17,7 @@
       
       real :: crlag !none          |lag factor for day
       real :: crlagdry = .99     !none          |lag in crack development when soil is dry
-      real :: crlagwet !none          |lag in crack development when soil is wet
+      real :: crlagwet = 0. !none          |lag in crack development when soil is wet
       integer :: j !none          |HRU number
       integer :: l !none          |counter
       real :: volcrnew !mm            |crack volume for soil layer based on new 

@@ -33,7 +33,7 @@
 
       integer :: j
       integer :: jj
-      integer :: gw_soil_flag
+      integer :: gw_soil_flag = 0 
       integer :: ics
       integer :: sol_index
       real :: cocs

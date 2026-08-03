@@ -17,13 +17,13 @@
       integer :: ireg
       integer :: ielem
       real :: area_ha
-      integer :: i
+      integer :: i = 0 
       integer :: ilum
       integer :: nlum
       real :: const
       integer :: ilum_db
       real :: constnb
-      integer :: icu
+      integer :: icu = 0 
       real :: constwb
       real :: constpw
               

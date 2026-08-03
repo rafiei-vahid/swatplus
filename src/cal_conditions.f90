@@ -39,7 +39,7 @@
                                                               !                |the standard temperature (20 degrees C)
       real :: chg_par                                         !variable        |type of change (absval, abschg, pctchg)
       integer :: iday !none            |counter
-      integer :: ig !                |
+      integer :: ig = 0 !                |
       integer :: nvar !                |number of plant cal variables (1=lai_pot, 2=harv_idx)
       integer :: cal_lyr1
       integer :: cal_lyr2

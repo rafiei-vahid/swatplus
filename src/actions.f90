@@ -60,6 +60,10 @@
       integer :: istr !         |
       integer :: istr1 !         |
       integer :: iplt_bsn
+      !! Per-HRU copy of the action's `option`. NOT initialised here on purpose: an
+      !! initialiser would confer implicit SAVE (F2018 8.5.16), making it static and shared --
+      !! the very defect class this change exists to remove. Seeded per iteration below.
+      character(len=40) :: act_option
       integer :: irrop !         |
       integer :: igr
       integer :: ireg !         |
@@ -104,6 +108,14 @@
 !$omp threadprivate(action, lu_prev, snow_prev)
 
       do iac = 1, d_tbl%acts
+        !! `d_tbl` is threadprivate but it is a POINTER -- privatising it gives each thread its
+        !! own pointer, all aimed at the SAME `dtbl_lum(id)`. The plant/harvest branches below
+        !! used to WRITE `d_tbl%act(iac)%option` and read it back a few lines later, so under
+        !! HRU-parallelism one thread could read another thread's crop name and plant or kill
+        !! the WRONG CROP. ThreadSanitizer named actions.f90 twice for this. Working on a local
+        !! copy keeps the per-HRU resolution and removes the shared write; in serial the
+        !! behaviour is identical, because each HRU overwrote before reading anyway.
+        act_option = d_tbl%act(iac)%option
         action = "n"
         do ial = 1, d_tbl%alts
           if (act_hit_tl(ial) == "y" .and. d_tbl%act_outcomes(iac,ial) == "y") then
@@ -402,16 +414,16 @@
             isched = hru(j)%mgt_ops
             if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                 sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-              d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+              act_option = sched(isched)%auto_crop(1)
             end if
             if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-              d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+              act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
             end if
             
               do ipl = 1, pcom(j)%npl
                 
                 idp = pcomdb(icom)%pl(ipl)%db_num
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm) then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm) then
                   !! check to see if the crop is already growing
                   if (pcom(j)%plcur(ipl)%gro == "n") then
                     pcom(j)%plcur(ipl)%gro = "y"
@@ -461,15 +473,15 @@
               isched = hru(j)%mgt_ops
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                   sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+                act_option = sched(isched)%auto_crop(1)
               end if
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+                act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
               end if
             
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   
                 !check minimum biomass for harvest
                 if (biomass > harvop_db(iharvop)%bm_min) then
@@ -503,7 +515,19 @@
                             
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
+                  !! ATOMIC: bsn_crop_yld is a module-level BASIN accumulator and is
+                  !! correctly shared -- every HRU contributes, so privatising it would
+                  !! destroy the sum. Concurrent HRUs read-modify-write the same element,
+                  !! which loses updates; atomic prevents that.
+                  !! NOTE, and this is a limit not a fix: atomic removes the DATA RACE but
+                  !! not ORDER DEPENDENCE. Floating-point addition is not associative, so
+                  !! the sum still depends on the order HRUs arrive in, which varies with
+                  !! thread count. Byte-identity for this accumulator additionally needs a
+                  !! deterministic reduction (per-HRU storage summed in index order after
+                  !! the parallel region) -- a separate design change, not done here.
+                  !$omp atomic
                   bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
+                  !$omp atomic
                   bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + yield * hru(j)%area_ha / 1000.
                   
                   if (cal_codes%plt == "y") then
@@ -543,7 +567,7 @@
               pcom(j)%days_kill = 1       !reset days since last kill
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   pcom(j)%last_kill = pcomdb(icom)%pl(ipl)%cpnm
                   call mgt_killop (j, ipl)
 
@@ -577,15 +601,15 @@
               isched = hru(j)%mgt_ops
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                   sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+                act_option = sched(isched)%auto_crop(1)
               end if
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+                act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
               end if
               
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   
                 !check minimum biomass for harvest
                 if (biomass > harvop_db(iharvop)%bm_min) then
@@ -621,7 +645,19 @@
                             
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
+                  !! ATOMIC: bsn_crop_yld is a module-level BASIN accumulator and is
+                  !! correctly shared -- every HRU contributes, so privatising it would
+                  !! destroy the sum. Concurrent HRUs read-modify-write the same element,
+                  !! which loses updates; atomic prevents that.
+                  !! NOTE, and this is a limit not a fix: atomic removes the DATA RACE but
+                  !! not ORDER DEPENDENCE. Floating-point addition is not associative, so
+                  !! the sum still depends on the order HRUs arrive in, which varies with
+                  !! thread count. Byte-identity for this accumulator additionally needs a
+                  !! deterministic reduction (per-HRU storage summed in index order after
+                  !! the parallel region) -- a separate design change, not done here.
+                  !$omp atomic
                   bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
+                  !$omp atomic
                   bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + pl_yield%m * hru(j)%area_ha / 1000.
                   
                   !! sum regional crop yields for soft calibration
@@ -906,7 +942,7 @@
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
             
-            if (d_tbl%act(iac)%option == "wet") then
+            if (act_option == "wet") then
               wet_ob(j)%weir_hgt = d_tbl%act(iac)%const / 1000. !m
               !update pvol/evol according to weir height for paddy weir discharge. Jaehak 2023
               wet_ob(j)%pvol = hru(j)%area_ha * wet_ob(j)%weir_hgt * 10.**4  ! m3

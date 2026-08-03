@@ -245,6 +245,14 @@
       type (fertilizer_mass), dimension(:), allocatable :: fert         !dimension to number of fertilzers in database
       
       type (organic_mass) :: org_frt  !dimension to number of manures in database
+!!    swatplus_perf 2026-08-03: pure per-call SCRATCH inside pl_fert -- zeroed at entry, filled
+!!    from fertdb, consumed a few lines later, never persisted across calls. As a shared module
+!!    variable it is one address for every worker, and pl_fert is called from actions.f90 inside
+!!    the HRU-parallel region, so concurrent HRUs overwrite each other's fertiliser mass.
+!!    ThreadSanitizer named pl_fert.f90:38 (worker-vs-worker). Referenced ONLY in pl_fert, so
+!!    per-thread copies change nothing; organic_mass is all-scalar m/c/n/p with no allocatable
+!!    components, so this costs 16 bytes per thread -- same reasoning as pl_yield above.
+!$omp threadprivate(org_frt)
       
       !manure object should be used as database input from manure.dat
       type (organic_mass), dimension(:), allocatable :: manure  !dimension to number of manures in database

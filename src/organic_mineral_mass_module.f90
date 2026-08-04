@@ -35,6 +35,19 @@
         type (organic_mass) :: water     !       |water soluble
       end type organic_mixing_mass
       type (organic_mixing_mass) :: mix_org
+!!    swatplus_perf 2026-08-04: TILLAGE-MIXING ACCUMULATOR, shared across threads until now.
+!!    mgt_newtillmix_cswat0/1 and mgt_biomix RESET it at entry (mix_org%tot = orgz ...) and then
+!!    accumulate per soil layer for ONE hru: `mix_org%tot = mix_org%tot + frac_mixed * soil1(jj)%tot(l)`.
+!!    As a plain module variable that is ONE address for every OpenMP worker, so two HRUs tilling
+!!    on the same day corrupt each other's soil profile. Called from actions.f90:393, inside the
+!!    HRU-parallel region.
+!!    WHY THIS IS THE RACE, measured rather than argued: divergence is confined to `agrr_lum`
+!!    (163 of 1,295 per run) and is EXACTLY ZERO across 1,196 hay HRUs in three trials -- hay is
+!!    perennial and never tills, so this routine never runs for it. The affected set is unstable
+!!    between trials (163/154/170, only 43 common), i.e. whichever HRUs happen to collide.
+!!    Pure per-call scratch, reset at every entry in all three users, so per-thread copies change
+!!    no result. All-scalar type, no allocatable components -> same reasoning as pl_yield above.
+!$omp threadprivate(mix_org)
 
       type clay_mass
         real :: m = 0.              !kg or kg/ha      |total object mass
@@ -55,6 +68,7 @@
       end type mineral_nitrogen
       type (mineral_nitrogen) :: mnz
       type (mineral_nitrogen) :: mix_mn    !       |mineral n pool used in tillage mixing
+!$omp threadprivate(mix_mn)   !! see mix_org above -- same tillage-mixing race
             
       type mineral_phosphorus
         real :: wsol = 0.           !kg/ha  |water soluble p dimensioned by layer
@@ -64,6 +78,7 @@
       end type mineral_phosphorus
       type (mineral_phosphorus) :: mpz
       type (mineral_phosphorus) :: mix_mp    !       |mineral p pool used in tillage mixing
+!$omp threadprivate(mix_mp)   !! see mix_org above -- same tillage-mixing race
       
       type plant_residue
         type (organic_mass), dimension(:), allocatable :: rsd       !       |fresh surface residue dimensioned by layer

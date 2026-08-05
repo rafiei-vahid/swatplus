@@ -47,9 +47,9 @@
       real :: sum_cal !              |temporary sum to do weighted average with 
       real :: sum_ph !              |temporary sum to do weighted average with   
       logical :: i_exist          !none          |check to determine if a file exists
-      character (len=500) :: header = "" !       |header of file
-      character (len=80) :: titldum = "" !       |title of file
-      character (len=16) :: units = ""  !        |name
+      character (len=500) :: header  !       |header of file
+      character (len=80) :: titldum  !       |title of file
+      character (len=16) :: units  !        |name
       logical :: first_layer_flag !              |True if first non 10 mm layer.
       type (soil_database), dimension(:), allocatable :: sol_mm_db
       

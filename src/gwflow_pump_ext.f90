@@ -16,7 +16,7 @@
       integer :: pumpex_start_date !       |starting date of pumping period
       integer :: pumpex_end_date !       |ending date of pumping period
       real :: Q !m3     |pumping rate
-      real :: solmass(100) = 0.             !g      |solute mass in pumped groundwater
+      real :: solmass(100)  !g      |solute mass in pumped groundwater
       real :: heat_flux !J      |heat in pumped groundwater
 
 

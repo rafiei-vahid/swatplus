@@ -15,8 +15,8 @@
       
       external :: ascrv
       
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file
       logical :: i_exist              !none       |check to determine if file exists
@@ -37,7 +37,7 @@
       integer :: mo !none       |counter
       real :: qn1 !           |
       real :: qn3 !           |
-      real :: s3 = 0.                 !none       |retention parameter for CN3 
+      real :: s3  !none       |retention parameter for CN3 
       real :: sumul !mm H2O     |amount of water held in soil profile at saturation
       real :: sumfc !mm H2O     |amount of water held in the soil profile at field capacity 
       real :: xi !           |

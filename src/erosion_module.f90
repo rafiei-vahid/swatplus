@@ -80,7 +80,7 @@
 contains
       
       !! add erosion outputs for each event
-      function ero_add (ero_1, ero_2) result (ero_3)
+      pure function ero_add (ero_1, ero_2) result (ero_3)
         type (erosion_output_variables), intent (in) :: ero_1
         type (erosion_output_variables), intent (in) :: ero_2
         type (erosion_output_variables) :: ero_3
@@ -101,7 +101,7 @@ contains
       end function ero_add
                           
       !! divide erosion outputs by number of events
-      function ero_divide (ero_1, const) result (ero_2)
+      pure function ero_divide (ero_1, const) result (ero_2)
         type (erosion_output_variables), intent (in) :: ero_1
         real, intent (in) :: const 
         type (erosion_output_variables) :: ero_2

@@ -1349,7 +1349,7 @@
       end subroutine hyd_convert_mass_to_conc
          
       !! routines for hydrograph module
-      function hydout_add (hyd1, hyd2) result (hyd3)
+      pure function hydout_add (hyd1, hyd2) result (hyd3)
         type (hyd_output), intent (in) :: hyd1
         type (hyd_output), intent (in) :: hyd2
         type (hyd_output) :: hyd3
@@ -1378,7 +1378,7 @@
       end function hydout_add
                      
       !! routines for hydrograph module
-      function hydout_subtract (hyd1, hyd2) result (hyd3)
+      pure function hydout_subtract (hyd1, hyd2) result (hyd3)
         type (hyd_output), intent (in) :: hyd1
         type (hyd_output), intent (in) :: hyd2
         type (hyd_output) :: hyd3
@@ -1403,7 +1403,7 @@
       end function hydout_subtract
             
       !! routines for hydrograph module
-      function hydout_mult (hyd1, hyd2) result (hyd3)
+      pure function hydout_mult (hyd1, hyd2) result (hyd3)
         type (hyd_output), intent (in) :: hyd1
         type (hyd_output), intent (in) :: hyd2
         type (hyd_output) :: hyd3
@@ -1428,7 +1428,7 @@
       end function hydout_mult
             
       !! routines for hydrograph module
-      function hydout_add_const (const, hyd1) result (hyd2)
+      pure function hydout_add_const (const, hyd1) result (hyd2)
         real, intent (in) :: const
         type (hyd_output), intent (in) :: hyd1
         type (hyd_output) :: hyd2
@@ -1452,7 +1452,7 @@
         hyd2%temp = hyd1%temp
       end function hydout_add_const
       
-      function hydout_mult_const (const, hyd1) result (hyd2)
+      pure function hydout_mult_const (const, hyd1) result (hyd2)
         type (hyd_output), intent (in) :: hyd1
         real, intent (in) :: const
         type (hyd_output) :: hyd2
@@ -1477,7 +1477,7 @@
         hyd2%temp = hyd1%temp
       end function hydout_mult_const
       
-      function hydout_div_const (hyd1,const) result (hyd2)
+      pure function hydout_div_const (hyd1,const) result (hyd2)
         type (hyd_output), intent (in) :: hyd1
         real, intent (in) :: const
         type (hyd_output) :: hyd2
@@ -1502,7 +1502,7 @@
       end function hydout_div_const
             
       !function to divide hyd by another hyd
-      function hydout_div_conv (hyd1, hyd2) result (hyd3)
+      pure function hydout_div_conv (hyd1, hyd2) result (hyd3)
         type (hyd_output), intent (in) :: hyd1
         type (hyd_output), intent (in) :: hyd2
         type (hyd_output) :: hyd3

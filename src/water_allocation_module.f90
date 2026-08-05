@@ -252,7 +252,7 @@
       contains
 
       !! routines for hydrograph module
-      function wallout_add (wallo1, wallo2) result (wallo3)
+      pure function wallout_add (wallo1, wallo2) result (wallo3)
         type (source_output), intent (in) :: wallo1
         type (source_output), intent (in) :: wallo2
         type (source_output) :: wallo3
@@ -261,7 +261,7 @@
         wallo3%unmet = wallo1%unmet + wallo2%unmet
       end function wallout_add
 
-      function wallo_div_const (wallo1, const) result (wallo2)
+      pure function wallo_div_const (wallo1, const) result (wallo2)
         type (source_output), intent (in) :: wallo1
         real, intent (in) :: const
         type (source_output) :: wallo2

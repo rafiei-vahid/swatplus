@@ -10,8 +10,8 @@
       
       implicit none
       
-      character (len=4) :: salt_ion = ""!           |
-      character (len=15) :: station_name = "" !       |
+      character (len=4) :: salt_ion  !           |
+      character (len=15) :: station_name  !       |
       integer :: eof !           |end of file
       integer :: iadep !           |counter
       integer :: imo !           |counter
@@ -22,7 +22,7 @@
       integer :: yr_weat
       integer :: year_days
       integer :: iday
-      integer :: day_flag(366) = 0
+      integer :: day_flag(366)
       real :: day_precip
       real :: day_temp
       real :: year_precip

@@ -39,7 +39,7 @@
       real :: gwvol_removed !m3     |groundwater removed from the gwflow cell for irrigation demand
       real :: gwvol_unmet !m3     |groundwater not available to meet irrigation demand
       real :: gw_mass !kg     |mass of solute in groundwater of the gwflow cell
-      real :: irr_mass(100) = 0.            !kg     |mass of solute removed from aquifer for irrigation
+      real :: irr_mass(100)  !kg     |mass of solute removed from aquifer for irrigation
       real :: mass_diff !kg     |difference between irrigation mass and actual groundwater mass
       real :: sum_pump !m3     |total pumping for the HRU
       real :: hru_area_m2 !m2     |HRU area

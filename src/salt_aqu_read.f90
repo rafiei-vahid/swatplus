@@ -7,8 +7,8 @@
       
       implicit none
  
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
       integer :: isalt
       integer :: eof
       integer :: imax

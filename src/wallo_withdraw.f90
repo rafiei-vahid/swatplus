@@ -26,8 +26,8 @@ subroutine wallo_withdraw (iwallo, itrn, isrc)
       external :: gwflow_pump_allo
       real :: extracted !m3         |water extracted from the aquifer object (gwflow - rtb)
       real :: trn_unmet !m3         |demand that is unmet (gwflow - rtb)
-      real :: withdraw !m3
-      real :: unmet !m3
+      real :: withdraw = 0. !m3
+      real :: unmet = 0. !m3
         
       !! zero withdrawal hyd for the demand source
       wdraw_om = hz

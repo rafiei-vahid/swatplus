@@ -20,7 +20,7 @@
 !! (F2018 8.5.16; no compiler flag changes this). See res_hydro.f90.
 !$omp threadprivate(sol_index)
       integer :: ics
-	  integer :: isalt = 0
+	  integer :: isalt
       real :: width !m      |canal width
       real :: depth !m      |canal depth
       real :: thick !m      |canal bed thickness
@@ -33,7 +33,7 @@
       real :: canal_bed !m      |canal bed elevation in the cell
       real :: head_diff !m      |head difference between canal stage and groundwater head
       real :: Q !m3/day |water exchange flow rate, calculated by Darcy's Law
-      real :: solmass(100) = 0.               !g      |solute mass transferred
+      real :: solmass(100)  !g      |solute mass transferred
       real :: heat_flux !J      |heat in groundawter-canal exchange water
 
 

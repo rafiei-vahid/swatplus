@@ -65,9 +65,9 @@
             rto = min(0.99, irrig(j)%demand / ch_stor(isrc)%flo)                ! ratio of water removed from channel volume
           end if
           irrig(j)%water = rto * ch_stor(isrc)                       ! irrigation water
-          cs_irr(isrc) = rto * ch_water(isrc)                         ! constituents in irrigation water
+          call hydcs_set (cs_irr(isrc), rto, ch_water(isrc))! constituents in irrigation water
           ch_stor(isrc) = (1. - rto) * ch_stor(isrc)                        ! remainder stays in channel
-          ch_water(isrc) = (1. - rto) * ch_water(isrc)                      
+          call hydcs_scale (ch_water(isrc), (1. - rto))
         else
           irrig(j)%water%flo = irrig(j)%demand
         endif
@@ -78,9 +78,9 @@
             rto = min(0.99, irrig(j)%demand / res(isrc)%flo)                    ! ratio of water removed from res volume
           end if
           irrig(j)%water = rto * res(isrc)                           ! organics in irrigation water
-          cs_irr(isrc) = rto * res_water(isrc)                        ! constituents in irrigation water
+          call hydcs_set (cs_irr(isrc), rto, res_water(isrc))! constituents in irrigation water
           res(isrc) = (1. - rto) * res(isrc)                                ! remainder stays in reservoir
-          res_water(isrc) = (1. - rto) * res_water(isrc)                    
+          call hydcs_scale (res_water(isrc), (1. - rto))
         else
           irrig(j)%water%flo = irrig(j)%demand
         endif
@@ -92,9 +92,9 @@
           end if
       !    irrig(j)%water%flo = rto * aqu_d(isrc)%flo                 ! organics in irrigation water
           irrig(j)%water%flo = rto * aqu_d(isrc)%stor                 ! organics in irrigation water  Jaehak 2024
-          cs_irr(isrc) = rto * cs_aqu(isrc)                           ! constituents in irrigation water
+          call hydcs_set (cs_irr(isrc), rto, cs_aqu(isrc))! constituents in irrigation water
           aqu_d(isrc)%stor = (1. - rto) * aqu_d(isrc)%stor                  ! remainder stays in aquifer
-          cs_aqu(isrc) = (1. - rto) * cs_aqu(isrc)  
+          call hydcs_scale (cs_aqu(isrc), (1. - rto))
         else
           irrig(j)%water%flo = irrig(j)%demand
         endif

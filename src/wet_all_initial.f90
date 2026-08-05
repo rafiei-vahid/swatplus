@@ -8,7 +8,7 @@
       external :: wet_initial
       
       integer :: iihru !              |hru counter
-      integer :: iprop = 0      !none          |pointer to surface storage data 
+      integer :: iprop  !none          |pointer to surface storage data 
 
       do iihru = 1, sp_ob%hru
         !! set initial volumes and convert units

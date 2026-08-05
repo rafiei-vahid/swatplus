@@ -9,8 +9,8 @@
       
       external :: cli_initwgn, gcycl
             
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
       integer :: iwgn !           | 
       integer :: eof !           |end of file
       integer :: imax !none       |determine max number for array (imax) and total number in file

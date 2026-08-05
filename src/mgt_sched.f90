@@ -1,6 +1,7 @@
       subroutine mgt_sched (isched)
 
       use plant_data_module
+      use deferred_reduce_module
       use mgt_operations_module
       use tillage_data_module
       use basin_module
@@ -197,8 +198,9 @@
                   
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
-                  bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
-                  bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                  !! deferred: applied in HRU index order by dfr_flush, so the basin sum is
+                  !! independent of thread count (see deferred_reduce_module).
+                  call dfr_add (j, dfr_kind_bsn, iplt_bsn, 0, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                   
                   !! sum regional crop yields for soft calibration
                   if (cal_codes%plt == "y") then
@@ -206,8 +208,8 @@
                       ireg = hru(j)%crop_reg
                       do ilum = 1, plcal(ireg)%lum_num
                         if (plcal(ireg)%lum(ilum)%meas%name == mgt%op_char) then
-                          plcal(ireg)%lum(ilum)%ha = plcal(ireg)%lum(ilum)%ha + hru(j)%area_ha
-                          plcal(ireg)%lum(ilum)%sim%yield = plcal(ireg)%lum(ilum)%sim%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                          !! deferred: see dfr_add above -- same reason, region-level accumulator.
+                          call dfr_add (j, dfr_kind_plcal, ireg, ilum, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                         end if
                       end do
                     end if
@@ -310,16 +312,17 @@
                   
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
-                  bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
-                  bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                  !! deferred: applied in HRU index order by dfr_flush, so the basin sum is
+                  !! independent of thread count (see deferred_reduce_module).
+                  call dfr_add (j, dfr_kind_bsn, iplt_bsn, 0, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                   
                   !! sum regional crop yields for soft calibration
                   if (cal_codes%plt == "y") then
                     ireg = hru(j)%crop_reg
                     do ilum = 1, plcal(ireg)%lum_num
                       if (plcal(ireg)%lum(ilum)%meas%name == mgt%op_char) then
-                        plcal(ireg)%lum(ilum)%ha = plcal(ireg)%lum(ilum)%ha + hru(j)%area_ha
-                        plcal(ireg)%lum(ilum)%sim%yield = plcal(ireg)%lum(ilum)%sim%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                        !! deferred: see dfr_add above -- same reason, region-level accumulator.
+                        call dfr_add (j, dfr_kind_plcal, ireg, ilum, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                       end if
                     end do
                   end if

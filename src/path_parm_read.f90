@@ -6,8 +6,8 @@
       
       implicit none
 
-      character (len=80) :: titldum = "" !              |title of file
-      character (len=80) :: header = ""  !              |header of file
+      character (len=80) :: titldum  !              |title of file
+      character (len=80) :: header  !              |header of file
       integer :: ibac !none          |counter  
       integer :: eof !              |end of file
       integer :: imax !none          |counter 

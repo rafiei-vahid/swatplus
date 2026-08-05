@@ -20,7 +20,7 @@
 			integer :: dum
       real :: satx_depth !m      |height of water table above ground surface
       real :: satx_volume !m3     |volume of groundwater above ground surface
-      real :: solmass(100) = 0.          !g      |solute mass transferred
+      real :: solmass(100)  !g      |solute mass transferred
       real :: heat_flux !J      |groundwater heat flux to the channel
       real :: chan_heat !J      |heat in the channel
 			real :: chan_flow = 0.

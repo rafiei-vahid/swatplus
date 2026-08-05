@@ -20,9 +20,9 @@
       implicit none
 
       integer, intent (in) :: jrch
-      integer :: ipf = 0
-      integer :: jpf = 0
-      integer :: iob = 0
+      integer :: ipf
+      integer :: jpf
+      integer :: iob
       logical, save :: opened = .false.
 
       if (npfas <= 0) return

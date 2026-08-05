@@ -9,8 +9,8 @@
       
       external :: exco_read_om, ee, exco_read_hmet, exco_read_path, exco_read_pest, exco_read_salt
  
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
       integer :: eof
       integer :: imax
       logical :: i_exist              !none       |check to determine if file exists

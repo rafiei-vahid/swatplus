@@ -27,8 +27,8 @@
       real :: Q !m3     |water volume exchange between cell and reservoir
       real :: conn_length !m      |length of connection between reservoir cell and adjacent cell
       real :: res_volume !m3     |water volume in reservoir before groundwater exchange occurs
-      real :: resv_csol(100) = 0.        !g/m3   |solute concentration in reservoir water
-      real :: solmass(100) = 0.          !g      |solute mass transferred
+      real :: resv_csol(100)  !g/m3   |solute concentration in reservoir water
+      real :: solmass(100)  !g      |solute mass transferred
       real :: heat_flux !J      |heat removed from groundwater
       real :: seep_total !m3	 |total seepage from reservoir to gwflow cells
 

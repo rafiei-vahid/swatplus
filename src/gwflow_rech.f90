@@ -26,8 +26,8 @@
       real :: hru_recharge !m3         |volume of recharge from the HRU
       real :: rech_volume !m3         |summation of recharge from multiple HRUs
       real :: cell_rech_volume !m3         |volume of recharge to the cell
-      real :: rech_solmass(100) = 0.  !g          |summation of solute mass in recharge from multiple HRUs
-      real :: cell_rech_solmass(100) = 0. !g      |solute mass in recharge to the cell
+      real :: rech_solmass(100)  !g          |summation of solute mass in recharge from multiple HRUs
+      real :: cell_rech_solmass(100)  !g      |solute mass in recharge to the cell
       real :: cell_rech_heat !J          |heat in recharge to the cell
       real :: hru_total !m3         |summation of recharge from multiple HRUs
       real :: hru_cell_total !m3         |summation of recharge for multiple cells

@@ -5,6 +5,7 @@
       use hru_module, only : hru, isol, ilu
       use hydrograph_module, only : sp_ob
       use maximum_data_module
+      use deferred_reduce_module
             
       implicit none
       
@@ -19,6 +20,10 @@
       allocate (plts_bsn(db_mx%plantparm))
       allocate (bsn_crop_yld(db_mx%plantparm))
       allocate (bsn_crop_yld_aa(db_mx%plantparm))
+
+      !! per-HRU deferred-contribution buffers for bsn_crop_yld and plcal. Allocated here,
+      !! beside the accumulators they feed, so the two cannot get out of step.
+      call dfr_init (sp_ob%hru)
       
       !!assign land use pointers for the hru
       !!allocate and initialize land use and management

@@ -1,5 +1,6 @@
       subroutine actions (ob_cur, ob_num, idtbl)
       use conditional_module
+      use deferred_reduce_module
       use climate_module
       use time_module
       use aquifer_module
@@ -60,6 +61,10 @@
       integer :: istr !         |
       integer :: istr1 !         |
       integer :: iplt_bsn
+      !! Per-HRU copy of the action's `option`. NOT initialised here on purpose: an
+      !! initialiser would confer implicit SAVE (F2018 8.5.16), making it static and shared --
+      !! the very defect class this change exists to remove. Seeded per iteration below.
+      character(len=40) :: act_option
       integer :: irrop !         |
       integer :: igr
       integer :: ireg !         |
@@ -85,7 +90,14 @@
       real :: pest_kg !kg/ha    |amount of pesticide applied 
       real :: chg_par                      !variable |new parameter value
       real :: yield
-      real :: sumpst
+      real :: sumpst = 0. 
+!$omp threadprivate(sumpst)   !swatplus_perf 2026-08-03: `sumpst = sumpst + 1` (below) is a
+      !! read-modify-write into a variable whose initializer gives it implicit SAVE, hence
+      !! static storage shared by every OpenMP worker. ThreadSanitizer named actions.f90
+      !! from inside command.f90's HRU-parallel region. The initializer cannot simply be
+      !! stripped: it is the only thing defining sumpst before the increment reads it, and
+      !! the build carries -fpe0, so an uninitialized real could trap on a signalling NaN.
+      !! sumpst is never READ anywhere else, so per-thread copies change no result.
       real :: rock
       real :: p_factor
       real :: cn_prev
@@ -97,6 +109,14 @@
 !$omp threadprivate(action, lu_prev, snow_prev)
 
       do iac = 1, d_tbl%acts
+        !! `d_tbl` is threadprivate but it is a POINTER -- privatising it gives each thread its
+        !! own pointer, all aimed at the SAME `dtbl_lum(id)`. The plant/harvest branches below
+        !! used to WRITE `d_tbl%act(iac)%option` and read it back a few lines later, so under
+        !! HRU-parallelism one thread could read another thread's crop name and plant or kill
+        !! the WRONG CROP. ThreadSanitizer named actions.f90 twice for this. Working on a local
+        !! copy keeps the per-HRU resolution and removes the shared write; in serial the
+        !! behaviour is identical, because each HRU overwrote before reading anyway.
+        act_option = d_tbl%act(iac)%option
         action = "n"
         do ial = 1, d_tbl%alts
           if (act_hit_tl(ial) == "y" .and. d_tbl%act_outcomes(iac,ial) == "y") then
@@ -235,8 +255,8 @@
               irrig(j)%water%flo = rto * aqu_d(iob)%stor                ! organics in irrigation water
               aqu_d(iob)%stor = rto1 * aqu_d(iob)%stor                  ! remainder stays in aquifer
               if (cs_db%num_cs > 0) then
-                cs_irr(iob) = rto * cs_aqu(iob)                           ! constituents in irrigation water
-                cs_aqu(iob) = rto1 * cs_aqu(iob)                          ! remainder stays in aquifer
+                call hydcs_set (cs_irr(iob), rto, cs_aqu(iob))! constituents in irrigation water
+                call hydcs_scale (cs_aqu(iob), rto1)! remainder stays in aquifer
               end if
               
             case ("cha", "sdc")
@@ -253,8 +273,8 @@
               rto1 = (1. - rto)
               irrig(j)%water = rto * ch_stor(iob)                       ! organics in irrigation water
               ch_stor(iob) = rto1 * ch_stor(iob)                        ! remainder stays in channel
-              cs_irr(iob) = rto * ch_water(iob)                         ! constituents in irrigation water
-              ch_water(iob) = rto1 * ch_water(iob)                      ! remainder stays in channel
+              call hydcs_set (cs_irr(iob), rto, ch_water(iob))! constituents in irrigation water
+              call hydcs_scale (ch_water(iob), rto1)! remainder stays in channel
               
             case ("res")
               if (res(iob)%flo > irrig(j)%demand) then
@@ -395,16 +415,16 @@
             isched = hru(j)%mgt_ops
             if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                 sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-              d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+              act_option = sched(isched)%auto_crop(1)
             end if
             if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-              d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+              act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
             end if
             
               do ipl = 1, pcom(j)%npl
                 
                 idp = pcomdb(icom)%pl(ipl)%db_num
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm) then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm) then
                   !! check to see if the crop is already growing
                   if (pcom(j)%plcur(ipl)%gro == "n") then
                     pcom(j)%plcur(ipl)%gro = "y"
@@ -454,15 +474,15 @@
               isched = hru(j)%mgt_ops
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                   sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+                act_option = sched(isched)%auto_crop(1)
               end if
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+                act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
               end if
             
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   
                 !check minimum biomass for harvest
                 if (biomass > harvop_db(iharvop)%bm_min) then
@@ -496,16 +516,17 @@
                             
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
-                  bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
-                  bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + yield * hru(j)%area_ha / 1000.
+                  !! deferred: applied in HRU index order by dfr_flush, so the basin sum is
+                  !! independent of thread count (see deferred_reduce_module).
+                  call dfr_add (j, dfr_kind_bsn, iplt_bsn, 0, hru(j)%area_ha, yield * hru(j)%area_ha / 1000.)
                   
                   if (cal_codes%plt == "y") then
                     !! sum regional crop yields for soft calibration
                     ireg = hru(j)%crop_reg
                     do ilum = 1, plcal(ireg)%lum_num
                       if (plcal(ireg)%lum(ilum)%meas%name == mgt%op_char) then
-                        plcal(ireg)%lum(ilum)%ha = plcal(ireg)%lum(ilum)%ha + hru(j)%area_ha
-                        plcal(ireg)%lum(ilum)%sim%yield = plcal(ireg)%lum(ilum)%sim%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                        !! deferred: see dfr_add above -- same reason, region-level accumulator.
+                        call dfr_add (j, dfr_kind_plcal, ireg, ilum, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                       end if
                     end do
                   end if
@@ -536,7 +557,7 @@
               pcom(j)%days_kill = 1       !reset days since last kill
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   pcom(j)%last_kill = pcomdb(icom)%pl(ipl)%cpnm
                   call mgt_killop (j, ipl)
 
@@ -570,15 +591,15 @@
               isched = hru(j)%mgt_ops
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer1" .or.      &
                   sched(isched)%auto_name(idtbl) == "pl_hv_winter1") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(1)
+                act_option = sched(isched)%auto_crop(1)
               end if
               if (sched(isched)%auto_name(idtbl) == "pl_hv_summer2") then
-                d_tbl%act(iac)%option = sched(isched)%auto_crop(pcom(j)%rot_yr)
+                act_option = sched(isched)%auto_crop(pcom(j)%rot_yr)
               end if
               
               do ipl = 1, pcom(j)%npl
                 biomass = pl_mass(j)%tot(ipl)%m
-                if (d_tbl%act(iac)%option == pcomdb(icom)%pl(ipl)%cpnm .or. d_tbl%act(iac)%option == "all") then
+                if (act_option == pcomdb(icom)%pl(ipl)%cpnm .or. act_option == "all") then
                   
                 !check minimum biomass for harvest
                 if (biomass > harvop_db(iharvop)%bm_min) then
@@ -614,16 +635,17 @@
                             
                   !! sum basin crop yields and area harvested
                   iplt_bsn = pcom(j)%plcur(ipl)%bsn_num
-                  bsn_crop_yld(iplt_bsn)%area_ha = bsn_crop_yld(iplt_bsn)%area_ha + hru(j)%area_ha
-                  bsn_crop_yld(iplt_bsn)%yield = bsn_crop_yld(iplt_bsn)%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                  !! deferred: applied in HRU index order by dfr_flush, so the basin sum is
+                  !! independent of thread count (see deferred_reduce_module).
+                  call dfr_add (j, dfr_kind_bsn, iplt_bsn, 0, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                   
                   !! sum regional crop yields for soft calibration
                   if (cal_codes%plt == "y") then
                     ireg = hru(j)%crop_reg
                     do ilum = 1, plcal(ireg)%lum_num
                       if (plcal(ireg)%lum(ilum)%meas%name == d_tbl%act(iac)%option) then
-                        plcal(ireg)%lum(ilum)%ha = plcal(ireg)%lum(ilum)%ha + hru(j)%area_ha
-                        plcal(ireg)%lum(ilum)%sim%yield = plcal(ireg)%lum(ilum)%sim%yield + pl_yield%m * hru(j)%area_ha / 1000.
+                        !! deferred: see dfr_add above -- same reason, region-level accumulator.
+                        call dfr_add (j, dfr_kind_plcal, ireg, ilum, hru(j)%area_ha, pl_yield%m * hru(j)%area_ha / 1000.)
                       end if
                     end do
                   end if
@@ -899,7 +921,7 @@
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
             
-            if (d_tbl%act(iac)%option == "wet") then
+            if (act_option == "wet") then
               wet_ob(j)%weir_hgt = d_tbl%act(iac)%const / 1000. !m
               !update pvol/evol according to weir height for paddy weir discharge. Jaehak 2023
               wet_ob(j)%pvol = hru(j)%area_ha * wet_ob(j)%weir_hgt * 10.**4  ! m3

@@ -64,8 +64,7 @@
             end if       
           end if
                                                     
-        obcs(iob)%hcsin_m(iin) = obcs(iob)%hcsin_m(iin) + obcs(iob)%hcsin_d(iin)
-
+        call hydcs_add_to (obcs(iob)%hcsin_m(iin), obcs(iob)%hcsin_d(iin))
         !! monthly print
         if (time%end_mo == 1) then
           if (pco%hyd%m == "y") then
@@ -115,8 +114,7 @@
             end if
           end if
         
-        obcs(iob)%hcsin_y(iin) = obcs(iob)%hcsin_y(iin) + obcs(iob)%hcsin_m(iin)
-
+        call hydcs_add_to (obcs(iob)%hcsin_y(iin), obcs(iob)%hcsin_m(iin))
         !! yearly print
         if (time%end_yr == 1) then
           if (pco%hyd%y == "y") then
@@ -166,8 +164,7 @@
            end if
           end if
           
-        obcs(iob)%hcsin_a(iin) = obcs(iob)%hcsin_a(iin) + obcs(iob)%hcsin_y(iin)
-
+        call hydcs_add_to (obcs(iob)%hcsin_a(iin), obcs(iob)%hcsin_y(iin))
         !! average annual print
         if (time%end_sim == 1 .and. pco%hyd%a == "y") then
           ob(iob)%hin_a(iin) = ob(iob)%hin_a(iin) / time%yrs_prt

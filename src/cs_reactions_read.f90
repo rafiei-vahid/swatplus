@@ -7,8 +7,8 @@
       
       implicit none
       
-      character (len=80) :: titldum = ""
-      character (len=80) :: header = ""
+      character (len=80) :: titldum
+      character (len=80) :: header
       integer :: eof
       integer :: icount
       integer :: igroup
@@ -19,9 +19,9 @@
       integer :: aqu_dum
       logical :: i_exist              !none          |check to determine if file exists
 
-      integer :: num_rct = 0          !              |number of reaction parameters
+      integer :: num_rct  !              |number of reaction parameters
       integer :: num_groups !              |number of reaction groups
-      real    :: shale_fractions(500) = 0.!              |fraction of shale that covers an area's object
+      real    :: shale_fractions(500)  !              |fraction of shale that covers an area's object
       
       
       eof = 0

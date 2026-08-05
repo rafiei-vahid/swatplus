@@ -619,15 +619,171 @@
 
       contains
       
-      function hydcsout_add (hydcs1, hydcs2) result (hydcs3)
+      !! ---------------------------------------------------------------------------------
+      !! IN-PLACE constituent_mass operations. swatplus_perf 2026-08-04.
+      !!
+      !! WHY THESE EXIST. `constituent_mass` is the ONLY operator-overloaded type in the engine
+      !! with ALLOCATABLE components (11 of them); the other 30 overloaded types are all-scalar.
+      !! `hydcsout_add` and `hydcsout_mult_const` ALLOCATE their result's components inside the
+      !! function, so every `a = a + f*b` returns temporaries the CALLER must deallocate, and ifx
+      !! places each temporary's deallocation descriptor in STATIC storage. Inside the HRU-parallel
+      !! region every worker then writes the same descriptor -- the race ThreadSanitizer reports at
+      !! command_object.f90:1 and actions.f90:1, and the one thing four separate remedies could not
+      !! touch (`pure` on 92 overloads, `-auto`, stripping type component initialisers, and
+      !! `-assume norealloc_lhs` all left var$ at exactly 185).
+      !!
+      !! MEASURED, not assumed: converting ONE call site this way took var$ 185 -> 183, i.e. exactly
+      !! the two descriptors that statement owned. The per-routine descriptor counts reconcile
+      !! exactly with the statement counts (command_object 11 statements / 20 descriptors, wet_irrp
+      !! 3/6, actions 2/4, hcsin_output 3/3, hcsout_output 3/3, sd_channel_control3 1/1).
+      !!
+      !! SEMANTICS ARE PRESERVED EXACTLY, including a subtlety worth stating: intrinsic derived-type
+      !! assignment REALLOCATES the left-hand side's allocatable components. The engine relies on
+      !! that -- `cs_irr(ihru)%pest` etc. are allocated only when their constituent is active
+      !! (pesticide_init / pathogen_init / cs_hru_init / salt_hru_init), so an assignment can be the
+      !! thing that first allocates them. `hydcs_set` therefore allocates any destination component
+      !! that is not yet allocated, exactly as the assignment it replaces would have.
+      !! Component coverage and loop bounds mirror hydcsout_add / hydcsout_mult_const line for line,
+      !! including the PFAS guard-by-allocation (its count is not in cs_db).
+      !! ---------------------------------------------------------------------------------
+
+      !! dest = dest + const * src
+      subroutine hydcs_accum (dest, const, src)
+        type (constituent_mass), intent (inout) :: dest
+        type (constituent_mass), intent (in) :: src
+        real, intent (in) :: const
+        integer :: i
+        do i = 1, cs_db%num_pests
+          dest%pest(i) = dest%pest(i) + const * src%pest(i)
+        end do
+        do i = 1, cs_db%num_paths
+          dest%path(i) = dest%path(i) + const * src%path(i)
+        end do
+        do i = 1, cs_db%num_metals
+          dest%hmet(i) = dest%hmet(i) + const * src%hmet(i)
+        end do
+        do i = 1, cs_db%num_salts
+          dest%salt(i) = dest%salt(i) + const * src%salt(i)
+        end do
+        do i = 1, cs_db%num_cs
+          dest%cs(i) = dest%cs(i) + const * src%cs(i)
+        end do
+        if (allocated(src%pfas) .and. allocated(dest%pfas)) then
+          do i = 1, size(src%pfas)
+            dest%pfas(i) = dest%pfas(i) + const * src%pfas(i)
+          end do
+        end if
+      end subroutine hydcs_accum
+
+      !! dest = dest + src
+      subroutine hydcs_add_to (dest, src)
+        type (constituent_mass), intent (inout) :: dest
+        type (constituent_mass), intent (in) :: src
+        integer :: i
+        do i = 1, cs_db%num_pests
+          dest%pest(i) = dest%pest(i) + src%pest(i)
+        end do
+        do i = 1, cs_db%num_paths
+          dest%path(i) = dest%path(i) + src%path(i)
+        end do
+        do i = 1, cs_db%num_metals
+          dest%hmet(i) = dest%hmet(i) + src%hmet(i)
+        end do
+        do i = 1, cs_db%num_salts
+          dest%salt(i) = dest%salt(i) + src%salt(i)
+        end do
+        do i = 1, cs_db%num_cs
+          dest%cs(i) = dest%cs(i) + src%cs(i)
+        end do
+        if (allocated(src%pfas) .and. allocated(dest%pfas)) then
+          do i = 1, size(src%pfas)
+            dest%pfas(i) = dest%pfas(i) + src%pfas(i)
+          end do
+        end if
+      end subroutine hydcs_add_to
+
+      !! dest = const * src   (assignment semantics: allocates dest components as needed)
+      subroutine hydcs_set (dest, const, src)
+        type (constituent_mass), intent (inout) :: dest
+        type (constituent_mass), intent (in) :: src
+        real, intent (in) :: const
+        integer :: i
+        if (.not. allocated(dest%pest))  allocate (dest%pest(cs_db%num_pests),  source = 0.)
+        if (.not. allocated(dest%path))  allocate (dest%path(cs_db%num_paths),  source = 0.)
+        if (.not. allocated(dest%hmet))  allocate (dest%hmet(cs_db%num_metals), source = 0.)
+        if (.not. allocated(dest%salt))  allocate (dest%salt(cs_db%num_salts),  source = 0.)
+        if (.not. allocated(dest%cs))    allocate (dest%cs(cs_db%num_cs),       source = 0.)
+        do i = 1, cs_db%num_pests
+          dest%pest(i) = const * src%pest(i)
+        end do
+        do i = 1, cs_db%num_paths
+          dest%path(i) = const * src%path(i)
+        end do
+        do i = 1, cs_db%num_metals
+          dest%hmet(i) = const * src%hmet(i)
+        end do
+        do i = 1, cs_db%num_salts
+          dest%salt(i) = const * src%salt(i)
+        end do
+        do i = 1, cs_db%num_cs
+          dest%cs(i) = const * src%cs(i)
+        end do
+        if (allocated(src%pfas)) then
+          if (.not. allocated(dest%pfas)) allocate (dest%pfas(size(src%pfas)), source = 0.)
+          do i = 1, size(src%pfas)
+            dest%pfas(i) = const * src%pfas(i)
+          end do
+        end if
+      end subroutine hydcs_set
+
+      !! dest = const * dest   (self-scaling; no temporary, no reallocation)
+      !! These were missed on the first pass because the pattern searched for `dest = c * OTHER`
+      !! and these read `dest = c * dest`. The residue was exactly 3 (wet_irrp) + 2 (actions),
+      !! which is how they were found: the descriptor census did not reach zero and the shortfall
+      !! matched these statements one for one.
+      subroutine hydcs_scale (dest, const)
+        type (constituent_mass), intent (inout) :: dest
+        real, intent (in) :: const
+        integer :: i
+        do i = 1, cs_db%num_pests
+          dest%pest(i) = const * dest%pest(i)
+        end do
+        do i = 1, cs_db%num_paths
+          dest%path(i) = const * dest%path(i)
+        end do
+        do i = 1, cs_db%num_metals
+          dest%hmet(i) = const * dest%hmet(i)
+        end do
+        do i = 1, cs_db%num_salts
+          dest%salt(i) = const * dest%salt(i)
+        end do
+        do i = 1, cs_db%num_cs
+          dest%cs(i) = const * dest%cs(i)
+        end do
+        if (allocated(dest%pfas)) then
+          do i = 1, size(dest%pfas)
+            dest%pfas(i) = const * dest%pfas(i)
+          end do
+        end if
+      end subroutine hydcs_scale
+
+      !! dest = a + b   (three distinct objects; assignment semantics for dest)
+      subroutine hydcs_sum (dest, a, b)
+        type (constituent_mass), intent (inout) :: dest
+        type (constituent_mass), intent (in) :: a, b
+        call hydcs_set (dest, 1.0, a)
+        call hydcs_add_to (dest, b)
+      end subroutine hydcs_sum
+
+      pure function hydcsout_add (hydcs1, hydcs2) result (hydcs3)
         type (constituent_mass), intent (in) :: hydcs1
         type (constituent_mass), intent (in) :: hydcs2
         type (constituent_mass) :: hydcs3
-        integer :: ipest = 0
-        integer :: ipath = 0
-        integer :: ihmet = 0
-        integer :: isalt = 0
-        integer :: ics = 0
+        integer :: ipest
+        integer :: ipath
+        integer :: ihmet
+        integer :: isalt
+        integer :: ics
         allocate (hydcs3%pest(cs_db%num_pests), source = 0.)
         allocate (hydcs3%path(cs_db%num_paths), source = 0.)
         allocate (hydcs3%hmet(cs_db%num_metals), source = 0.)
@@ -659,15 +815,15 @@
       return
       end function hydcsout_add
       
-      function hydcsout_mult_const (const, hydcs1) result (hydcs2)
+      pure function hydcsout_mult_const (const, hydcs1) result (hydcs2)
         type (constituent_mass), intent (in) :: hydcs1
         type (constituent_mass) :: hydcs2
         real, intent (in) :: const
-        integer :: ipest = 0
-        integer :: ipath = 0
-        integer :: ihmet = 0
-        integer :: isalt = 0
-        integer :: ics = 0
+        integer :: ipest
+        integer :: ipath
+        integer :: ihmet
+        integer :: isalt
+        integer :: ics
         allocate (hydcs2%pest(cs_db%num_pests), source = 0.)
         allocate (hydcs2%path(cs_db%num_paths), source = 0.)
         allocate (hydcs2%hmet(cs_db%num_metals), source = 0.)
@@ -704,11 +860,11 @@
         real, intent (in) :: vol_m3
         type (constituent_mass), intent (in) :: hydcs1
         type (constituent_mass), intent (out) :: hydcs2
-        integer :: ipest = 0
-        integer :: ipath = 0
-        integer :: ihmet = 0
-        integer :: isalt = 0
-        integer :: ics = 0
+        integer :: ipest
+        integer :: ipath
+        integer :: ihmet
+        integer :: isalt
+        integer :: ics
         allocate (hydcs2%pest(cs_db%num_pests), source = 0.)
         allocate (hydcs2%path(cs_db%num_paths), source = 0.)
         allocate (hydcs2%hmet(cs_db%num_metals), source = 0.)

@@ -35,6 +35,19 @@
         type (organic_mass) :: water     !       |water soluble
       end type organic_mixing_mass
       type (organic_mixing_mass) :: mix_org
+!!    swatplus_perf 2026-08-04: TILLAGE-MIXING ACCUMULATOR, shared across threads until now.
+!!    mgt_newtillmix_cswat0/1 and mgt_biomix RESET it at entry (mix_org%tot = orgz ...) and then
+!!    accumulate per soil layer for ONE hru: `mix_org%tot = mix_org%tot + frac_mixed * soil1(jj)%tot(l)`.
+!!    As a plain module variable that is ONE address for every OpenMP worker, so two HRUs tilling
+!!    on the same day corrupt each other's soil profile. Called from actions.f90:393, inside the
+!!    HRU-parallel region.
+!!    WHY THIS IS THE RACE, measured rather than argued: divergence is confined to `agrr_lum`
+!!    (163 of 1,295 per run) and is EXACTLY ZERO across 1,196 hay HRUs in three trials -- hay is
+!!    perennial and never tills, so this routine never runs for it. The affected set is unstable
+!!    between trials (163/154/170, only 43 common), i.e. whichever HRUs happen to collide.
+!!    Pure per-call scratch, reset at every entry in all three users, so per-thread copies change
+!!    no result. All-scalar type, no allocatable components -> same reasoning as pl_yield above.
+!$omp threadprivate(mix_org)
 
       type clay_mass
         real :: m = 0.              !kg or kg/ha      |total object mass
@@ -55,6 +68,7 @@
       end type mineral_nitrogen
       type (mineral_nitrogen) :: mnz
       type (mineral_nitrogen) :: mix_mn    !       |mineral n pool used in tillage mixing
+!$omp threadprivate(mix_mn)   !! see mix_org above -- same tillage-mixing race
             
       type mineral_phosphorus
         real :: wsol = 0.           !kg/ha  |water soluble p dimensioned by layer
@@ -64,6 +78,7 @@
       end type mineral_phosphorus
       type (mineral_phosphorus) :: mpz
       type (mineral_phosphorus) :: mix_mp    !       |mineral p pool used in tillage mixing
+!$omp threadprivate(mix_mp)   !! see mix_org above -- same tillage-mixing race
       
       type plant_residue
         type (organic_mass), dimension(:), allocatable :: rsd       !       |fresh surface residue dimensioned by layer
@@ -245,6 +260,14 @@
       type (fertilizer_mass), dimension(:), allocatable :: fert         !dimension to number of fertilzers in database
       
       type (organic_mass) :: org_frt  !dimension to number of manures in database
+!!    swatplus_perf 2026-08-03: pure per-call SCRATCH inside pl_fert -- zeroed at entry, filled
+!!    from fertdb, consumed a few lines later, never persisted across calls. As a shared module
+!!    variable it is one address for every worker, and pl_fert is called from actions.f90 inside
+!!    the HRU-parallel region, so concurrent HRUs overwrite each other's fertiliser mass.
+!!    ThreadSanitizer named pl_fert.f90:38 (worker-vs-worker). Referenced ONLY in pl_fert, so
+!!    per-thread copies change nothing; organic_mass is all-scalar m/c/n/p with no allocatable
+!!    components, so this costs 16 bytes per thread -- same reasoning as pl_yield above.
+!$omp threadprivate(org_frt)
       
       !manure object should be used as database input from manure.dat
       type (organic_mass), dimension(:), allocatable :: manure  !dimension to number of manures in database
@@ -377,7 +400,7 @@
     contains
 
       !! add mineral n
-      function nmin_add (nmin_m1, nmin_m2) result (nmin_m3)
+      pure function nmin_add (nmin_m1, nmin_m2) result (nmin_m3)
         type (mineral_nitrogen), intent (in) :: nmin_m1
         type (mineral_nitrogen), intent (in) :: nmin_m2
         type (mineral_nitrogen) :: nmin_m3
@@ -386,7 +409,7 @@
       end function nmin_add
       
       !! multiply mineral n by a constant
-      function nmin_mult_const (const, nmin_m1) result (nmin_m2)
+      pure function nmin_mult_const (const, nmin_m1) result (nmin_m2)
         real, intent (in) :: const
         type (mineral_nitrogen), intent (in) :: nmin_m1
         type (mineral_nitrogen) :: nmin_m2
@@ -394,7 +417,7 @@
         nmin_m2%nh4 = const * nmin_m1%nh4
       end function nmin_mult_const
                           
-      function pmin_add (pmin_m1, pmin_m2) result (pmin_m3)
+      pure function pmin_add (pmin_m1, pmin_m2) result (pmin_m3)
         type (mineral_phosphorus), intent (in) :: pmin_m1
         type (mineral_phosphorus), intent (in) :: pmin_m2
         type (mineral_phosphorus) :: pmin_m3
@@ -405,7 +428,7 @@
       end function pmin_add
 
       !! multiply mineral n by a constant
-      function pmin_mult_const (const, pmin_m1) result (pmin_m2)
+      pure function pmin_mult_const (const, pmin_m1) result (pmin_m2)
         real, intent (in) :: const
         type (mineral_phosphorus), intent (in) :: pmin_m1
         type (mineral_phosphorus) :: pmin_m2
@@ -416,7 +439,7 @@
       end function pmin_mult_const
                           
       !! add organic mass
-      function om_add1 (o_m1, o_m2) result (o_m3)
+      pure function om_add1 (o_m1, o_m2) result (o_m3)
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass), intent (in) :: o_m2
         type (organic_mass) :: o_m3
@@ -427,7 +450,7 @@
       end function om_add1
             
       !! subtract organic mass
-      function om_subtract (o_m1, o_m2) result (o_m3)
+      pure function om_subtract (o_m1, o_m2) result (o_m3)
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass), intent (in) :: o_m2
         type (organic_mass) :: o_m3
@@ -438,7 +461,7 @@
       end function om_subtract
                            
       !! multiply organic mass by a constant
-      function om_mult_const (const, o_m1) result (o_m2)
+      pure function om_mult_const (const, o_m1) result (o_m2)
         real, intent (in) :: const
         type (organic_mass), intent (in) :: o_m1
         type (organic_mass) :: o_m2
@@ -449,7 +472,7 @@
       end function om_mult_const
                           
       !! divide organic mass by a constant
-      function om_divide (o_m1, const) result (o_m2)
+      pure function om_divide (o_m1, const) result (o_m2)
         type (organic_mass), intent (in) :: o_m1
         real, intent (in) :: const 
         type (organic_mass) :: o_m2
@@ -460,7 +483,7 @@
       end function om_divide
       
       !! add org_flux
-      function org_flux_add1 (org_flux1, org_flux2) result (org_flux3)
+      pure function org_flux_add1 (org_flux1, org_flux2) result (org_flux3)
         type (organic_flux), intent (in) :: org_flux1
         type (organic_flux), intent (in) :: org_flux2
         type (organic_flux) :: org_flux3

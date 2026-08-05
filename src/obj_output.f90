@@ -19,7 +19,7 @@
       integer :: ii
       integer :: ipl
       
-      character(100) :: lineFmt = ""!used to format plant status write statement
+      character(100) :: lineFmt  !used to format plant status write statement
       
       lineFmt ='1((4X, 1A),(16X, 1A),(18X, 1A), 10(4X,F)),1(17XA, 2(12X,A), 4X, 10(4X,F)))'
 

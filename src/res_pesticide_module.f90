@@ -75,7 +75,7 @@
       contains
 !! routines for swatdeg_hru module
 
-      function respest_add(res1, res2) result (res3)
+      pure function respest_add(res1, res2) result (res3)
         type (res_pesticide_processes),  intent (in) :: res1
         type (res_pesticide_processes),  intent (in) :: res2
         type (res_pesticide_processes) :: res3
@@ -95,7 +95,7 @@
         res3%benthic = res1%benthic + res2%benthic
       end function respest_add
       
-      function respest_div (res1, const) result (res2)
+      pure function respest_div (res1, const) result (res2)
         type (res_pesticide_processes), intent (in) :: res1
         real, intent (in) :: const
         type (res_pesticide_processes) :: res2
@@ -115,7 +115,7 @@
           res2%benthic = res1%benthic / const
       end function respest_div
       
-      function respest_ave (res1, const) result (res2)
+      pure function respest_ave (res1, const) result (res2)
         type (res_pesticide_processes), intent (in) :: res1
         real, intent (in) :: const
         type (res_pesticide_processes) :: res2

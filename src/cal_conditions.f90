@@ -18,10 +18,10 @@
       
       external :: chg_par, cal_parm_select
            
-      character(len=25) :: chg_parm = ""                      !                |               
-      character(len=16) :: chg_typ = ""                       !variable        |type of change (absval, abschg, pctchg)
-      character(len=1) :: cond_met = ""                       !                |       
-      character(len=1) :: pl_find = ""                        !                |       
+      character(len=25) :: chg_parm  !                |               
+      character(len=16) :: chg_typ  !variable        |type of change (absval, abschg, pctchg)
+      character(len=1) :: cond_met  !                |       
+      character(len=1) :: pl_find  !                |       
       integer :: lyr !none            |counter
       integer :: iyr !                |
       integer :: ichg_par !none            |counter
@@ -35,11 +35,11 @@
       integer :: ipg !                |
       integer :: ipl !                |
       integer :: iyear !none            |counter
-      real :: val_cur = 0.                                    !variable        |current parameter value
+      real :: val_cur  !variable        |current parameter value
                                                               !                |the standard temperature (20 degrees C)
       real :: chg_par                                         !variable        |type of change (absval, abschg, pctchg)
       integer :: iday !none            |counter
-      integer :: ig !                |
+      integer :: ig = 0 !                |
       integer :: nvar !                |number of plant cal variables (1=lai_pot, 2=harv_idx)
       integer :: cal_lyr1
       integer :: cal_lyr2

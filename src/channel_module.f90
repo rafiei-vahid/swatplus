@@ -359,7 +359,7 @@
              
       contains
              
-      function ch_add(cho1,cho2) result (cho3)
+      pure function ch_add(cho1,cho2) result (cho3)
       type (ch_output),  intent (in) :: cho1
       type (ch_output),  intent (in) :: cho2
       type (ch_output) :: cho3
@@ -423,7 +423,7 @@
        cho3%tot_ssed = cho1%tot_ssed + cho2%tot_ssed
       end function
       
-      function ch_div (ch1,const) result (ch2)
+      pure function ch_div (ch1,const) result (ch2)
         type (ch_output), intent (in) :: ch1
         real, intent (in) :: const
         type (ch_output) :: ch2
@@ -487,7 +487,7 @@
         ch2%tot_ssed = ch1%tot_ssed / const
       end function ch_div
       
-      function ch_mult (const, chn1) result (chn2)
+      pure function ch_mult (const, chn1) result (chn2)
         type (ch_output), intent (in) :: chn1
         real, intent (in) :: const
         type (ch_output) :: chn2

@@ -10,10 +10,10 @@
       
       implicit none      
  
-      character (len=80) :: titldum = ""!           |title of file
-      character (len=80) :: header = "" !           |header of file
-      character(len=16) :: ob_name = ""
-      character(len=8) :: ob_typ = ""
+      character (len=80) :: titldum  !           |title of file
+      character (len=80) :: header  !           |header of file
+      character(len=16) :: ob_name
+      character(len=8) :: ob_typ
       integer :: imax !none       |end of loop
       integer :: iyr !           |
       integer :: jday !           |

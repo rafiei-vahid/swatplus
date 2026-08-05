@@ -56,7 +56,7 @@
       real :: cone !mm/hr         |effective saturated lateral conductivity - based
                                  !              |on water table depth and conk/sol_k of layers
       real :: depth !mm            |actual depth from surface to impermeable layer 
-      real :: dg !mm            |depth of soil layer
+      real :: dg = 0. !mm            |depth of soil layer
       real :: ad !              | 
       real :: ap !              |
       real :: hdrain !mm            |equivalent depth from water surface in drain tube to

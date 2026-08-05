@@ -133,17 +133,17 @@
                   ! add to surface runon
                   ob(icmd)%hin_sur = ob(icmd)%hin_sur + frac_in * ob(iob)%hd(3)
                   if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                    obcs(icmd)%hin_sur(1) = obcs(icmd)%hin_sur(1) + frac_in * obcs(iob)%hd(3)
+                    call hydcs_accum (obcs(icmd)%hin_sur(1), frac_in, obcs(iob)%hd(3))
                   end if
                   ! add to tile flow
                   ob(icmd)%hin_til = ob(icmd)%hin_til + frac_in * ob(iob)%hd(5)
                   if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                    obcs(icmd)%hin_til(1) = obcs(icmd)%hin_til(1) + frac_in * obcs(iob)%hd(5)
+                    call hydcs_accum (obcs(icmd)%hin_til(1), frac_in, obcs(iob)%hd(5))
                   end if
                   ! add to lateral soil runon
                   ob(icmd)%hin_lat = ob(icmd)%hin_lat + frac_in * ob(iob)%hd(4)
                   if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                    obcs(icmd)%hin_lat(1) = obcs(icmd)%hin_lat(1) + frac_in * obcs(iob)%hd(4)
+                    call hydcs_accum (obcs(icmd)%hin_lat(1), frac_in, obcs(iob)%hd(4))
                   end if
                 else
                   ! if hyd in is not a total hyd from an hru or ru -> add the specified hyd typ 
@@ -152,31 +152,31 @@
                     ob(icmd)%hin_sur = ob(icmd)%hin_sur + frac_in * ob(iob)%hd(ihyd)
                     !add constituents
                     if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                      obcs(icmd)%hin_til(1) = obcs(icmd)%hin_til(1) + frac_in * obcs(iob)%hd(ihyd)
+                      call hydcs_accum (obcs(icmd)%hin_til(1), frac_in, obcs(iob)%hd(ihyd))
                     end if
                   case ("sur")   ! surface runoff
                     ob(icmd)%hin_sur = ob(icmd)%hin_sur + frac_in * ob(iob)%hd(ihyd)
                     !add constituents
                     if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                      obcs(icmd)%hin_sur(1) = obcs(icmd)%hin_sur(1) + frac_in * obcs(iob)%hd(ihyd)
+                      call hydcs_accum (obcs(icmd)%hin_sur(1), frac_in, obcs(iob)%hd(ihyd))
                     end if
                   case ("lat")   ! lateral soil flow
                     ob(icmd)%hin_lat = ob(icmd)%hin_lat + frac_in * ob(iob)%hd(ihyd)
                     !add constituents
                     if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                      obcs(icmd)%hin_lat(1) = obcs(icmd)%hin_lat(1) + frac_in * obcs(iob)%hd(ihyd)
+                      call hydcs_accum (obcs(icmd)%hin_lat(1), frac_in, obcs(iob)%hd(ihyd))
                     end if
                   case ("til")   ! tile flow
                     ob(icmd)%hin_til = ob(icmd)%hin_til + frac_in * ob(iob)%hd(ihyd)
                     !add constituents
                     if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                      obcs(icmd)%hin_til(1) = obcs(icmd)%hin_til(1) + frac_in * obcs(iob)%hd(ihyd)
+                      call hydcs_accum (obcs(icmd)%hin_til(1), frac_in, obcs(iob)%hd(ihyd))
                     end if
                   case ("aqu")   ! aquifer inflow
                     ob(icmd)%hin_aqu = ob(icmd)%hin_aqu + frac_in * ob(iob)%hd(ihyd)
                     !add constituents
                     if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                      obcs(icmd)%hin_aqu(1) = obcs(icmd)%hin_aqu(1) + frac_in * obcs(iob)%hd(ihyd)
+                      call hydcs_accum (obcs(icmd)%hin_aqu(1), frac_in, obcs(iob)%hd(ihyd))
                     end if
                   end select
                 end if  
@@ -184,7 +184,7 @@
                 ! add total inflow to surface runon if channel or recall
                 ob(icmd)%hin_sur = ob(icmd)%hin_sur + frac_in * ob(iob)%hd(1)
                 if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                  obcs(icmd)%hin_sur(1) = obcs(icmd)%hin_sur(1) + frac_in * obcs(iob)%hd(1)
+                  call hydcs_accum (obcs(icmd)%hin_sur(1), frac_in, obcs(iob)%hd(1))
                 end if
               end if
               
@@ -212,8 +212,8 @@
               
               ! fraction of constituents
               if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then
-                hcs1 = frac_in * obcs(iob)%hd(ihyd)
-                obcs(icmd)%hin(1) = obcs(icmd)%hin(1) + hcs1
+                call hydcs_set (hcs1, frac_in, obcs(iob)%hd(ihyd))
+                call hydcs_add_to (obcs(icmd)%hin(1), hcs1)
               end if
               ob(icmd)%hin_d(in) = ht1        !for hydrograph output
               if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) then

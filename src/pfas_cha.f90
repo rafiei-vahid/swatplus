@@ -67,19 +67,19 @@
 
       implicit none
 
-      integer :: ipf = 0        !none          |PFAS counter - sequential
-      integer :: jpf = 0        !none          |PFAS counter from data base
-      real :: pfin = 0.         !kg            |total PFAS transported into reach during time step
-      real :: kd = 0.           !(mg/kg)/(mg/L)|koc * carbon
-      real :: depth = 0.        !m             |depth of water in reach
-      real :: chpfmass = 0.     !kg            |mass of PFAS in reach water column
-      real :: sedpfmass = 0.    !kg            |mass of PFAS in bed sediment
-      real :: fd2 = 0.          !none          |benthic sorbed/total partition factor
-      real :: solmax = 0.       !kg            |max soluble PFAS at solubility limit
-      real :: sedcon = 0.       !g/m^3         |sediment concentration
-      real :: tday = 0.         !none          |flow duration (fraction of 24 hr)
-      real :: por = 0.          !none          |porosity of bottom sediments
-      real :: rto_out = 0.      !none          |ratio of outflow to (outflow + storage)
+      integer :: ipf  !none          |PFAS counter - sequential
+      integer :: jpf  !none          |PFAS counter from data base
+      real :: pfin  !kg            |total PFAS transported into reach during time step
+      real :: kd  !(mg/kg)/(mg/L)|koc * carbon
+      real :: depth  !m             |depth of water in reach
+      real :: chpfmass  !kg            |mass of PFAS in reach water column
+      real :: sedpfmass  !kg            |mass of PFAS in bed sediment
+      real :: fd2  !none          |benthic sorbed/total partition factor
+      real :: solmax  !kg            |max soluble PFAS at solubility limit
+      real :: sedcon  !g/m^3         |sediment concentration
+      real :: tday  !none          |flow duration (fraction of 24 hr)
+      real :: por  !none          |porosity of bottom sediments
+      real :: rto_out  !none          |ratio of outflow to (outflow + storage)
       !! wtrin is a module global (channel_module) -- shared with ch_rtpest
 
       !! zero daily outputs for this reach

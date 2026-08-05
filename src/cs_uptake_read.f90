@@ -13,8 +13,8 @@
       
       implicit none
       
-      character (len=80) :: header = ""  !           |header of file
-      character (len=30) :: name = ""    !           |header of file
+      character (len=80) :: header  !           |header of file
+      character (len=30) :: name  !           |header of file
       logical :: i_exist                 !none       |check to determine if file exists
       integer :: eof !           |end of file
       integer :: i !           |counters

@@ -1,6 +1,7 @@
       program main
 
       use time_module
+      use deferred_reduce_module
       use hydrograph_module
       use maximum_data_module
       use calibration_data_module
@@ -185,6 +186,7 @@
         !! export coefficient - average annual
         time%end_sim = 1
         call command
+        call dfr_flush     !! export-coefficient path bypasses time_control
       else
         call time_control
         call mf6_coupler_finalize    !! SWAT+ <-> MODFLOW 6: finalize (no-op if inactive)

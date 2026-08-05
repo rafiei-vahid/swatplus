@@ -35,6 +35,7 @@
 !!    ~ ~ ~ ~ ~ ~ END SPECIFICATIONS ~ ~ ~ ~ ~ ~
 
       use maximum_data_module
+      use deferred_reduce_module
       use calibration_data_module
       use plant_data_module
       use mgt_operations_module
@@ -256,6 +257,11 @@
           end if
           
           call command              !! command loop
+
+          !! Apply the day's buffered basin/region crop-yield contributions in ascending
+          !! HRU index order. MUST stay after command -- that is where the HRU-parallel
+          !! region closes -- and before any consumer of bsn_crop_yld or plcal.
+          call dfr_flush
 
           !! SWAT+ <-> MODFLOW 6: advance groundwater one coupling step (no-op if inactive)
           call mf6_coupler_step

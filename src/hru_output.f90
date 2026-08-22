@@ -60,12 +60,14 @@
       !! daily print
          if (pco%day_print == "y" .and. pco%int_day_cur == pco%int_day) then
           if (pco%wb_hru%d == "y") then
+             if (pco%cdfout /= "y") then
              write (2000,100) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hwb_d(j),      &
                                                                            lum(ilu)%plant_cov, lum(ilu)%mgt_ops     !! water bal day
              if (pco%csvout == "y") then
                !! changed write unit below (2004 to write file data)
                write (2004,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, &
                                                                     hwb_d(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops  
+             end if
              end if
           end if
           hwb_d(j)%sw_init = hwb_d(j)%sw_final
@@ -119,12 +121,14 @@
            hwb_m(j)%sno_final = hwb_d(j)%sno_final
            
            if (pco%wb_hru%m == "y") then
+             if (pco%cdfout /= "y") then
              write (2001,100) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hwb_m(j),        &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops           !! water bal mon
                if (pco%csvout == "y") then
                  write (2005,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, &
                                                                           hwb_m(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops 
                end if
+             end if
            end if
            
            if (pco%nb_hru%m == "y") then
@@ -190,12 +194,14 @@
              hru(j)%irr = 1
            end if
           if (pco%wb_hru%y == "y") then
+             if (pco%cdfout /= "y") then
              write (2002,100) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hwb_y(j),          &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops           !! water balance yr
                if (pco%csvout == "y") then
                  write (2006,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name,   &
                                                                           hwb_y(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops 
                end if
+             end if
           end if
           
            if (pco%nb_hru%y == "y") then
@@ -242,11 +248,13 @@
            hwb_a(j)%sno_init = sno_init
            hwb_a(j)%sno_final = hwb_d(j)%sno_final
            if (pco%wb_hru%a == "y") then
+             if (pco%cdfout /= "y") then
              write (2003,100) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hwb_a(j),       &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops       !! water balance ann
              if (pco%csvout == "y") then
                write (2007,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name,  &
                                                                         hwb_a(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops
+             end if
              end if
            end if
            sw_init = hwb_d(j)%sw_final

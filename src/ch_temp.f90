@@ -34,6 +34,7 @@
       real :: h_atm
       real :: numerator
       real :: t_equil
+      real :: m_step                      !none |Q403: dimensionless relaxation step k_e*rttime/k_factor
       real :: k_factor
       real :: t_heat_exch
       real :: dep_chan
@@ -442,7 +443,32 @@
       rttime = sd_ch_vel(ich)%rttime / 24   !routing time in days
               
       k_factor = 1000. * 4186. * dep_flow / 86400       ! E: Density*Spec_heat_water*water_depth / time_convers 
-      t_heat_exch = k_e * (t_equil - tw_init) / k_factor * rttime
+
+      !! Q403. The line below used to be an EXPLICIT (forward-Euler) step of an equilibrium
+      !! relaxation:  t_heat_exch = k_e * (t_equil - tw_init) / k_factor * rttime
+      !! Its dimensionless step factor is m_step = k_e*rttime/k_factor. Explicit relaxation is
+      !! stable only for m_step <= 1, oscillates for 1 < m_step < 2 and DIVERGES above 2 -- and
+      !! m_step exceeds 2 routinely here, because dep_flow is floored at 0.1 m (:436) and
+      !! rttime rises at low flow, so both drivers move together as a channel dries.
+      !! Measured on the White River build (2020-2024, 2,058 channels x 1,461 days): 33,542
+      !! channel-days above 60 degC (1.116 %), max 1,259.6 degC, the exceeding channels
+      !! carrying 8x less flow than the rest, and the worst channel alternating the sign of its
+      !! daily change on 64 % of days against 44 % for well-behaved ones -- the fingerprint of
+      !! an overshooting explicit step, not of a physical process.
+      !!
+      !! Replaced with the CLOSED-FORM solution of the same relaxation over the step:
+      !!     tw = t_equil + (tw_init - t_equil) * exp(-m_step)
+      !! exact for constant t_equil across the step, unconditionally stable for ANY m_step, and
+      !! identical to the explicit form to first order when m_step << 1, so well-behaved
+      !! channels barely move. This is the same form res_temp.f90 uses for impoundments.
+      !! NOT a clamp: an upper bound would hide the signal that found this. Boundedness is
+      !! structural -- the result lies between tw_init and t_equil by construction.
+      m_step = k_e * rttime / k_factor
+      if (m_step > 50.) then
+        t_heat_exch = t_equil - tw_init          !! fully equilibrated; exp(-m) underflows
+      else
+        t_heat_exch = (t_equil - tw_init) * (1. - Exp(-m_step))
+      end if
         
       ! =========================================================
       !  Step 6. Final output

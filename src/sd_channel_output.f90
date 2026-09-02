@@ -35,15 +35,15 @@
        if (pco%day_print == "y" .and. pco%int_day_cur == pco%int_day) then
         if (pco%sd_chan%d == "y" .and. output_filter_write_ch_sd(ichan)) then
           if (pco%cdfout == "y") then
-            call nc_stage_sd_channel(ichan, ch_wat_d(ichan), ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), wtemp)
+            call nc_stage_sd_channel(ichan, ch_wat_d(ichan), ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), ch_out_d(ichan)%temp)
           else
           write (2500,100) time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,       &
             ch_wat_d(ichan)%area_ha, ch_wat_d(ichan)%precip, ch_wat_d(ichan)%evap, ch_wat_d(ichan)%seep,        &                
-            ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), wtemp
+            ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), ch_out_d(ichan)%temp
            if (pco%csvout == "y") then
              write (2504,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,  &
                ch_wat_d(ichan)%area_ha, ch_wat_d(ichan)%precip, ch_wat_d(ichan)%evap, ch_wat_d(ichan)%seep,     &
-               ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), wtemp
+               ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), ch_out_d(ichan)%temp
            end if
           end if
         end if
@@ -64,16 +64,16 @@
           
           if (pco%sd_chan%m == "y" .and. output_filter_write_ch_sd(ichan)) then
           if (pco%cdfout == "y") then
-            call nc_stage_sd_channel_mon(ichan, ch_wat_m(ichan), ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), wtemp)
+            call nc_stage_sd_channel_mon(ichan, ch_wat_m(ichan), ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), ch_out_m(ichan)%temp)
           else
           write (2501,100) time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,  &
             ch_wat_m(ichan)%area_ha, ch_wat_m(ichan)%precip, ch_wat_m(ichan)%evap, ch_wat_m(ichan)%seep,   &
-            ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), wtemp
+            ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), ch_out_m(ichan)%temp
 
           if (pco%csvout == "y") then
             write (2505,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,   &
             ch_wat_m(ichan)%area_ha, ch_wat_m(ichan)%precip, ch_wat_m(ichan)%evap, ch_wat_m(ichan)%seep,   &
-            ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), wtemp
+            ch_stor(ichan), ch_in_m(ichan), ch_out_m(ichan), ch_out_m(ichan)%temp
           end if
           end if
         end if
@@ -98,15 +98,15 @@
           
         if (pco%sd_chan%y == "y" .and. output_filter_write_ch_sd(ichan)) then 
           if (pco%cdfout == "y") then
-            call nc_stage_sd_channel_yr(ichan, ch_wat_y(ichan), ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), wtemp)
+            call nc_stage_sd_channel_yr(ichan, ch_wat_y(ichan), ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), ch_out_y(ichan)%temp)
           else
           write (2502,100) time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,   &
             ch_wat_y(ichan)%area_ha, ch_wat_y(ichan)%precip, ch_wat_y(ichan)%evap, ch_wat_y(ichan)%seep,    &
-            ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), wtemp
+            ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), ch_out_y(ichan)%temp
           if (pco%csvout == "y") then
            write (2506,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,    &
             ch_wat_y(ichan)%area_ha, ch_wat_y(ichan)%precip, ch_wat_y(ichan)%evap, ch_wat_y(ichan)%seep,    &
-            ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), wtemp
+            ch_stor(ichan), ch_in_y(ichan), ch_out_y(ichan), ch_out_y(ichan)%temp
           end if
           end if
         end if
@@ -122,15 +122,15 @@
         
         if (pco%sd_chan%a == "y" .and. output_filter_write_ch_sd(ichan)) then
         if (pco%cdfout == "y") then
-          call nc_stage_sd_channel_aa(ichan, ch_wat_a(ichan), ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), wtemp)
+          call nc_stage_sd_channel_aa(ichan, ch_wat_a(ichan), ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), ch_out_a(ichan)%temp)
         else
         write (2503,100) time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,  &
           ch_wat_a(ichan)%area_ha, ch_wat_a(ichan)%precip, ch_wat_a(ichan)%evap, ch_wat_a(ichan)%seep,   &
-          ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), wtemp
+          ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), ch_out_a(ichan)%temp
         if (pco%csvout == "y") then
           write (2507,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,   &
           ch_wat_a(ichan)%area_ha, ch_wat_a(ichan)%precip, ch_wat_a(ichan)%evap, ch_wat_a(ichan)%seep,   &
-          ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), wtemp
+          ch_stor(ichan), ch_in_a(ichan), ch_out_a(ichan), ch_out_a(ichan)%temp
         end if
         end if
        end if

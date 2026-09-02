@@ -167,7 +167,12 @@
             ht2%flo = ht2%flo * alpha_down + res_ob(jres)%prev_flo * (1. - alpha_down)
           end if
           res_ob(jres)%prev_flo = ht2%flo
-            
+
+          !! Q380: impoundment heat budget. Placed here because ht2%flo is final for the
+          !! day (the lag above is applied) and res(jres)%temp already holds the
+          !! storage+inflow mixture from line 76. Sets res(jres)%temp and ht2%temp.
+          call res_temp (jres)
+
           call res_sediment
         else
           ictbl = res_dat(idat)%release                              !! Osvaldo

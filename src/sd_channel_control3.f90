@@ -467,7 +467,15 @@
       !! this routine (ch_rtmusk :206, ch_watqual4 :266, ch_temp :457) so it would work today,
       !! but it would couple this fix to that ordering. Capturing the value directly does not.
       tw_reported = ch_out_d(ich)%temp
-      
+      !! Q462 (2026-09-05). The answer must ALSO travel downstream. The next channel's inflow
+      !! temperature is hin_d(in)%temp, built in command_object.f90:194,218 as frac_in * ob(iob)%hd(1)
+      !! (the hydrograph operators carry %temp unchanged) -- and hd(1)%temp still held the :127 air
+      !! regression after ch_temp ran, because ch_temp writes ch_out_d(ich)%temp and nothing copied
+      !! it back. So every reach saw its upstream at 5 + 0.75*tave whatever the upstream physics did.
+      !! Measured by Lane C on the Q381 arms: outflow temperature v58 differed on 3,759,966 cells,
+      !! inflow temperature v40 on 0. One assignment closes the loop; hydrology is untouched.
+      ob(icmd)%hd(1)%temp = tw_reported
+
       !! set constituents for routing
       if (cs_db%num_pests > 0) then
         obcs(icmd)%hd(1)%pest = hcs2%pest

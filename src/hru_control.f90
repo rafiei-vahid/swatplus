@@ -51,7 +51,7 @@
                   smp_grass_wway, sq_canopyint, sq_snom, sq_surfst, stmp_solt, stor_surfstor, surface, &
                   swr_latsed, swr_percmain, swr_substor, swr_subwq, varinit, wet_irrp, wetland_control, &
                   sq_crackvol, mgt_operatn, mgt_newtillmix, sep_biozone, pest_washp, pest_pesty, smp_buffer, &
-                  mgt_newtillmix_cswat3, cbn_surfrsd_decomp, cbn_rsd_transfer, mgt_biomix, pfas_lch, pfas_sed
+                  mgt_newtillmix_cswat3, cbn_surfrsd_decomp, cbn_rsd_transfer, mgt_biomix, pfas_lch, pfas_sed, pfas_dep
 
       integer :: j = 0              !none          |same as ihru (hru number)
       integer :: j1 = 0             !none          |counter (rtb)
@@ -516,6 +516,10 @@
 
         !! compute pesticide movement in soil
         call pest_lch
+
+        !! optional atmospheric PFAS deposition to the top soil layer (research build;
+        !! no-op unless pfas_dep.dat was read)
+        call pfas_dep
 
         !! compute PFAS soil 3-phase equilibrium + leach/runoff/lateral (no-op if npfas=0)
         call pfas_lch

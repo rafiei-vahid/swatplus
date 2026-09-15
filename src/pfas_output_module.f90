@@ -37,4 +37,10 @@
       !!    pfas_read -> the reference for the end-of-run mass-balance check.
       real, dimension(:,:), allocatable, save :: pfas_init_hru   !! (hru, pfas) kg/ha
 
+      !!    optional atmospheric deposition (research build, pfas_dep): per-HRU
+      !!    run-cumulative scheduled (target) and actually applied deposit, kg/ha,
+      !!    double precision; allocated only when pfas_dep.dat is present.
+      real(8), dimension(:,:), allocatable, save :: pfas_dep_target    !! (hru, pfas) kg/ha
+      real(8), dimension(:,:), allocatable, save :: pfas_dep_applied   !! (hru, pfas) kg/ha
+
       end module pfas_output_module

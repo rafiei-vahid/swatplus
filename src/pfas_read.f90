@@ -77,6 +77,8 @@
 
       implicit none
 
+      external :: pfas_dep_read
+
       character (len=80) :: titldum = ""   !!          |title line of file
       character (len=80) :: header = ""    !!          |header line of file
       integer :: eof = 0                   !!          |end-of-file flag
@@ -187,6 +189,10 @@
         if (pfas_soil_scale < 0.) pfas_soil_scale = 1.0
         if (pfas_koc_scale  < 0.) pfas_koc_scale  = 1.0
       end if
+
+      !! optional atmospheric deposition schedule (research build): pfas_dep.dat.
+      !! Absent -> no-op (pfas_dep_on stays 0).
+      call pfas_dep_read
 
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 !!    (2) ALLOCATE PER-HRU SOIL COLUMN  ->  pfas_soil_hru(:)%ly(:)

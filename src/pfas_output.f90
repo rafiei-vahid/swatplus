@@ -15,6 +15,13 @@
 !!        init_pool - final_pool  ==  surq + latq + perc + sed   (to FP round-off).
 !!    A non-zero residual would mean the decrement/accumulation bookkeeping is
 !!    inconsistent.  Called once from main after time_control.
+!!
+!!    RESEARCH BUILD (Q645): when pfas_dep.dat was read (pfas_dep_on == 1) the
+!!    applied deposit is a land-phase source, the closure becomes
+!!        init_pool + deposit_applied - final_pool == surq + latq + perc + sed,
+!!    pfas_hru_aa.txt gains a trailing dep_kgha column and pfas_balance.out two
+!!    trailing columns (dep_applied_kg, dep_target_kg). With the file ABSENT every
+!!    statement below takes its original branch, so both files are unchanged.
 !!    ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~ ~
 
       use pfas_module
@@ -31,6 +38,8 @@
       integer :: j, ly, k, nly, nhru, jworst
       real :: finalm, lossm, resid, rel, maxres, maxrel, area
       real(8), dimension(:), allocatable :: tinit, tfinal, tsurq, tlatq, tperc, tsed
+      real :: depm
+      real(8), dimension(:), allocatable :: tdep, tdept
 
       if (npfas <= 0) return
 
@@ -70,10 +79,18 @@
       tinit = 0.d0; tfinal = 0.d0; tsurq = 0.d0; tlatq = 0.d0
       tperc = 0.d0; tsed = 0.d0
       maxres = 0.; maxrel = 0.; jworst = 0
+      allocate (tdep(npfas), tdept(npfas))
+      tdep = 0.d0; tdept = 0.d0
+      depm = 0.
 
       open (7701, file="pfas_hru_aa.txt")
-      write (7701,'(a)') "hru   pfas   init_kgha   final_kgha   surq_kgha   "  &
-     &  // "latq_kgha   perc_kgha   sed_kgha   resid_kgha"
+      if (pfas_dep_on == 1) then
+        write (7701,'(a)') "hru   pfas   init_kgha   final_kgha   surq_kgha   "  &
+     &    // "latq_kgha   perc_kgha   sed_kgha   resid_kgha   dep_kgha"
+      else
+        write (7701,'(a)') "hru   pfas   init_kgha   final_kgha   surq_kgha   "  &
+     &    // "latq_kgha   perc_kgha   sed_kgha   resid_kgha"
+      end if
 
       do j = 1, nhru
         if (.not. allocated(pfas_soil_hru(j)%ly)) cycle
@@ -87,7 +104,14 @@
           end do
           lossm = hpfasb_d(j)%surq_a(k) + hpfasb_d(j)%latq_a(k)            &
      &          + hpfasb_d(j)%perc_a(k) + hpfasb_d(j)%sed_a(k)
-          resid = (pfas_init_hru(j,k) - finalm) - lossm
+          if (pfas_dep_on == 1) then
+            depm = real(pfas_dep_applied(j,k))
+            resid = (pfas_init_hru(j,k) + depm - finalm) - lossm
+            tdep(k)  = tdep(k)  + pfas_dep_applied(j,k) * area
+            tdept(k) = tdept(k) + pfas_dep_target(j,k) * area
+          else
+            resid = (pfas_init_hru(j,k) - finalm) - lossm
+          end if
 
           tinit(k)  = tinit(k)  + real(pfas_init_hru(j,k),8) * area
           tfinal(k) = tfinal(k) + real(finalm,8) * area
@@ -99,12 +123,22 @@
           if (abs(resid) > maxres) then
             maxres = abs(resid); jworst = j
           end if
-          if (pfas_init_hru(j,k) > 0.) then
-            rel = abs(resid) / pfas_init_hru(j,k)
-            if (rel > maxrel) maxrel = rel
-            write (7701,'(i8,i5,7es13.5)') j, k, pfas_init_hru(j,k),       &
-     &        finalm, hpfasb_d(j)%surq_a(k), hpfasb_d(j)%latq_a(k),        &
-     &        hpfasb_d(j)%perc_a(k), hpfasb_d(j)%sed_a(k), resid
+          if (pfas_dep_on == 1) then
+            if (pfas_init_hru(j,k) > 0. .or. depm > 0.) then
+              rel = abs(resid) / max(pfas_init_hru(j,k) + depm, tiny(1.))
+              if (rel > maxrel) maxrel = rel
+              write (7701,'(i8,i5,8es13.5)') j, k, pfas_init_hru(j,k),     &
+     &          finalm, hpfasb_d(j)%surq_a(k), hpfasb_d(j)%latq_a(k),      &
+     &          hpfasb_d(j)%perc_a(k), hpfasb_d(j)%sed_a(k), resid, depm
+            end if
+          else
+            if (pfas_init_hru(j,k) > 0.) then
+              rel = abs(resid) / pfas_init_hru(j,k)
+              if (rel > maxrel) maxrel = rel
+              write (7701,'(i8,i5,7es13.5)') j, k, pfas_init_hru(j,k),     &
+     &          finalm, hpfasb_d(j)%surq_a(k), hpfasb_d(j)%latq_a(k),      &
+     &          hpfasb_d(j)%perc_a(k), hpfasb_d(j)%sed_a(k), resid
+            end if
           end if
         end do
       end do
@@ -113,23 +147,41 @@
       open (7702, file="pfas_balance.out")
       write (7702,'(a)') "PFAS surface-water land-phase mass balance "      &
      &  // "(area-weighted, kg over the simulation)"
-      write (7702,'(a)') "pfas  name              init_kg       "          &
-     &  // "final_kg      surq_kg       latq_kg       perc_kg       "       &
-     &  // "sed_kg        loss_kg       resid_kg     resid_pct"
-      do k = 1, npfas
-        write (7702,'(i4,2x,a16,8es14.5,f10.4)') k, pfasdb(k)%name,        &
-     &    tinit(k), tfinal(k), tsurq(k), tlatq(k), tperc(k), tsed(k),      &
-     &    tsurq(k)+tlatq(k)+tperc(k)+tsed(k),                              &
-     &    tinit(k)-tfinal(k)-(tsurq(k)+tlatq(k)+tperc(k)+tsed(k)),         &
-     &    real(100.d0*(tinit(k)-tfinal(k)-(tsurq(k)+tlatq(k)+tperc(k)      &
-     &      +tsed(k))) / max(tinit(k),1.d-30))
-      end do
+      if (pfas_dep_on == 1) then
+        write (7702,'(a)') "pfas  name              init_kg       "        &
+     &    // "final_kg      surq_kg       latq_kg       perc_kg       "     &
+     &    // "sed_kg        loss_kg       resid_kg     resid_pct"           &
+     &    // "  dep_applied_kg dep_target_kg"
+        do k = 1, npfas
+          write (7702,'(i4,2x,a16,8es14.5,f10.4,2es14.5)') k,              &
+     &      pfasdb(k)%name,                                                &
+     &      tinit(k), tfinal(k), tsurq(k), tlatq(k), tperc(k), tsed(k),    &
+     &      tsurq(k)+tlatq(k)+tperc(k)+tsed(k),                            &
+     &      tinit(k)+tdep(k)-tfinal(k)-(tsurq(k)+tlatq(k)+tperc(k)+tsed(k)), &
+     &      real(100.d0*(tinit(k)+tdep(k)-tfinal(k)-(tsurq(k)+tlatq(k)     &
+     &        +tperc(k)+tsed(k))) / max(tinit(k)+tdep(k),1.d-30)),         &
+     &      tdep(k), tdept(k)
+        end do
+      else
+        write (7702,'(a)') "pfas  name              init_kg       "        &
+     &    // "final_kg      surq_kg       latq_kg       perc_kg       "     &
+     &    // "sed_kg        loss_kg       resid_kg     resid_pct"
+        do k = 1, npfas
+          write (7702,'(i4,2x,a16,8es14.5,f10.4)') k, pfasdb(k)%name,      &
+     &      tinit(k), tfinal(k), tsurq(k), tlatq(k), tperc(k), tsed(k),    &
+     &      tsurq(k)+tlatq(k)+tperc(k)+tsed(k),                            &
+     &      tinit(k)-tfinal(k)-(tsurq(k)+tlatq(k)+tperc(k)+tsed(k)),       &
+     &      real(100.d0*(tinit(k)-tfinal(k)-(tsurq(k)+tlatq(k)+tperc(k)    &
+     &        +tsed(k))) / max(tinit(k),1.d-30))
+        end do
+      end if
       write (7702,'(/,a,es13.5)') "max per-HRU abs closure residual (kg/ha): ", maxres
       write (7702,'(a,es13.5)')   "max per-HRU rel closure residual (-):     ", maxrel
       write (7702,'(a,i9)')       "worst HRU index:                          ", jworst
       close (7702)
 
       deallocate (tinit, tfinal, tsurq, tlatq, tperc, tsed)
+      deallocate (tdep, tdept)
 
       return
       end subroutine pfas_output

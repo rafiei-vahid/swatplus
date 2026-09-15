@@ -75,6 +75,16 @@
       real, save :: pfas_soil_scale = 1.0     !! none |x initial soil PFAS pools
       real, save :: pfas_koc_scale  = 1.0     !! none |x in-stream koc (partition)
 
+      !!    ~ ~ ~ OPTIONAL ATMOSPHERIC DEPOSITION (research build; pfas_dep.dat) ~ ~ ~
+      !!    Read once by pfas_dep_read; applied by pfas_dep to the top soil layer.
+      !!    The flux is absolute (NOT multiplied by pfas_soil_scale).
+      integer, save :: pfas_dep_on = 0        !! none |1 if pfas_dep.dat was read, else 0
+      integer, save :: pfas_dep_mode = 0      !! none |1 daily (flux/days-in-year), 2 year_start
+      integer, save :: pfas_dep_yr0 = 0       !! yr   |first calendar year in the schedule
+      integer, save :: pfas_dep_yr1 = -1      !! yr   |last calendar year in the schedule
+      real(8), dimension(:,:), allocatable, save :: pfas_dep_flux    !! ug/ha/yr |(year, pfas) schedule
+      integer, dimension(:), allocatable, save :: pfas_dep_lastyr    !! yr       |per HRU, last year_start deposit
+
       !!    ~ ~ ~ MODULE-LEVEL COUNTS / FLAGS / CROSSWALK ~ ~ ~
       integer, save :: npfas = 0                                  !! none |number of PFAS simulated
       integer, dimension(:), allocatable, save :: pfas_num        !! none |sequential PFAS -> pfasdb index crosswalk

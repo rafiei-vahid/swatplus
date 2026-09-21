@@ -233,6 +233,27 @@
         arr(59)=c%tot_ssed
       end subroutine bch_pack
 
+      !! Q859 helpers. Self-contained on purpose: swatplus_perf carries overrides
+      !! onto a fetched tree, so this module cannot depend on a date utility that
+      !! may not be present in every checked-out revision.
+      integer function nc_days_in_year(y)
+        integer, intent(in) :: y
+        if (mod(y,4) == 0 .and. (mod(y,100) /= 0 .or. mod(y,400) == 0)) then
+          nc_days_in_year = 366
+        else
+          nc_days_in_year = 365
+        end if
+      end function nc_days_in_year
+
+      integer function nc_elapsed_days(yrc, jday)
+        integer, intent(in) :: yrc, jday
+        integer :: y
+        nc_elapsed_days = jday - 1
+        do y = pco%yrc_start, yrc - 1
+          nc_elapsed_days = nc_elapsed_days + nc_days_in_year(y)
+        end do
+      end function nc_elapsed_days
+
       subroutine nc_epoch_init()
         write(nc_time_units,'(a,i0.4,a)') "days since ", pco%yrc_start, "-01-01"
         nc_epoch_jday = pco%day_start
@@ -330,7 +351,13 @@
         if (.not. s%on) return
         s%time_idx = s%time_idx + 1
         t = s%time_idx
-        tarr(1) = real(time%day - nc_epoch_jday)
+        !! Q859: time%day is DAY-OF-YEAR, so `time%day - nc_epoch_jday` resets
+        !! every 1 January that prints and the CF axis is not monotonic. Measured
+        !! 2026-09-21: max(time) <= 365 in 203 of 203 populated channel_sd_day.nc.
+        !! The ORIGIN is correct and deliberately unchanged -- nc_time_units still
+        !! names pco%yrc_start; only the offset becomes true elapsed days, so a
+        !! single-year run decodes to exactly the same dates as before.
+        tarr(1) = real(nc_elapsed_days(time%yrc, time%day))
         mo(1) = real(time%mo); dm(1) = real(time%day_mo)
         yr(1) = real(time%yrc); jd(1) = real(time%day)
         call nc_put_var_1d_r32_slice(s%ncid, s%vid_time, tarr, t)

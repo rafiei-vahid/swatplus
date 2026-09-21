@@ -355,8 +355,28 @@
         !! every 1 January that prints and the CF axis is not monotonic. Measured
         !! 2026-09-21: max(time) <= 365 in 203 of 203 populated channel_sd_day.nc.
         !! The ORIGIN is correct and deliberately unchanged -- nc_time_units still
-        !! names pco%yrc_start; only the offset becomes true elapsed days, so a
-        !! single-year run decodes to exactly the same dates as before.
+        !! names pco%yrc_start; only the OFFSET becomes true elapsed days.
+        !!
+        !! WHAT CHANGES, stated exactly. This comment used to end "so a single-year
+        !! run decodes to exactly the same dates as before", which is FALSE in
+        !! general: new - old = pco%day_start - 1 in the first printed year at
+        !! nyskip 0, so a run is unchanged there IFF day_start == 1. A print.prt
+        !! carrying 0 is set to 1 at basin_print_codes_read.f90:785, which is the
+        !! common case and the one the acceptance decks used.
+        !!
+        !! Where day_start /= 1 the values DO move, and the NEW one is right.
+        !! MEASURED 2026-09-21 (box 2, gfortran, 1-yr 2024 deck, day_start = 100),
+        !! not derived: day_start does NOT restrict which days print -- all 366
+        !! print, jday 1..366 -- but it DOES reach nc_epoch_jday. So the old
+        !! expression writes jday - 100 = -99 .. 266, i.e. 99 NEGATIVE values
+        !! decoding to dates BEFORE the simulation start; the new one writes
+        !! jday - 1 = 0 .. 365, and jday 1 correctly decodes to 1 Jan 2024.
+        !! The two differ by exactly 99 = day_start - 1 at EVERY index, and all
+        !! 79 other variables are byte-identical.
+        !!
+        !! An earlier version of this comment said the first printed day would be
+        !! day 100 and the old value 0. That was reasoned, never run, and it was
+        !! wrong in both halves.
         tarr(1) = real(nc_elapsed_days(time%yrc, time%day))
         mo(1) = real(time%mo); dm(1) = real(time%day_mo)
         yr(1) = real(time%yrc); jd(1) = real(time%day)

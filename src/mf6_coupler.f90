@@ -362,7 +362,7 @@
       implicit none
       integer :: istat, ios
       logical :: halt_save(5)
-      real(c_double) :: tnow, dt0
+      real(c_double) :: tnow, dt0, tprev
       character(len=256) :: cwd0
 
       if (.not. mf6_active) return
@@ -374,6 +374,7 @@
       call fpe_off(halt_save)
       ios = p_get_current_time(tnow)
       if (tnow < mf6_tend) then
+        tprev = tnow                          !! Q1040(c): MF6 time before this coupled step
         !! granular step so we can inject recharge between prepare and solve
         dt0 = 0.0_c_double
         ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads recharge + sources
@@ -385,9 +386,22 @@
           call coupler_fatal("MF6 do_time_step failed on a coupled day")
         end if
         ios = p_finalize_time_step()
+        if (ios /= 0) then
+          !! Q1040(c): MF6 reports non-convergence here, not at do_time_step. Discarding it let a diverged
+          !! run print a full summary with rc 0 (Q1040(b) OAT: 6 of 13 gfortran cases).
+          write (*,*) "MF6 COUPLER: finalize_time_step failed day ", mf6_daycount, " status ", ios
+          call coupler_fatal("MF6 finalize_time_step failed on a coupled day (MF6 did not converge; see mfsim.lst)")
+        end if
         if (bf_ready) call pull_baseflow      !! aggregate MF6 SFR baseflow -> channels
         if (pdis_ready) call pull_pfas_discharge  !! GW PFAS discharge -> channels
         ios = p_get_current_time(tnow)
+        !! Q1040(c): one coupled step must advance MF6 by exactly the coupling cadence. ATS re-solving a period
+        !! (or NSTP > 1) left MF6 up to 26 periods behind SWAT+ with rc 0 (Q1040(b) OAT).
+        if (abs((tnow - tprev) - real(gwf_cadence, c_double)) > 1.0e-6_c_double) then
+          write (*,'(a,i0,a,f14.6,a,f14.6,a,i0)') " MF6 COUPLER: clock check day ", mf6_daycount, &
+            "  MF6 t before ", tprev, "  after ", tnow, "  expected step (d) ", gwf_cadence
+          call coupler_fatal("MF6 clock out of step with SWAT+ (MF6 did not advance by the coupling step)")
+        end if
       end if
       call fpe_restore(halt_save)
       istat = chdir(trim(cwd0))

@@ -26,7 +26,22 @@
       end type co2
     
       type co2_annual
-        integer :: yrs
+        !! Q870: DEFAULT-INITIALISED, and the default is the whole fix.
+        !!
+        !! When co2_yr.dat is absent -- the normal case; no SWATGenX deck ships one -- the
+        !! reading branch below never executes and `yrs` was never assigned. Line ~79 then
+        !! evaluates `co2_inc%co2_yr(co2_inc%yrs)%iyr`, indexing the UNALLOCATED co2_yr with
+        !! whatever the stack held.
+        !!
+        !! The code already handles yrs == 0 correctly (it falls back to bsn_prm%co2); that
+        !! branch was simply unreachable on a compiler that does not zero the component.
+        !! gfortran's -finit-local-zero does NOT cover derived-type components: measured
+        !! 2026-09-21 on box 2, SIGSEGV rc 139 at co2_read -> proc_bsn -> MAIN__, on a modified
+        !! deck, an unmodified deck and a debug build alike. ifx evidently zeroes it, so the
+        !! shipped engine takes the correct branch BY COMPILER BEHAVIOUR rather than by
+        !! construction. This removes that dependence; it does not change any result where
+        !! co2_yr.dat exists, which is the acceptance's byte-identity row.
+        integer :: yrs = 0
         type (co2), dimension(:), allocatable :: co2_yr
       end type co2_annual
       type (co2_annual) :: co2_inc

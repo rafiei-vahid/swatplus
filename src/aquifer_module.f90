@@ -118,8 +118,8 @@
           character(len=15) :: revap    =      "          revap"        ! (mm)
           character(len=15) :: no3_st   =      "         no3_st"        ! (kg/ha N)
           character(len=15) :: minp     =      "           minp"        ! (kg/ha P)
-          character(len=15) :: orgn     =      "           orgn"        ! (kg/ha N)
-          character(len=15) :: orgp     =      "           orgp"        ! (kg/ha P)
+          character(len=15) :: orgn     =      "            cbn"        ! (percent) Q890: this column holds aquifer_dynamic%cbn
+          character(len=15) :: orgp     =      "           orgn"        ! (kg/ha N) Q890: this column holds aquifer_dynamic%orgn
           character(len=15) :: no3_rchg =      "       no3_rchg"        ! (kg/ha N)
           character(len=15) :: no3_loss =      "       no3_loss"        ! (kg/ha N)
           character(len=15) :: no3_lat  =      "        no3_lat"        ! (kg N/ha)
@@ -146,8 +146,8 @@
           character(len=15) :: revap    =  "             mm"          ! (mm)
           character(len=15) :: no3_st   =  "        kg/ha_N"          ! (kg/ha N)
           character(len=15) :: minp     =  "        kg/ha_P"          ! (kg/ha P)
-          character(len=15) :: orgn     =  "        kg/ha_N"          ! (kg/ha N)
-          character(len=15) :: orgp     =  "        kg/ha_P"          ! (kg/ha P)
+          character(len=15) :: orgn     =  "        percent"          ! (percent) Q890: cbn
+          character(len=15) :: orgp     =  "        kg/ha_N"          ! (kg/ha N) Q890: orgn
           character(len=15) :: no3_rchg =  "        kg/ha_N"          ! (kg/ha N)
           character(len=15) :: no3_loss =  "        kg/ha_N"          ! (kg/ha N)
           character(len=15) :: no3_lat  =  "        kg/ha_N"          ! (kg N/ha)

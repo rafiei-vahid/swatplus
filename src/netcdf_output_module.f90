@@ -10,7 +10,7 @@
       use carbon_module
       use sd_channel_module
       use water_body_module
-      use channel_module, only : ch_output
+      use channel_module, only : ch_output, ch_hdr, ch_hdr_units
       use output_filter_module
       implicit none
       private
@@ -46,6 +46,9 @@
       integer, parameter :: naqu = 18
       integer, parameter :: nchnsd = 73
       integer, parameter :: nch = 59
+      !! Q890: attributes of a column that has no header-table entry (always written as 0)
+      character(len=*), parameter :: nc_pad_long_name = "unused (always 0)", nc_pad_units = "1"
+      integer, parameter :: nc_hdr_buf = 8192, nc_hdr_max = 128
       integer, parameter :: name_len = 64
 
       type nc_stream
@@ -259,11 +262,12 @@
         nc_epoch_jday = pco%day_start
       end subroutine nc_epoch_init
 
-      subroutine nc_stream_open(s, path, nobj, vnames, tchunk)
+      subroutine nc_stream_open(s, path, nobj, vnames, tchunk, fam)
         type(nc_stream), intent(inout) :: s
         character(len=*), intent(in) :: path
         integer, intent(in) :: nobj, tchunk
         character(len=*), intent(in) :: vnames(:)
+        character(len=*), intent(in), optional :: fam
         integer :: i, dimids(2), chunk(2), n
         n = size(vnames)
         s%on = .true.
@@ -298,9 +302,104 @@
         do i = 1, n
           call nc_def_var_r32(s%ncid, trim(s%vname(i)), dimids, s%var_id(i), chunk, .true.)
         end do
+        if (present(fam)) call nc_stream_put_var_attrs(s, fam)
         call nc_enddef_file(s%ncid)
         write(9000,*) "HRU                       ", trim(path)
       end subroutine nc_stream_open
+
+      subroutine nc_stream_put_var_attrs(s, fam)
+        !! Q890: every data variable's long_name and units come from the SAME header-type
+        !! instances the text writer writes (header_*.f90, output_*_init.f90), so the two
+        !! outputs cannot drift: the types are written into a buffer with '(*(a,"|"))' and
+        !! split on '|'. Variable NAMES are unchanged (readers select v41 etc.). A column
+        !! past the table's value columns has no entry and gets the pad constants.
+        type(nc_stream), intent(inout) :: s
+        character(len=*), intent(in) :: fam
+        integer, parameter :: nid = 7    !! jday mon day yr unit gis_id name lead every table
+        character(len=nc_hdr_buf) :: bn, bu
+        character(len=32) :: tn(nc_hdr_max), tu(nc_hdr_max)
+        integer :: nn, nu, nval, off, i, k, kneed
+        off = 0
+        select case (fam)
+        case ("wb")
+          write (bn,'(*(a,"|"))') wb_hdr;  write (bu,'(*(a,"|"))') wb_hdr_units
+        case ("nb")
+          write (bn,'(*(a,"|"))') nb_hdr;  write (bu,'(*(a,"|"))') nb_hdr_units
+        case ("ls")
+          write (bn,'(*(a,"|"))') ls_hdr;  write (bu,'(*(a,"|"))') ls_hdr_units
+        case ("pw")
+          write (bn,'(*(a,"|"))') pw_hdr;  write (bu,'(*(a,"|"))') pw_hdr_units
+        case ("aqu")
+          write (bn,'(*(a,"|"))') aqu_hdr; write (bu,'(*(a,"|"))') aqu_hdr_units
+        case ("cha")
+          write (bn,'(*(a,"|"))') ch_hdr;  write (bu,'(*(a,"|"))') ch_hdr_units
+        case ("sdch")    !! the tables header_sd_channel.f90 writes for channel_sd_*.txt, in that order
+          write (bn,'(*(a,"|"))') ch_wbod_hdr, hyd_stor_hdr, hyd_in_hdr, hyd_out_hdr, wtmp_hdr
+          write (bu,'(*(a,"|"))') ch_wbod_hdr_units, hyd_hdr_units3, hyd_hdr_units1, hyd_hdr_units1, wtmp_units
+        case ("hsc", "hrc", "hpc")    !! one text table (carb_gl), three NetCDF slices: soil 9, residue 6, plant 6
+          write (bn,'(*(a,"|"))') carb_gl_hdr; write (bu,'(*(a,"|"))') carb_gl_hdr_units
+          if (fam == "hrc") off = nhsc
+          if (fam == "hpc") off = nhsc + nhrc
+        case ("hscf")
+          write (bn,'(*(a,"|"))') hscf_hdr; write (bu,'(*(a,"|"))') hscf_hdr_units
+        case default
+          return
+        end select
+        call nc_split_hdr(bn, tn, nn)
+        call nc_split_hdr(bu, tu, nu)
+        nval = nn - nid
+        !! Both tables must cover every column this stream labels. They need not be the same
+        !! length: the wb/nb/pw units tables stop at the last data column and omit the
+        !! text-only plt_cov, mgt_ops that trail the names table.
+        kneed = 0
+        do i = 1, s%nvar
+          k = nc_hdr_col(fam, i, off, nval)
+          if (k <= nval) kneed = max(kneed, k)
+        end do
+        if (nval <= 0 .or. nid + kneed > nu) then
+          write (*,*) "Q890 NetCDF attributes skipped for ", trim(fam), ": header has ", nn, &
+                      " names and ", nu, " units; column ", kneed, " is needed"
+          return
+        end if
+        do i = 1, s%nvar
+          k = nc_hdr_col(fam, i, off, nval)
+          if (k <= nval) then
+            call nc_put_att_text(s%ncid, s%var_id(i), "long_name", trim(tn(nid + k)))
+            call nc_put_att_text(s%ncid, s%var_id(i), "units", trim(tu(nid + k)))
+          else
+            call nc_put_att_text(s%ncid, s%var_id(i), "long_name", nc_pad_long_name)
+            call nc_put_att_text(s%ncid, s%var_id(i), "units", nc_pad_units)
+          end if
+        end do
+      end subroutine nc_stream_put_var_attrs
+
+      integer function nc_hdr_col(fam, i, off, nval)
+        !! Q890: the header-table value column that labels NetCDF variable i of a family.
+        character(len=*), intent(in) :: fam
+        integer, intent(in) :: i, off, nval
+        nc_hdr_col = off + i
+        !! ls: NetCDF v13 is percn, the table's LAST column (after the text-only plt_cov, mgt_ops)
+        if (fam == "ls" .and. i == nls) nc_hdr_col = nval
+      end function nc_hdr_col
+
+      subroutine nc_split_hdr(buf, tok, n)
+        !! Q890: split an '(*(a,"|"))' record into its fields, each left-adjusted and trimmed.
+        !! A blank field (a units column with no unit) is kept as a blank token.
+        character(len=*), intent(in) :: buf
+        character(len=32), intent(out) :: tok(:)
+        integer, intent(out) :: n
+        integer :: i0, j
+        n = 0
+        i0 = 1
+        do
+          j = index(buf(i0:), "|")
+          if (j == 0 .or. n >= size(tok)) exit
+          n = n + 1
+          tok(n) = adjustl(buf(i0:i0 + j - 2))
+          i0 = i0 + j
+          if (i0 > len(buf)) exit
+        end do
+      end subroutine nc_split_hdr
 
 !!    Write the obj_id/gis_id coordinate variables that every open path fills in memory.
 !!    Only nc_stream_set_hru_meta used to do this, so channel/sd_channel/aquifer/basin
@@ -453,7 +552,7 @@
         if (.not. nc_use_output()) return
         if (flag /= "y" .or. sp_ob%hru <= 0) return
         call names_wb(vn)
-        call nc_stream_open(s, "hru_wb_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "hru_wb_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix), "wb")
         call nc_stream_set_hru_meta(s)
       end subroutine nc_open_hru_wb
 
@@ -465,7 +564,7 @@
         if (.not. nc_use_output()) return
         if (flag /= "y" .or. sp_ob%hru <= 0) return
         call names_nb(vn)
-        call nc_stream_open(s, "hru_nb_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "hru_nb_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix), "nb")
         call nc_stream_set_hru_meta(s)
       end subroutine nc_open_hru_nb
 
@@ -477,13 +576,13 @@
         if (.not. nc_use_output()) return
         if (flag /= "y" .or. sp_ob%hru <= 0) return
         call names_ls(vn)
-        call nc_stream_open(s, "hru_ls_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "hru_ls_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix), "ls")
         call nc_stream_set_hru_meta(s)
       end subroutine nc_open_hru_ls
 
-      subroutine nc_open_hru_carbon(s, fname, nvar, flag, tchunk)
+      subroutine nc_open_hru_carbon(s, fname, nvar, flag, tchunk, fam)
         type(nc_stream), intent(inout) :: s
-        character(len=*), intent(in) :: fname
+        character(len=*), intent(in) :: fname, fam
         integer, intent(in) :: nvar, tchunk
         character(len=1), intent(in) :: flag
         character(len=32) :: vn(32)
@@ -493,13 +592,13 @@
         do i = 1, nvar
           write(vn(i), '(a,i0)') "v", i
         end do
-        call nc_stream_open(s, trim(fname)//".nc", sp_ob%hru, vn(1:nvar), tchunk)
+        call nc_stream_open(s, trim(fname)//".nc", sp_ob%hru, vn(1:nvar), tchunk, fam)
         call nc_stream_set_hru_meta(s)
       end subroutine nc_open_hru_carbon
 
-      subroutine nc_open_basin_singleton(s, fname, nvar, flag, tchunk)
+      subroutine nc_open_basin_singleton(s, fname, nvar, flag, tchunk, fam)
         type(nc_stream), intent(inout) :: s
-        character(len=*), intent(in) :: fname
+        character(len=*), intent(in) :: fname, fam
         integer, intent(in) :: nvar, tchunk
         character(len=1), intent(in) :: flag
         character(len=32) :: vn(64)
@@ -509,18 +608,18 @@
         do i = 1, nvar
           write(vn(i), '(a,i0)') "v", i
         end do
-        call nc_stream_open(s, trim(fname)//".nc", 1, vn(1:nvar), tchunk)
+        call nc_stream_open(s, trim(fname)//".nc", 1, vn(1:nvar), tchunk, fam)
         s%obj_id(1) = 1; s%gis_id(1) = 1; s%oname(1) = bsn%name
         call nc_stream_put_ids(s)
       end subroutine nc_open_basin_singleton
 
-      subroutine nc_open_lsu_stream(s, fname, n, vn, flag, tchunk)
+      subroutine nc_open_lsu_stream(s, fname, n, vn, flag, tchunk, fam)
         type(nc_stream), intent(inout) :: s
-        character(len=*), intent(in) :: fname
+        character(len=*), intent(in) :: fname, fam
         integer, intent(in) :: n, tchunk
         character(len=32), intent(in) :: vn(:)
         character(len=1), intent(in) :: flag
-        if (flag == "y" .and. n > 0) call nc_stream_open(s, trim(fname), n, vn, tchunk)
+        if (flag == "y" .and. n > 0) call nc_stream_open(s, trim(fname), n, vn, tchunk, fam)
       end subroutine nc_open_lsu_stream
 
       subroutine nc_open_lsu_streams()
@@ -530,22 +629,22 @@
         n = db_mx%lsu_out
         if (n <= 0) return
         call names_wb(vnwb); call names_nb(vnnb); call names_ls(vnls); call names_pw(vnpw)
-        call nc_open_lsu_stream(s_lsu_wb_d, "lsunit_wb_day.nc", n, vnwb, pco%wb_lsu%d, 30)
-        call nc_open_lsu_stream(s_lsu_wb_m, "lsunit_wb_mon.nc", n, vnwb, pco%wb_lsu%m, 12)
-        call nc_open_lsu_stream(s_lsu_wb_y, "lsunit_wb_yr.nc", n, vnwb, pco%wb_lsu%y, 1)
-        call nc_open_lsu_stream(s_lsu_wb_a, "lsunit_wb_aa.nc", n, vnwb, pco%wb_lsu%a, 1)
-        call nc_open_lsu_stream(s_lsu_nb_d, "lsunit_nb_day.nc", n, vnnb, pco%nb_lsu%d, 30)
-        call nc_open_lsu_stream(s_lsu_nb_m, "lsunit_nb_mon.nc", n, vnnb, pco%nb_lsu%m, 12)
-        call nc_open_lsu_stream(s_lsu_nb_y, "lsunit_nb_yr.nc", n, vnnb, pco%nb_lsu%y, 1)
-        call nc_open_lsu_stream(s_lsu_nb_a, "lsunit_nb_aa.nc", n, vnnb, pco%nb_lsu%a, 1)
-        call nc_open_lsu_stream(s_lsu_ls_d, "lsunit_ls_day.nc", n, vnls, pco%ls_lsu%d, 30)
-        call nc_open_lsu_stream(s_lsu_ls_m, "lsunit_ls_mon.nc", n, vnls, pco%ls_lsu%m, 12)
-        call nc_open_lsu_stream(s_lsu_ls_y, "lsunit_ls_yr.nc", n, vnls, pco%ls_lsu%y, 1)
-        call nc_open_lsu_stream(s_lsu_ls_a, "lsunit_ls_aa.nc", n, vnls, pco%ls_lsu%a, 1)
-        call nc_open_lsu_stream(s_lsu_pw_d, "lsunit_pw_day.nc", n, vnpw, pco%pw_lsu%d, 30)
-        call nc_open_lsu_stream(s_lsu_pw_m, "lsunit_pw_mon.nc", n, vnpw, pco%pw_lsu%m, 12)
-        call nc_open_lsu_stream(s_lsu_pw_y, "lsunit_pw_yr.nc", n, vnpw, pco%pw_lsu%y, 1)
-        call nc_open_lsu_stream(s_lsu_pw_a, "lsunit_pw_aa.nc", n, vnpw, pco%pw_lsu%a, 1)
+        call nc_open_lsu_stream(s_lsu_wb_d, "lsunit_wb_day.nc", n, vnwb, pco%wb_lsu%d, 30, "wb")
+        call nc_open_lsu_stream(s_lsu_wb_m, "lsunit_wb_mon.nc", n, vnwb, pco%wb_lsu%m, 12, "wb")
+        call nc_open_lsu_stream(s_lsu_wb_y, "lsunit_wb_yr.nc", n, vnwb, pco%wb_lsu%y, 1, "wb")
+        call nc_open_lsu_stream(s_lsu_wb_a, "lsunit_wb_aa.nc", n, vnwb, pco%wb_lsu%a, 1, "wb")
+        call nc_open_lsu_stream(s_lsu_nb_d, "lsunit_nb_day.nc", n, vnnb, pco%nb_lsu%d, 30, "nb")
+        call nc_open_lsu_stream(s_lsu_nb_m, "lsunit_nb_mon.nc", n, vnnb, pco%nb_lsu%m, 12, "nb")
+        call nc_open_lsu_stream(s_lsu_nb_y, "lsunit_nb_yr.nc", n, vnnb, pco%nb_lsu%y, 1, "nb")
+        call nc_open_lsu_stream(s_lsu_nb_a, "lsunit_nb_aa.nc", n, vnnb, pco%nb_lsu%a, 1, "nb")
+        call nc_open_lsu_stream(s_lsu_ls_d, "lsunit_ls_day.nc", n, vnls, pco%ls_lsu%d, 30, "ls")
+        call nc_open_lsu_stream(s_lsu_ls_m, "lsunit_ls_mon.nc", n, vnls, pco%ls_lsu%m, 12, "ls")
+        call nc_open_lsu_stream(s_lsu_ls_y, "lsunit_ls_yr.nc", n, vnls, pco%ls_lsu%y, 1, "ls")
+        call nc_open_lsu_stream(s_lsu_ls_a, "lsunit_ls_aa.nc", n, vnls, pco%ls_lsu%a, 1, "ls")
+        call nc_open_lsu_stream(s_lsu_pw_d, "lsunit_pw_day.nc", n, vnpw, pco%pw_lsu%d, 30, "pw")
+        call nc_open_lsu_stream(s_lsu_pw_m, "lsunit_pw_mon.nc", n, vnpw, pco%pw_lsu%m, 12, "pw")
+        call nc_open_lsu_stream(s_lsu_pw_y, "lsunit_pw_yr.nc", n, vnpw, pco%pw_lsu%y, 1, "pw")
+        call nc_open_lsu_stream(s_lsu_pw_a, "lsunit_pw_aa.nc", n, vnpw, pco%pw_lsu%a, 1, "pw")
       end subroutine nc_open_lsu_streams
 
       subroutine nc_open_aquifer(s, suffix, flag)
@@ -561,7 +660,7 @@
         vn(9)='cbn'; vn(10)='orgn'; vn(11)='no3_rchg'; vn(12)='no3_loss'
         vn(13)='no3_lat'; vn(14)='no3_seep'; vn(15)='flo_cha'
         vn(16)='flo_res'; vn(17)='flo_ls'; vn(18)='pad'
-        call nc_stream_open(s, "aquifer_"//trim(suffix)//".nc", sp_ob%aqu, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "aquifer_"//trim(suffix)//".nc", sp_ob%aqu, vn, nc_tchunk_for_suffix(suffix), "aqu")
         do iaq = 1, sp_ob%aqu
           iob = sp_ob1%aqu + iaq - 1
           s%obj_id(iaq) = iaq
@@ -582,7 +681,7 @@
         do i = 1, nch
           write(vn(i), '(a,i0)') "v", i
         end do
-        call nc_stream_open(s, "channel_"//trim(suffix)//".nc", sp_ob%chan, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "channel_"//trim(suffix)//".nc", sp_ob%chan, vn, nc_tchunk_for_suffix(suffix), "cha")
         do ich = 1, sp_ob%chan
           iob = sp_ob1%chan + ich - 1
           s%obj_id(ich) = ich
@@ -609,7 +708,7 @@
         do i = 1, nchnsd
           write(vn(i), '(a,i0)') "v", i
         end do
-        call nc_stream_open(s, "channel_sd_"//trim(suffix)//".nc", nobj, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "channel_sd_"//trim(suffix)//".nc", nobj, vn, nc_tchunk_for_suffix(suffix), "sdch")
         islot = 0
         do ich = 1, sp_ob%chandeg
           if (.not. output_filter_write_ch_sd(ich)) cycle
@@ -630,7 +729,7 @@
         if (.not. nc_use_output()) return
         if (flag /= "y" .or. sp_ob%hru <= 0) return
         call names_pw(vn)
-        call nc_stream_open(s, "hru_pw_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix))
+        call nc_stream_open(s, "hru_pw_"//trim(suffix)//".nc", sp_ob%hru, vn, nc_tchunk_for_suffix(suffix), "pw")
         call nc_stream_set_hru_meta(s)
       end subroutine nc_open_hru_pw
 
@@ -654,46 +753,46 @@
         call nc_open_hru_pw(s_hru_pw_m, "mon", pco%pw_hru%m)
         call nc_open_hru_pw(s_hru_pw_y, "yr", pco%pw_hru%y)
         call nc_open_hru_pw(s_hru_pw_a, "aa", pco%pw_hru%a)
-        call nc_open_hru_carbon(s_hru_sc_d, "hru_soilcarb_day", nhsc, pco%nb_hru%d, 30)
-        call nc_open_hru_carbon(s_hru_rc_d, "hru_rescarb_day", nhrc, pco%nb_hru%d, 30)
-        call nc_open_hru_carbon(s_hru_pc_d, "hru_plcarb_day", nhpc, pco%nb_hru%d, 30)
-        call nc_open_hru_carbon(s_hru_cf_d, "hru_scf_day", nhscf, pco%nb_hru%d, 30)
-        call nc_open_hru_carbon(s_hru_sc_m, "hru_soilcarb_mon", nhsc, pco%nb_hru%m, 12)
-        call nc_open_hru_carbon(s_hru_rc_m, "hru_rescarb_mon", nhrc, pco%nb_hru%m, 12)
-        call nc_open_hru_carbon(s_hru_pc_m, "hru_plcarb_mon", nhpc, pco%nb_hru%m, 12)
-        call nc_open_hru_carbon(s_hru_cf_m, "hru_scf_mon", nhscf, pco%nb_hru%m, 12)
-        call nc_open_hru_carbon(s_hru_sc_y, "hru_soilcarb_yr", nhsc, pco%nb_hru%y, 1)
-        call nc_open_hru_carbon(s_hru_rc_y, "hru_rescarb_yr", nhrc, pco%nb_hru%y, 1)
-        call nc_open_hru_carbon(s_hru_pc_y, "hru_plcarb_yr", nhpc, pco%nb_hru%y, 1)
-        call nc_open_hru_carbon(s_hru_cf_y, "hru_scf_yr", nhscf, pco%nb_hru%y, 1)
-        call nc_open_hru_carbon(s_hru_sc_a, "hru_soilcarb_aa", nhsc, pco%nb_hru%a, 1)
-        call nc_open_hru_carbon(s_hru_rc_a, "hru_rescarb_aa", nhrc, pco%nb_hru%a, 1)
-        call nc_open_hru_carbon(s_hru_pc_a, "hru_plcarb_aa", nhpc, pco%nb_hru%a, 1)
-        call nc_open_hru_carbon(s_hru_cf_a, "hru_scf_aa", nhscf, pco%nb_hru%a, 1)
-        call nc_open_basin_singleton(s_bsn_wb_d, "basin_wb_day", nwb, pco%wb_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_nb_d, "basin_nb_day", nnb, pco%nb_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_ls_d, "basin_ls_day", nls, pco%ls_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_pw_d, "basin_pw_day", npw, pco%pw_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_wb_m, "basin_wb_mon", nwb, pco%wb_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_nb_m, "basin_nb_mon", nnb, pco%nb_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_ls_m, "basin_ls_mon", nls, pco%ls_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_pw_m, "basin_pw_mon", npw, pco%pw_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_wb_y, "basin_wb_yr", nwb, pco%wb_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_nb_y, "basin_nb_yr", nnb, pco%nb_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_ls_y, "basin_ls_yr", nls, pco%ls_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_pw_y, "basin_pw_yr", npw, pco%pw_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_wb_a, "basin_wb_aa", nwb, pco%wb_bsn%a, 1)
-        call nc_open_basin_singleton(s_bsn_nb_a, "basin_nb_aa", nnb, pco%nb_bsn%a, 1)
-        call nc_open_basin_singleton(s_bsn_ls_a, "basin_ls_aa", nls, pco%ls_bsn%a, 1)
-        call nc_open_basin_singleton(s_bsn_pw_a, "basin_pw_aa", npw, pco%pw_bsn%a, 1)
-        call nc_open_basin_singleton(s_bsn_aqu_d, "basin_aqu_day", naqu, pco%aqu_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_aqu_m, "basin_aqu_mon", naqu, pco%aqu_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_aqu_y, "basin_aqu_yr", naqu, pco%aqu_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_aqu_a, "basin_aqu_aa", naqu, pco%aqu_bsn%a, 1)
-        call nc_open_basin_singleton(s_bsn_cha_d, "basin_cha_day", nch, pco%chan_bsn%d, 30)
-        call nc_open_basin_singleton(s_bsn_cha_m, "basin_cha_mon", nch, pco%chan_bsn%m, 12)
-        call nc_open_basin_singleton(s_bsn_cha_y, "basin_cha_yr", nch, pco%chan_bsn%y, 1)
-        call nc_open_basin_singleton(s_bsn_cha_a, "basin_cha_aa", nch, pco%chan_bsn%a, 1)
+        call nc_open_hru_carbon(s_hru_sc_d, "hru_soilcarb_day", nhsc, pco%nb_hru%d, 30, "hsc")
+        call nc_open_hru_carbon(s_hru_rc_d, "hru_rescarb_day", nhrc, pco%nb_hru%d, 30, "hrc")
+        call nc_open_hru_carbon(s_hru_pc_d, "hru_plcarb_day", nhpc, pco%nb_hru%d, 30, "hpc")
+        call nc_open_hru_carbon(s_hru_cf_d, "hru_scf_day", nhscf, pco%nb_hru%d, 30, "hscf")
+        call nc_open_hru_carbon(s_hru_sc_m, "hru_soilcarb_mon", nhsc, pco%nb_hru%m, 12, "hsc")
+        call nc_open_hru_carbon(s_hru_rc_m, "hru_rescarb_mon", nhrc, pco%nb_hru%m, 12, "hrc")
+        call nc_open_hru_carbon(s_hru_pc_m, "hru_plcarb_mon", nhpc, pco%nb_hru%m, 12, "hpc")
+        call nc_open_hru_carbon(s_hru_cf_m, "hru_scf_mon", nhscf, pco%nb_hru%m, 12, "hscf")
+        call nc_open_hru_carbon(s_hru_sc_y, "hru_soilcarb_yr", nhsc, pco%nb_hru%y, 1, "hsc")
+        call nc_open_hru_carbon(s_hru_rc_y, "hru_rescarb_yr", nhrc, pco%nb_hru%y, 1, "hrc")
+        call nc_open_hru_carbon(s_hru_pc_y, "hru_plcarb_yr", nhpc, pco%nb_hru%y, 1, "hpc")
+        call nc_open_hru_carbon(s_hru_cf_y, "hru_scf_yr", nhscf, pco%nb_hru%y, 1, "hscf")
+        call nc_open_hru_carbon(s_hru_sc_a, "hru_soilcarb_aa", nhsc, pco%nb_hru%a, 1, "hsc")
+        call nc_open_hru_carbon(s_hru_rc_a, "hru_rescarb_aa", nhrc, pco%nb_hru%a, 1, "hrc")
+        call nc_open_hru_carbon(s_hru_pc_a, "hru_plcarb_aa", nhpc, pco%nb_hru%a, 1, "hpc")
+        call nc_open_hru_carbon(s_hru_cf_a, "hru_scf_aa", nhscf, pco%nb_hru%a, 1, "hscf")
+        call nc_open_basin_singleton(s_bsn_wb_d, "basin_wb_day", nwb, pco%wb_bsn%d, 30, "wb")
+        call nc_open_basin_singleton(s_bsn_nb_d, "basin_nb_day", nnb, pco%nb_bsn%d, 30, "nb")
+        call nc_open_basin_singleton(s_bsn_ls_d, "basin_ls_day", nls, pco%ls_bsn%d, 30, "ls")
+        call nc_open_basin_singleton(s_bsn_pw_d, "basin_pw_day", npw, pco%pw_bsn%d, 30, "pw")
+        call nc_open_basin_singleton(s_bsn_wb_m, "basin_wb_mon", nwb, pco%wb_bsn%m, 12, "wb")
+        call nc_open_basin_singleton(s_bsn_nb_m, "basin_nb_mon", nnb, pco%nb_bsn%m, 12, "nb")
+        call nc_open_basin_singleton(s_bsn_ls_m, "basin_ls_mon", nls, pco%ls_bsn%m, 12, "ls")
+        call nc_open_basin_singleton(s_bsn_pw_m, "basin_pw_mon", npw, pco%pw_bsn%m, 12, "pw")
+        call nc_open_basin_singleton(s_bsn_wb_y, "basin_wb_yr", nwb, pco%wb_bsn%y, 1, "wb")
+        call nc_open_basin_singleton(s_bsn_nb_y, "basin_nb_yr", nnb, pco%nb_bsn%y, 1, "nb")
+        call nc_open_basin_singleton(s_bsn_ls_y, "basin_ls_yr", nls, pco%ls_bsn%y, 1, "ls")
+        call nc_open_basin_singleton(s_bsn_pw_y, "basin_pw_yr", npw, pco%pw_bsn%y, 1, "pw")
+        call nc_open_basin_singleton(s_bsn_wb_a, "basin_wb_aa", nwb, pco%wb_bsn%a, 1, "wb")
+        call nc_open_basin_singleton(s_bsn_nb_a, "basin_nb_aa", nnb, pco%nb_bsn%a, 1, "nb")
+        call nc_open_basin_singleton(s_bsn_ls_a, "basin_ls_aa", nls, pco%ls_bsn%a, 1, "ls")
+        call nc_open_basin_singleton(s_bsn_pw_a, "basin_pw_aa", npw, pco%pw_bsn%a, 1, "pw")
+        call nc_open_basin_singleton(s_bsn_aqu_d, "basin_aqu_day", naqu, pco%aqu_bsn%d, 30, "aqu")
+        call nc_open_basin_singleton(s_bsn_aqu_m, "basin_aqu_mon", naqu, pco%aqu_bsn%m, 12, "aqu")
+        call nc_open_basin_singleton(s_bsn_aqu_y, "basin_aqu_yr", naqu, pco%aqu_bsn%y, 1, "aqu")
+        call nc_open_basin_singleton(s_bsn_aqu_a, "basin_aqu_aa", naqu, pco%aqu_bsn%a, 1, "aqu")
+        call nc_open_basin_singleton(s_bsn_cha_d, "basin_cha_day", nch, pco%chan_bsn%d, 30, "cha")
+        call nc_open_basin_singleton(s_bsn_cha_m, "basin_cha_mon", nch, pco%chan_bsn%m, 12, "cha")
+        call nc_open_basin_singleton(s_bsn_cha_y, "basin_cha_yr", nch, pco%chan_bsn%y, 1, "cha")
+        call nc_open_basin_singleton(s_bsn_cha_a, "basin_cha_aa", nch, pco%chan_bsn%a, 1, "cha")
         call nc_open_channel(s_cha_d, "day", pco%chan%d)
         call nc_open_channel(s_cha_m, "mon", pco%chan%m)
         call nc_open_channel(s_cha_y, "yr", pco%chan%y)

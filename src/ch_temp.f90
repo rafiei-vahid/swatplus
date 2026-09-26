@@ -124,11 +124,14 @@
       ru_count = 0
       ru_index = 1
 
-      do in = 1, size(ob(iob)%obtyp_in)
-          if (allocated(ob(iob)%obtyp_in) .and. ob(iob)%obtyp_in(in) == "ru") then
+      !! Q889: test allocated() BEFORE size(); size() of an unallocated array is undefined
+      if (allocated(ob(iob)%obtyp_in)) then
+        do in = 1, size(ob(iob)%obtyp_in)
+          if (ob(iob)%obtyp_in(in) == "ru") then
               ru_count = count(ob(iob)%obtyp_in == "ru")
           end if
-      end do
+        end do
+      end if
       
       if (allocated(ruid_array)) deallocate(ruid_array)
       allocate(ruid_array(ru_count))
@@ -142,9 +145,16 @@
       ht1 = ob(iob)%hd(1)
       do in = 1, ob(iob)%rcv_tot
           if (ob(iob)%obtyp_in(in) == "chandeg") then
-              trib1_temp = ob(iob)%hin_d(in-1)%temp
+              !! Q889: hin_d is 1-based (hyd_connect.f90:345), so at in = 1 there is no previous
+              !! hydrograph: trib1 is absent. Reading hin_d(0) made the result depend on the heap.
+              if (in > 1) then
+                trib1_temp = ob(iob)%hin_d(in-1)%temp
+                trib1_flo = ob(iob)%hin_d(in-1)%flo/86400
+              else
+                trib1_temp = 0.
+                trib1_flo = 0.
+              end if
               trib2_temp = ob(iob)%hin_d(in)%temp
-              trib1_flo = ob(iob)%hin_d(in-1)%flo/86400
               trib2_flo = ob(iob)%hin_d(in)%flo/86400
               trib_flo = trib1_flo + trib2_flo
               if (trib_flo < 1e-6) then             ! if it has tributaries but the flows are 0, estimate from old equation (to avoid division by 0)

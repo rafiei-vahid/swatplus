@@ -189,13 +189,11 @@
       !! --- dlopen libmf6.so privately + resolve symbols ---
       mf6_handle = c_dlopen(trim(mf6_lib)//c_null_char, RTLD_NOW_LOCAL)
       if (.not. c_associated(mf6_handle)) then
-        write (*,*) "MF6 COUPLER: dlopen failed for ", trim(mf6_lib)
-        return
+        call coupler_fatal("dlopen failed for "//trim(mf6_lib))
       end if
       call trace("init: dlopen OK")
       if (.not. bind_bmi()) then
-        write (*,*) "MF6 COUPLER: could not resolve BMI symbols in libmf6.so"
-        return
+        call coupler_fatal("could not resolve BMI symbols in "//trim(mf6_lib))
       end if
       call trace("init: BMI symbols resolved")
 
@@ -205,8 +203,7 @@
       istat = chdir(trim(mf6_ws))
       call trace("init: chdir to workspace done")
       if (istat /= 0) then
-        write (*,*) "MF6 COUPLER: cannot chdir to workspace ", trim(mf6_ws)
-        return
+        call coupler_fatal("cannot chdir to workspace "//trim(mf6_ws))
       end if
       call trace("init: calling MF6 BMI initialize()...")
       call fpe_off(halt_save)        !! engine runs -fpe0; MF6 handles Inf/NaN itself
@@ -217,9 +214,8 @@
       istat = chdir(trim(cwd0))
 
       if (ios /= 0) then
-        write (*,*) "MF6 COUPLER: BMI initialize FAILED, status=", ios
         mf6_active = .false.
-        return
+        call coupler_fatal("BMI initialize failed (see the MF6 listing in the workspace)")
       end if
       mf6_active = .true.
       mf6_daycount = 0
@@ -286,14 +282,13 @@
       end if
       open (newunit=iu, file="pfas_leach.map", status="old", action="read")
       read (iu,*,iostat=ios) nleach, nsrc
-      if (ios /= 0 .or. nleach <= 0) then; close(iu); return; end if
+      if (ios /= 0 .or. nleach <= 0) call coupler_fatal("pfas_leach.map header unreadable or count <= 0")
       n_leach = nleach; n_src = nsrc
       allocate (leach_src(n_leach), leach_hru(n_leach), leach_ov(n_leach))
       do e = 1, n_leach
         read (iu,*,iostat=ios) sidx, hru, ov
         if (ios /= 0) then
-          call trace("pfas-src: map truncated -> disabled"); close(iu)
-          deallocate (leach_src, leach_hru, leach_ov); return
+          call coupler_fatal("pfas_leach.map truncated (fewer rows than its header count)")
         end if
         leach_src(e) = sidx; leach_hru(e) = hru; leach_ov(e) = ov
       end do
@@ -302,8 +297,7 @@
       cptr = c_null_ptr
       ios = p_get_value_ptr_double(trim(src_addr)//c_null_char, cptr)
       if (ios /= 0 .or. .not. c_associated(cptr)) then
-        call trace("pfas-src: get_value_ptr_double failed for "//trim(src_addr))
-        deallocate (leach_src, leach_hru, leach_ov); return
+        call coupler_fatal("cannot bind MF6 variable "//trim(src_addr))
       end if
       call c_f_pointer(cptr, src_arr, [n_src])
       src_ready = .true.
@@ -332,14 +326,13 @@
       end if
       open (newunit=iu, file="mf6_recharge.map", status="old", action="read")
       read (iu,*,iostat=ios) nmap, nrch, ncolx, nhrux
-      if (ios /= 0 .or. nmap <= 0) then; close(iu); return; end if
+      if (ios /= 0 .or. nmap <= 0) call coupler_fatal("mf6_recharge.map header unreadable or count <= 0")
       n_map = nmap; n_rch = nrch
       allocate (map_idx(n_map), map_hru(n_map), map_w(n_map))
       do e = 1, n_map
         read (iu,*,iostat=ios) idx, hru, w
         if (ios /= 0) then
-          call trace("recharge: map truncated -> disabled"); close(iu)
-          deallocate (map_idx, map_hru, map_w); return
+          call coupler_fatal("mf6_recharge.map truncated (fewer rows than its header count)")
         end if
         map_idx(e) = idx; map_hru(e) = hru; map_w(e) = w
       end do
@@ -349,8 +342,7 @@
       cptr = c_null_ptr
       ios = p_get_value_ptr_double(trim(rch_addr)//c_null_char, cptr)
       if (ios /= 0 .or. .not. c_associated(cptr)) then
-        call trace("recharge: get_value_ptr_double failed for "//trim(rch_addr))
-        deallocate (map_idx, map_hru, map_w); return
+        call coupler_fatal("cannot bind MF6 variable "//trim(rch_addr))
       end if
       call c_f_pointer(cptr, rch_arr, [n_rch])
       rch_ready = .true.
@@ -388,8 +380,10 @@
         if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
         if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
         ios = p_do_time_step()
-        if (ios /= 0) write (*,*) "MF6 COUPLER: do_time_step failed day ", &
-                                  mf6_daycount, " status ", ios
+        if (ios /= 0) then
+          write (*,*) "MF6 COUPLER: do_time_step failed day ", mf6_daycount, " status ", ios
+          call coupler_fatal("MF6 do_time_step failed on a coupled day")
+        end if
         ios = p_finalize_time_step()
         if (bf_ready) call pull_baseflow      !! aggregate MF6 SFR baseflow -> channels
         if (pdis_ready) call pull_pfas_discharge  !! GW PFAS discharge -> channels
@@ -520,15 +514,14 @@
       end if
       open (newunit=iu, file="mf6_baseflow.map", status="old", action="read")
       read (iu,*,iostat=ios) nbf, nsfr
-      if (ios /= 0 .or. nbf <= 0) then; close(iu); return; end if
+      if (ios /= 0 .or. nbf <= 0) call coupler_fatal("mf6_baseflow.map header unreadable or count <= 0")
       n_bf = nbf; n_sfr = nsfr
       allocate (bf_reach(n_bf), bf_gis(n_bf))
       max_gis = 0
       do e = 1, n_bf
         read (iu,*,iostat=ios) rea, gis
         if (ios /= 0) then
-          call trace("baseflow: map truncated -> disabled"); close(iu)
-          deallocate (bf_reach, bf_gis); return
+          call coupler_fatal("mf6_baseflow.map truncated (fewer rows than its header count)")
         end if
         bf_reach(e) = rea; bf_gis(e) = gis
         if (gis > max_gis) max_gis = gis
@@ -538,8 +531,7 @@
       cptr = c_null_ptr
       ios = p_get_value_ptr_double(trim(gwf_addr)//c_null_char, cptr)
       if (ios /= 0 .or. .not. c_associated(cptr)) then
-        call trace("baseflow: get_value_ptr_double failed for "//trim(gwf_addr))
-        deallocate (bf_reach, bf_gis); return
+        call coupler_fatal("cannot bind MF6 variable "//trim(gwf_addr))
       end if
       call c_f_pointer(cptr, gwf_arr, [n_sfr])
       allocate (bf_chan(0:max_gis)); bf_chan = 0.0_c_double
@@ -657,6 +649,17 @@
       logical, intent(in) :: saved(:)
       call ieee_set_halting_mode(ieee_all, saved)
       end subroutine fpe_restore
+
+      subroutine coupler_fatal(msg)
+      !! Q1040(a): mf6.con requested MODFLOW 6 coupling and it cannot be delivered. Stop with a named
+      !! error and a non-zero status instead of continuing UNCOUPLED with a success status.
+      use iso_fortran_env, only : error_unit
+      character(len=*), intent(in) :: msg
+      write (*,'(a)') " MF6 COUPLER FATAL: "//msg
+      write (error_unit,'(a)') " MF6 COUPLER FATAL: "//msg
+      flush (error_unit)
+      error stop 2
+      end subroutine coupler_fatal
 
       subroutine trace(msg)
       !! unbuffered diagnostic to stderr (survives a hard crash)

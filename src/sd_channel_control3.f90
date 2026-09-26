@@ -456,6 +456,9 @@
       
       !! calculate stream temperature (component mixing model)
       call ch_temp
+      !! Q1019 (D6): hd(1) was copied at :439 BEFORE ch_temp, so downstream channels read the air regression.
+      !! Carry the simulated stream temperature to the outflow hydrograph that downstream objects receive.
+      ob(icmd)%hd(1)%temp = ht2%temp
       !! Q380. ch_temp has just written its answer to ch_out_d(ich)%temp. TWO whole-struct
       !! copies below (:472 and :540, ich = isdch) overwrite ch_out_d from ob(icmd)%hd(1),
       !! captured at :438 BEFORE ch_temp ran and carrying the air regression ch_watqual4 set

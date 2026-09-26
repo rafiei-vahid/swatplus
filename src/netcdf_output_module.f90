@@ -364,6 +364,7 @@
         do i = 1, s%nvar
           k = nc_hdr_col(fam, i, off, nval)
           if (k <= nval) then
+            call nc_hdr_override(fam, k, tn(nid + k), tu(nid + k))
             call nc_put_att_text(s%ncid, s%var_id(i), "long_name", trim(tn(nid + k)))
             call nc_put_att_text(s%ncid, s%var_id(i), "units", trim(tu(nid + k)))
           else
@@ -372,6 +373,31 @@
           end if
         end do
       end subroutine nc_stream_put_var_attrs
+
+      subroutine nc_hdr_override(fam, k, ln, un)
+        !! Q890: the ONLY labels not taken from the shared header tables. The text tables must keep
+        !! these tokens, because the SWAT+ Editor keys on them (its importer renames each "null" to
+        !! undefinedN and its output models declare undefined1..3 and aquifer orgn/orgp; SWAT+ Check
+        !! fails without them, measured 2026-09-26). The text labels are wrong for these columns:
+        !! "null" is the water temperature of the storage/inflow/outflow blocks, and aqu_hdr labels
+        !! aquifer_dynamic%cbn "orgn" and %orgn "orgp" (inherited from upstream). NetCDF is labelled
+        !! by what each column holds; every other column comes from the tables unchanged.
+        character(len=*), intent(in) :: fam
+        integer, intent(in) :: k
+        character(len=32), intent(inout) :: ln, un
+        !! Each entry applies only while the table still holds the token it corrects, so a table
+        !! that is ever reordered or fixed falls back to the table instead of being overwritten.
+        select case (fam)
+        case ("sdch")    !! hydrograph blocks start after the 4 water-body columns; temp is each block's 18th
+          if (trim(ln) /= "null") return
+          if (k == 22) then; ln = "temp_stor"; un = "degc"; end if
+          if (k == 40) then; ln = "temp_in";   un = "degc"; end if
+          if (k == 58) then; ln = "temp_out";  un = "degc"; end if
+        case ("aqu")
+          if (k == 9  .and. trim(ln) == "orgn") then; ln = "cbn";  un = "percent"; end if
+          if (k == 10 .and. trim(ln) == "orgp") then; ln = "orgn"; un = "kg/ha_N"; end if
+        end select
+      end subroutine nc_hdr_override
 
       integer function nc_hdr_col(fam, i, off, nval)
         !! Q890: the header-table value column that labels NetCDF variable i of a family.

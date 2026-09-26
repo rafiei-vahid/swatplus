@@ -150,6 +150,10 @@
             if (tave > 0.) phu0 = phu0 + tave
           end do
           iday_sh = 181
+          !! Q1021: igrow is assigned below only for annual (:198/:200) and "null" (:210-236) plant types;
+          !! for every other type the :241 heat-unit loop read it uninitialised. 0 = today's zero-init behaviour,
+          !! made explicit; the intended start day is a separate model question.
+          igrow = 0
 
           ! if days to maturity are not input (0) - assume the plant is potentially active during entire growing season
           if (pldb(idp)%days_mat < 1.e-6 .and. pldb(idp)%days_mat > -1.e-6) then

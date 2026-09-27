@@ -64,8 +64,12 @@
           !! checked). It could never fit the file on any compiler either: the type's 54th item is res_part_fracs, while the
           !! file's 54th column is the description. Parsing a single record also stops a short or malformed row from
           !! running on into the next one. Any failure now STOPS the run and names the row.
-          read (104,'(a)',iostat=eof) plrec
+          read (104,'(a)',iostat=eof,iomsg=plmsg) plrec
           if (eof < 0) exit
+          if (eof > 0) then     !! an I/O error on the record itself must stop too, never reuse the previous record (Lane S)
+            write (*,'(a,i5,a,i6,2a)') ' plants.plt row ', ic, ': record read iostat ', eof, ' -- ', trim(plmsg)
+            error stop 'plants.plt: a record could not be read (Q1072)'
+          end if
           if (plrec(len(plrec):len(plrec)) /= ' ') then
             write (*,'(a,i5,a,i6,a)') ' plants.plt row ', ic, ' is longer than ', len(plrec), ' characters (Q1072)'
             error stop 'plants.plt: a record is longer than the read buffer'

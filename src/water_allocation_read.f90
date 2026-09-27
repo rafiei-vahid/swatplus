@@ -191,7 +191,8 @@
       
       !! read water allocation POD inputs
       inquire (file=in_wallo%pod, exist=i_exist)
-      if (.not. i_exist .or. in_wallo%pod /= "null") then
+      !! Q1049 fork fix J1, second instance (the POD reader has the POU reader's inverted test): read only when it exists
+      if (i_exist .and. in_wallo%pod /= "null") then
       do 
         open (107,file=in_wallo%pod)
         read (107,*,iostat=eof) titldum

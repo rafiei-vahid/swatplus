@@ -137,6 +137,7 @@
       hpc_d(j) = hpcz
       hscf_d(j) = hscfz
       hru(j)%water_seep = 0.
+      hru(j)%water_evap = 0.
       irrig(j)%demand = 0.
       hnb_d(j)%nuptake = 0.
       hnb_d(j)%puptake = 0.
@@ -748,10 +749,10 @@
           gwflow_perc(j) = sepbtm(j)
         end if
         !! add evap from impounded water (wetland) to et and esoil
-        hwb_d(j)%et = etday + hru(j)%water_evap
+        hwb_d(j)%et = etday     !es_day already includes ponded water evaporation
         hwb_d(j)%ecanopy = canev
         hwb_d(j)%eplant = ep_day
-        hwb_d(j)%esoil = es_day + hru(j)%water_evap 
+        hwb_d(j)%esoil = es_day
         hwb_d(j)%wet_evap = hru(j)%water_evap 
         hwb_d(j)%wet_out = wet_outflow
         hwb_d(j)%wet_stor = wet(j)%flo / (10. * hru(j)%area_ha)

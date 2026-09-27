@@ -15,7 +15,7 @@
         ch_morph_ordm(iord) = ch_morph_ordm(iord) + ch_morph_ord(iord)
         
         !! daily print
-        if (pco%sd_chan%d == "y") then
+        if (pco%sd_chan%d == "y" .and. pco%sedbud_txt == "y") then
             write (3161,*) time%day, time%mo, time%day_mo, time%yrc, iord, ch_morph_ord(iord)
 
           if (pco%csvout == "y") then
@@ -31,7 +31,7 @@
           !! add into the yearly total
           ch_morph_ordy(iord) = ch_morph_ordy(iord) + ch_morph_ordm(iord)   
 
-          if (pco%sd_chan%m == "y") then
+          if (pco%sd_chan%m == "y" .and. pco%sedbud_txt == "y") then
           write (3162,*) time%day, time%mo, time%day_mo, time%yrc, iord, ch_morph_ordm(iord)
  
           if (pco%csvout == "y") then
@@ -49,7 +49,7 @@
         !! add into the yearly total
         ch_morph_ordy(iord) =  ch_morph_ordy(iord) + ch_morph_ordm(iord)
           
-        if (pco%sd_chan%y == "y") then
+        if (pco%sd_chan%y == "y" .and. pco%sedbud_txt == "y") then
           write (3163,*) time%day, time%mo, time%day_mo, time%yrc, iord, ch_morph_ordy(iord)
   
               if (pco%csvout == "y") then
@@ -71,7 +71,7 @@
         !! convert the accumulated total to an average annual value
         ch_morph_orda(iord) = ch_morph_orda(iord) / time%yrs_prt
 
-        if (pco%sd_chan%a == "y") then
+        if (pco%sd_chan%a == "y" .and. pco%sedbud_txt == "y") then
         write (3164,*) time%day, time%mo, time%day_mo, time%yrc, iord, ch_morph_orda(iord)
 
         if (pco%csvout == "y") then

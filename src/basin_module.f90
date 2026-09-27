@@ -172,6 +172,8 @@
                                                      !!  in the row (1st column) to identify name of the print object 
 
         character(len=1) :: cdfout   = "n"            !!  code to print netcdf (cdf) files n=no print; y=print;
+        character(len=1) :: sedbud_txt = "y"          !!  Q1049 fork fix: upstream's sediment-budget text outputs
+                                                     !!  (sedbud_*, ch_sedbud_*, chanbud_order_*); "n" in cdfout mode
       ! OTHER OUTPUTS
         !!   nbs   character(len=1) :: snutc  = "    n"         !!  not used - soils nutrients carbon output (default ave annual-d,m,y,a input)
         character(len=1) :: crop_yld  = "a"      !!  crop yields - a=average annual; y=yearly; b=both annual and yearly; n=no print

@@ -35,6 +35,9 @@
         pco%res%d = "n"; pco%res%m = "n"; pco%res%y = "n"; pco%res%a = "n"
         pco%hyd%d = "n"; pco%hyd%m = "n"; pco%hyd%y = "n"; pco%hyd%a = "n"
         pco%ru%d = "n"; pco%ru%m = "n"; pco%ru%y = "n"; pco%ru%a = "n"
+        !! Q1049 fork fix (Lane P ruling F-a): upstream's sediment-budget writers (units 3152-3178) are gated only on
+        !! pco%sd_chan, which stays on here for channel_sd NetCDF, and their units are never opened -> fort.<N>
+        pco%sedbud_txt = "n"
       else
       call output_landscape_init
       call header_channel

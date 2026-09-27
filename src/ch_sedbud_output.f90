@@ -17,7 +17,7 @@
         ch_morphm(ichan) = ch_morphm(ichan) + ch_morph(ichan)
         
         !! daily print
-        if (pco%sd_chan%d == "y") then
+        if (pco%sd_chan%d == "y" .and. pco%sedbud_txt == "y") then
           write (3171,*) time%day, time%mo, time%day_mo, time%yrc, ichan, &
             ob(iob)%gis_id, ob(iob)%name, ch_morph(ichan)
 
@@ -35,7 +35,7 @@
           !! add into the yearly total
           ch_morphy(ichan) = ch_morphy(ichan) + ch_morphm(ichan)
 
-          if (pco%sd_chan%m == "y") then
+          if (pco%sd_chan%m == "y" .and. pco%sedbud_txt == "y") then
           write (3172,*) time%day, time%mo, time%day_mo, time%yrc, ichan, &
             ob(iob)%gis_id, ob(iob)%name, ch_morphm(ichan)
  
@@ -55,7 +55,7 @@
         !! add into the yearly total
         ch_morphy(ichan) =  ch_morphy(ichan) + ch_morphm(ichan)
           
-        if (pco%sd_chan%y == "y") then
+        if (pco%sd_chan%y == "y" .and. pco%sedbud_txt == "y") then
           write (3173,*) time%day, time%mo, time%day_mo, time%yrc, ichan, &
             ob(iob)%gis_id, ob(iob)%name, ch_morphy(ichan)
   
@@ -79,7 +79,7 @@
         !! convert the accumulated total to an average annual value
         ch_morpha(ichan) = ch_morpha(ichan) / time%yrs_prt
 
-        if (pco%sd_chan%a == "y") then
+        if (pco%sd_chan%a == "y" .and. pco%sedbud_txt == "y") then
         write (3174,*) time%day, time%mo, time%day_mo, time%yrc, ichan, &
           ob(iob)%gis_id, ob(iob)%name, ch_morpha(ichan)
 

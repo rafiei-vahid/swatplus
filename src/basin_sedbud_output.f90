@@ -9,7 +9,7 @@
         bsn_sedbudm = bsn_sedbudm + bsn_sedbud
         
         !! daily print
-        if (pco%sd_chan%d == "y") then
+        if (pco%sd_chan%d == "y" .and. pco%sedbud_txt == "y") then
           write (3152,*) time%day, time%mo, time%day_mo, time%yrc, bsn_sedbud
 
           if (pco%csvout == "y") then
@@ -25,7 +25,7 @@
           !! add into the yearly total
           bsn_sedbudy = bsn_sedbudy + bsn_sedbudm
 
-          if (pco%sd_chan%m == "y") then
+          if (pco%sd_chan%m == "y" .and. pco%sedbud_txt == "y") then
           write (3153,*) time%day, time%mo, time%day_mo, time%yrc, bsn_sedbudm
  
           if (pco%csvout == "y") then
@@ -43,7 +43,7 @@
         !! add into the yearly total
         bsn_sedbudy =  bsn_sedbudy + bsn_sedbudm
           
-        if (pco%sd_chan%y == "y") then
+        if (pco%sd_chan%y == "y" .and. pco%sedbud_txt == "y") then
           write (3154,*) time%day, time%mo, time%day_mo, time%yrc, bsn_sedbudy
   
               if (pco%csvout == "y") then
@@ -65,7 +65,7 @@
         !! convert the accumulated total to an average annual value
         bsn_sedbuda = bsn_sedbuda / time%yrs_prt
 
-        if (pco%sd_chan%a == "y") then
+        if (pco%sd_chan%a == "y" .and. pco%sedbud_txt == "y") then
         write (3155,*) time%day, time%mo, time%day_mo, time%yrc, bsn_sedbuda
 
         if (pco%csvout == "y") then

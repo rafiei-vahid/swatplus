@@ -568,6 +568,7 @@
            write(100100,'(4(I6,","),20(f20.1,","))') time%yrc,time%mo,time%day_mo,j,w%precip,irrig(j)%applied,hru(j)%water_seep,     &
             pet_day,es_day,ep_day,wet_ob(j)%weir_hgt*1000,wet_ob(j)%depth*1000.,ht2%flo/(hru(j)%area_ha*10.),soil(j)%sw,sedppm,ht2%sed*1000, &
             wet(j)%no3,ht2%no3,pcom(j)%lai_sum,saltcon,soil(j)%sw/soil(j)%sumfc*100 
+            !$omp end critical (paddy_dbg_out)
             end if
           end if
         end if

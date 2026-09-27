@@ -75,6 +75,14 @@
         !! add incoming flow to reservoir
         res(jres) = res(jres) + ht1
 
+        !! Q1049 fork fix (Lane P ruling, bus 09:34): upstream 109179b deleted these four assignments while the reads
+        !! below stayed, so the reservoir's monthly inflow memory (I_mon_past, d_mon_past, read by res_hydro's release
+        !! rule) never updated. Restored at their v1.0-51 position, before any POD withdrawal.
+        dom          = time%day_mo
+        mon          = time%mo
+        end_of_mo    = time%end_mo
+        daily_inflow = ht1%flo
+
         !! if channel is a POD, allocate water for users and adjust flow in channel accordingly
         if (res_ob(jres)%wallo_pod > 0) then
           call wallo_control (res_ob(jres)%wallo_pod)

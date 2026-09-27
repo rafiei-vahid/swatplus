@@ -35,7 +35,9 @@
       
       !! read water allocation POU inputs
       inquire (file=in_wallo%pou, exist=i_exist)
-      if (.not. i_exist .or. in_wallo%pou /= "null") then
+      !! Q1049 fork fix J1 (Lane P ruling JUNK (a)): upstream's test entered the read loop when the file was ABSENT, and
+      !! the default-status open then created it (a file literally named "null" in models that set it to null)
+      if (i_exist .and. in_wallo%pou /= "null") then
       do 
         open (107,file=in_wallo%pou)
         read (107,*,iostat=eof) titldum

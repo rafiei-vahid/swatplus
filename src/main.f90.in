@@ -9,6 +9,7 @@
       use netcdf_output_module, only: netcdf_output_finish
       use mf6_coupler, only: mf6_coupler_finalize
       use sched_conflict_module, only: sched_audit_requested, sched_conflict_report
+      use reservoir_data_module, only: wet_dat_c     !! Q1049 fork fix J3: the paddy debug-file gate
 
       implicit none
       
@@ -180,8 +181,12 @@
       time_init = time
       !if (bsn_cc%uhyd==1)then
  
+      !! Q1049 fork fix J3 (Lane P ruling JUNK (a)): upstream opens this debug file on every run (v1.0-51 had it commented
+      !! out). Open it only when a wetland record is a paddy; hru_control's unit-100100 write needs a paddy record too.
+      if (any(wet_dat_c%hyd == 'paddy')) then
 	   open(100100,file="paddy_test.csv") !temporary output for paddy Jaehak 2022 
       write(100100,'(4a7,20a21)')"Year,","Mon,","Day,","HRU,","Precip,","Irrig,","Seep,","PET,","ES,","EP,","WeirH,","Wtrdep,","WeirQ,","SW,","Sedcon,","SedYld,","NO3Con,","NO3Yld,","LAI,","SALT,","SW%" 
+      end if
 
       !! simulate watershed processes
       if (time%step < 0) then

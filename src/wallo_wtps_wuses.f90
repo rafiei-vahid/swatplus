@@ -22,7 +22,9 @@
       
       !! read water allocation inputs
       inquire (file='wtps_wuses.wal', exist=i_exist)
-      if (i_exist .or. 'wtps_wuses.wal' /= "null") then
+      !! Q1049 fork fix J2 (Lane P ruling JUNK (a)): upstream compared two literals (always true), so the default-status
+      !! open created an EMPTY wtps_wuses.wal in every run dir; read it only when it exists
+      if (i_exist) then
       do 
         open (107,file='wtps_wuses.wal')
         read (107,*,iostat=eof) titldum

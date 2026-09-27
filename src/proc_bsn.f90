@@ -18,7 +18,11 @@
      call open_output_file(9001, "diagnostics.out", 8000)  !!ext to 8000 recl per email 8/2/21 - Kai-Uwe
      write (9001,*) "DIAGNOSTICS.OUT FILE" 
 !!!  open drainage areas output file
-     call open_output_file(9004, "area_calc.out", 80000)
+     !! Q1049 fork fix J4 (Lane P ruling J4-a): hyd_connect writes one list-directed record per object, and an object with
+     !! ~1,400+ inflows needs ~110-130 KB. At RECL 80000 gfortran STOPS ("End of record") and ifx wraps silently (37 of 223
+     !! served models). 2**24 is > 100x the longest measured record and keeps a bounded record buffer (a larger RECL, or no
+     !! RECL, which makes ifx wrap list-directed output at its short default, are both avoided on purpose).
+     call open_output_file(9004, "area_calc.out", 16777216)
                 
       call basin_read_cc
       call basin_read_objs

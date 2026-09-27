@@ -118,8 +118,9 @@
             write (*,'(2a)') ' record: ', trim(plrec)
             error stop 'plants.plt: a row could not be read (Q1072)'
           end if
-          pldb(ic)%days_mat = nint(days_mat_r)
-          pldb(ic)%mat_yrs = nint(mat_yrs_r)
+          !! int() truncates, as ifx's own integer read of "110.99999" does: production parity, not rounding (Lane S)
+          pldb(ic)%days_mat = int(days_mat_r)
+          pldb(ic)%mat_yrs = int(mat_yrs_r)
           if (plcols == 57) then
             read (plrec,*,iostat=ios,iomsg=plmsg) cdum, rdum, pldb(ic)%res_part_fracs%meta_frac,                       &
               pldb(ic)%res_part_fracs%str_frac, pldb(ic)%res_part_fracs%lig_frac

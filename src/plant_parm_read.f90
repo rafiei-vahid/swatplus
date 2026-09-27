@@ -70,11 +70,11 @@
         !! lignin columns the old whole-type read took into res_part_fracs. Any other count is a layout this reader does
         !! not know, so it stops rather than guess.
         plcols = 0
-        do k = 1, len_trim(plhdr)
-          if (plhdr(k:k) /= ' ' .and. plhdr(k:k) /= char(9)) then
+        do k = 1, len_trim(plhdr)     !! blank, tab and carriage return separate columns (upstream's refdata is CRLF)
+          if (plhdr(k:k) /= ' ' .and. plhdr(k:k) /= char(9) .and. plhdr(k:k) /= char(13)) then
             if (k == 1) then
               plcols = plcols + 1
-            else if (plhdr(k-1:k-1) == ' ' .or. plhdr(k-1:k-1) == char(9)) then
+            else if (plhdr(k-1:k-1) == ' ' .or. plhdr(k-1:k-1) == char(9) .or. plhdr(k-1:k-1) == char(13)) then
               plcols = plcols + 1
             end if
           end if

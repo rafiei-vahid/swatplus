@@ -22,6 +22,10 @@
       real :: days_mat_r              !           |days_mat as the editor writes it, a real (Q1072)
       real :: mat_yrs_r               !           |yrs_mat as the editor writes it, a real (Q1072)
       integer :: ios                  !           |iostat of the record parse (Q1072)
+      character (len=4000) :: plhdr   !           |the header record; its column count decides the layout (Q1072)
+      integer :: plcols               !           |header columns: 54 (53 values + description) or 57 (+ 3 lignin) (Q1072)
+      integer :: k                    !           |character / column counter (Q1072)
+      real :: rlig(3)                 !           |lignin columns skipped when reading pl_class on the 57 layout (Q1072)
 
       
       eof = 0
@@ -54,8 +58,32 @@
         rewind (104)
         read (104,*,iostat=eof) titldum
         if (eof < 0) exit
-        read (104,*,iostat=eof) header
+        read (104,'(a)',iostat=eof,iomsg=plmsg) plhdr
         if (eof < 0) exit
+        if (eof > 0) then
+          write (*,'(a,i6,2a)') ' plants.plt header: record read iostat ', eof, ' -- ', trim(plmsg)
+          error stop 'plants.plt: the header could not be read (Q1072)'
+        end if
+        if (plhdr(len(plhdr):len(plhdr)) /= ' ') error stop 'plants.plt: the header is longer than the read buffer (Q1072)'
+        !! Q1072: the header decides the layout. 54 columns = 53 values + description (the editor); 57 = 53 values +
+        !! avg_lig_frac, ab_lig_frac, bg_lig_frac + description (upstream's refdata/Ames_sub1, carbon = 2), whose three
+        !! lignin columns the old whole-type read took into res_part_fracs. Any other count is a layout this reader does
+        !! not know, so it stops rather than guess.
+        plcols = 0
+        do k = 1, len_trim(plhdr)
+          if (plhdr(k:k) /= ' ' .and. plhdr(k:k) /= char(9)) then
+            if (k == 1) then
+              plcols = plcols + 1
+            else if (plhdr(k-1:k-1) == ' ' .or. plhdr(k-1:k-1) == char(9)) then
+              plcols = plcols + 1
+            end if
+          end if
+        end do
+        if (plcols /= 54 .and. plcols /= 57) then
+          write (*,'(a,i5,a)') ' plants.plt header has ', plcols, &
+            ' columns; this reader knows 54 (53 values + description) and 57 (+ avg/ab/bg_lig_frac) (Q1072)'
+          error stop 'plants.plt: unknown column layout (Q1072)'
+        end if
         
         do ic = 1, imax
           !! Q1072: read the row as ONE record, then parse its 53 values from that string. The old list-directed read of
@@ -63,7 +91,8 @@
           !! ("110.00000"), and it silently kept every later item at its type default (iostat 5010, only eof < 0 was
           !! checked). It could never fit the file on any compiler either: the type's 54th item is res_part_fracs, while the
           !! file's 54th column is the description. Parsing a single record also stops a short or malformed row from
-          !! running on into the next one. Any failure now STOPS the run and names the row.
+          !! running on into the next one. Any failure now STOPS the run and names the row. On the 57-column layout the three
+          !! lignin columns (54-56) are read into res_part_fracs as the old read did; on 54 they keep the type defaults.
           read (104,'(a)',iostat=eof,iomsg=plmsg) plrec
           if (eof < 0) exit
           if (eof > 0) then     !! an I/O error on the record itself must stop too, never reuse the previous record (Lane S)
@@ -91,8 +120,18 @@
           end if
           pldb(ic)%days_mat = nint(days_mat_r)
           pldb(ic)%mat_yrs = nint(mat_yrs_r)
+          if (plcols == 57) then
+            read (plrec,*,iostat=ios,iomsg=plmsg) cdum, rdum, pldb(ic)%res_part_fracs%meta_frac,                       &
+              pldb(ic)%res_part_fracs%str_frac, pldb(ic)%res_part_fracs%lig_frac
+            if (ios /= 0) then
+              write (*,'(a,i5,a,i6,2a)') ' plants.plt row ', ic, ' lignin columns 54-56: iostat ', ios, ' -- ', trim(plmsg)
+              write (*,'(2a)') ' record: ', trim(plrec)
+              error stop 'plants.plt: the lignin columns (54-56) could not be read (Q1072)'
+            end if
+          end if
           if (bsn_cc%nam1 /= 0) then
-            read (plrec,*,iostat=ios,iomsg=plmsg) cdum, rdum, pl_class(ic)
+            !! the plant class is the description column, 54 or 57: the token the old read gave pl_class on 57 (Q1072)
+            read (plrec,*,iostat=ios,iomsg=plmsg) cdum, rdum, (rlig(k), k = 1, plcols - 54), pl_class(ic)
             if (ios /= 0) then
               write (*,'(a,i5,a,i6,2a)') ' plants.plt row ', ic, ' plant class: iostat ', ios, ' -- ', trim(plmsg)
               error stop 'plants.plt: the plant class column could not be read (Q1072)'

@@ -63,12 +63,11 @@
       integer :: ihyd !              |
       integer :: idr !              |
       integer :: iwro !              |
+      integer :: ipou !              |place of use counter (upstream POU/POD output loop)
       real :: conv !              |
       real :: frac_in !              |
       integer :: ts1
       integer :: ts2
-      integer :: iw !              |counter for water allocation object
-      integer :: iwallo !              |variable to pass to wallo_control
       integer :: i_count !rtb gwflow
       integer :: i_mfl !rtb gwflow    |counter
       integer :: i_chan !rtb gwflow    |counter
@@ -89,8 +88,6 @@
       external :: command_object
 
       icmd = sp_ob1%objs
-      wallo(:)%trn_cur = 1
-      if (allocated(res_ob)) res_ob(:)%wallo_call = 0
 
       !! swatplus_perf: per-object body moved to reentrant command_object(ic).
       !! Walk drives it serially here; the parallel HRU wavefront (added next)
@@ -113,8 +110,10 @@
       n_threads = 1
 !$    n_threads = omp_get_max_threads()
 
+      !! Q1049 sync: upstream's POU/POD water allocation no longer sets db_mx%wallo_db (it counts POUs and PODs
+      !! in wallo_pou / wallo_pod), so the guard that keeps water-allocation models out of the parallel wave reads those.
       use_objwave = (n_threads > 1 .and. hru_wave_ready .and. obj_nwave > 0 .and.          &
-                     db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
+                     db_mx%wallo_pou == 0 .and. db_mx%wallo_pod == 0 .and. db_mx%mallo_db == 0 .and. bsn_cc%gwflow == 0)
 
       !! swatplus_perf: SWATPLUS_ROUTING_SERIAL=1 forces the byte-identical configuration --
       !! HRU land phase parallel, channel routing serial (command order). Use this when in-stream
@@ -192,7 +191,7 @@
         !! Fallback: HRU land phase wave (parallel) + serial routing walk. Handles
         !! wallo/mallo/gwflow models, which the full-DAG wave cannot reorder safely.
         use_wave = (n_threads > 1 .and. hru_wave_ready .and. hru_nwave > 0 .and.  &
-                    db_mx%wallo_db == 0 .and. db_mx%mallo_db == 0)
+                    db_mx%wallo_pou == 0 .and. db_mx%wallo_pod == 0 .and. db_mx%mallo_db == 0)
         if (use_wave) then
           !$omp parallel default(shared) private(k, lev)
           do lev = 1, hru_nwave
@@ -221,15 +220,22 @@
       !! print all output files
       if (time%yrs > pco%nyskip) then
       
+        !! print sediment budget output (only when channels exist)
+        if (sp_ob%chandeg > 0) then
+          call basin_sedbud_output
+        
+          !! print basin channel morphology output
+          call ch_sedbud_output
+          call chord_sedbud_output
+        end if
+        
         !! print water allocation output
-        do iwro =1, db_mx%wallo_db
-          call wallo_allo_output (iwro)
-          call wallo_trn_output (iwro)
-          call wallo_treat_output (iwro)
-          call wallo_use_output (iwro)
-          !call wallo_osrc_output (iwro)
-          !call wallo_odmd_output (iwro)
+        do ipou =1, db_mx%wallo_pou
+          call wallo_pou_output (ipou)
         end do
+        !! print amount treated and used
+        call wallo_treat_output
+        call wallo_use_output
         
         !! print manure allocation output
         do iwro =1, db_mx%mallo_db

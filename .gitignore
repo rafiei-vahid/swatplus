@@ -120,3 +120,4 @@ ford.md
 build_*/
 scratch/
 __pycache__/
+enc_temp_folder/

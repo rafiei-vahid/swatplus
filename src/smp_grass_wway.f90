@@ -58,13 +58,16 @@
       real :: depnet !metric tons   |
       real :: deg !metric tons   |sediment reentrained in water by channel
                                      !              |degradation
-      real :: dep !              |
-      real :: sedout !mg            | Sediment out of waterway channel
-      real :: sed_frac !              |
-      real :: surq_frac !              |
-      real :: sedtrap !              | 
-      real :: xrem !              | 
-      integer :: k !m^3/s         |Total number of HRUs plus this HRU number
+      real :: dep  !              |
+      real :: sedout  !mg            | Sediment out of waterway channel
+      real :: sed_frac  !              |
+      real :: surq_frac  !              |
+      real :: sedtrap  !              | 
+      real :: xrem  !              |
+      real :: filt_surq  !              | 
+      real :: filt_sed  !              
+      
+      integer :: k  !m^3/s         |Total number of HRUs plus this HRU number
       
       !!  set variables
       j = ihru
@@ -219,9 +222,19 @@
         sagyld(j) = Max(0., sagyld(j))
         lagyld(j) = Max(0., lagyld(j))
 
+!! Calculate pesticide removal 
+!! based on the sediment and runoff removal only
+!! BUG FIX: return filtered pesticide mass to soil surface layer
+!! Previously, filtered mass was removed from hpestb_d but never returned
+!! to cs_soil — creating a mass leak (pest_lch already removed it from cs_soil)
         !! Calculate pesticide removal 
         !! based on the sediment and runoff removal only
         do k = 1, cs_db%num_pests
+          filt_surq = hpestb_d(j)%pest(k)%surq * (1. - surq_frac)
+          filt_sed  = hpestb_d(j)%pest(k)%sed  * (sed_remove / 100.)
+          hpestb_d(j)%pest(k)%surq = hpestb_d(j)%pest(k)%surq - filt_surq
+          hpestb_d(j)%pest(k)%sed  = hpestb_d(j)%pest(k)%sed  - filt_sed
+          cs_soil(j)%ly(1)%pest(k) = cs_soil(j)%ly(1)%pest(k) + filt_surq + filt_sed
           hpestb_d(j)%pest(k)%surq = hpestb_d(j)%pest(k)%surq * surq_frac
           hpestb_d(j)%pest(k)%sed = hpestb_d(j)%pest(k)%sed * (1. - sed_remove / 100.)
         end do

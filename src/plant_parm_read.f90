@@ -15,7 +15,14 @@
       integer :: imax !none       |determine max number for array (imax) and total number in file
       integer :: mpl !           | 
       logical :: i_exist              !none       |check to determine if file exists
-      
+      character (len=4000) :: plrec   !           |one plants.plt record, parsed on its own (Q1072)
+      character (len=200) :: plmsg    !           |iomsg of a failed parse (Q1072)
+      character (len=40) :: cdum(3)   !           |text columns skipped when reading pl_class (Q1072)
+      real :: rdum(50)                !           |numeric columns skipped when reading pl_class (Q1072)
+      real :: days_mat_r              !           |days_mat as the editor writes it, a real (Q1072)
+      real :: mat_yrs_r               !           |yrs_mat as the editor writes it, a real (Q1072)
+      integer :: ios                  !           |iostat of the record parse (Q1072)
+
       
       eof = 0
       imax = 0
@@ -51,12 +58,42 @@
         if (eof < 0) exit
         
         do ic = 1, imax
-          if (bsn_cc%nam1 == 0) then
-            read (104,*,iostat=eof) pldb(ic)
-          else
-            read (104,*,iostat=eof) pldb(ic), pl_class(ic)
-          end if
+          !! Q1072: read the row as ONE record, then parse its 53 values from that string. The old list-directed read of
+          !! the whole plant_db stopped at item 5 under gfortran, because the editor writes days_mat and yrs_mat as reals
+          !! ("110.00000"), and it silently kept every later item at its type default (iostat 5010, only eof < 0 was
+          !! checked). It could never fit the file on any compiler either: the type's 54th item is res_part_fracs, while the
+          !! file's 54th column is the description. Parsing a single record also stops a short or malformed row from
+          !! running on into the next one. Any failure now STOPS the run and names the row.
+          read (104,'(a)',iostat=eof) plrec
           if (eof < 0) exit
+          if (plrec(len(plrec):len(plrec)) /= ' ') then
+            write (*,'(a,i5,a,i6,a)') ' plants.plt row ', ic, ' is longer than ', len(plrec), ' characters (Q1072)'
+            error stop 'plants.plt: a record is longer than the read buffer'
+          end if
+          read (plrec,*,iostat=ios,iomsg=plmsg) pldb(ic)%plantnm, pldb(ic)%typ, pldb(ic)%trig, pldb(ic)%nfix_co,      &
+            days_mat_r, pldb(ic)%bio_e, pldb(ic)%hvsti, pldb(ic)%blai, pldb(ic)%frgrw1, pldb(ic)%laimx1,                  &
+            pldb(ic)%frgrw2, pldb(ic)%laimx2, pldb(ic)%dlai, pldb(ic)%dlai_rate, pldb(ic)%chtmx, pldb(ic)%rdmx,           &
+            pldb(ic)%t_opt, pldb(ic)%t_base, pldb(ic)%cnyld, pldb(ic)%cpyld, pldb(ic)%pltnfr1, pldb(ic)%pltnfr2,          &
+            pldb(ic)%pltnfr3, pldb(ic)%pltpfr1, pldb(ic)%pltpfr2, pldb(ic)%pltpfr3, pldb(ic)%wsyf, pldb(ic)%usle_c,       &
+            pldb(ic)%gsi, pldb(ic)%vpdfr, pldb(ic)%gmaxfr, pldb(ic)%wavp, pldb(ic)%co2hi, pldb(ic)%bioehi,                &
+            pldb(ic)%rsdco_pl, pldb(ic)%alai_min, pldb(ic)%laixco_tree, mat_yrs_r, pldb(ic)%bmx_peren,                    &
+            pldb(ic)%ext_coef, pldb(ic)%leaf_tov_min, pldb(ic)%leaf_tov_max, pldb(ic)%bm_dieoff, pldb(ic)%rsr1,           &
+            pldb(ic)%rsr2, pldb(ic)%pop1, pldb(ic)%frlai1, pldb(ic)%pop2, pldb(ic)%frlai2, pldb(ic)%frsw_gro,             &
+            pldb(ic)%aeration, pldb(ic)%rsd_pctcov, pldb(ic)%rsd_covfac
+          if (ios /= 0) then
+            write (*,'(a,i5,a,i6,2a)') ' plants.plt row ', ic, ': iostat ', ios, ' -- ', trim(plmsg)
+            write (*,'(2a)') ' record: ', trim(plrec)
+            error stop 'plants.plt: a row could not be read (Q1072)'
+          end if
+          pldb(ic)%days_mat = nint(days_mat_r)
+          pldb(ic)%mat_yrs = nint(mat_yrs_r)
+          if (bsn_cc%nam1 /= 0) then
+            read (plrec,*,iostat=ios,iomsg=plmsg) cdum, rdum, pl_class(ic)
+            if (ios /= 0) then
+              write (*,'(a,i5,a,i6,2a)') ' plants.plt row ', ic, ' plant class: iostat ', ios, ' -- ', trim(plmsg)
+              error stop 'plants.plt: the plant class column could not be read (Q1072)'
+            end if
+          end if
           pldb(ic)%mat_yrs = Max (1, pldb(ic)%mat_yrs)
           if (bsn_cc%cswat == 2) then
             cswat_1_part_fracs(ic)%lig_frac_blg = pldb(ic)%res_part_fracs%lig_frac

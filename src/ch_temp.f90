@@ -34,6 +34,7 @@
       real :: h_atm
       real :: numerator
       real :: t_equil
+      real :: m_step                      !none |Q403: dimensionless relaxation step k_e*rttime/k_factor
       real :: k_factor
       real :: t_heat_exch
       real :: dep_chan
@@ -123,11 +124,14 @@
       ru_count = 0
       ru_index = 1
 
-      do in = 1, size(ob(iob)%obtyp_in)
-          if (allocated(ob(iob)%obtyp_in) .and. ob(iob)%obtyp_in(in) == "ru") then
+      !! Q889: test allocated() BEFORE size(); size() of an unallocated array is undefined
+      if (allocated(ob(iob)%obtyp_in)) then
+        do in = 1, size(ob(iob)%obtyp_in)
+          if (ob(iob)%obtyp_in(in) == "ru") then
               ru_count = count(ob(iob)%obtyp_in == "ru")
           end if
-      end do
+        end do
+      end if
       
       if (allocated(ruid_array)) deallocate(ruid_array)
       allocate(ruid_array(ru_count))
@@ -141,9 +145,16 @@
       ht1 = ob(iob)%hd(1)
       do in = 1, ob(iob)%rcv_tot
           if (ob(iob)%obtyp_in(in) == "chandeg") then
-              trib1_temp = ob(iob)%hin_d(in-1)%temp
+              !! Q889: hin_d is 1-based (hyd_connect.f90:345), so at in = 1 there is no previous
+              !! hydrograph: trib1 is absent. Reading hin_d(0) made the result depend on the heap.
+              if (in > 1) then
+                trib1_temp = ob(iob)%hin_d(in-1)%temp
+                trib1_flo = ob(iob)%hin_d(in-1)%flo/86400
+              else
+                trib1_temp = 0.
+                trib1_flo = 0.
+              end if
               trib2_temp = ob(iob)%hin_d(in)%temp
-              trib1_flo = ob(iob)%hin_d(in-1)%flo/86400
               trib2_flo = ob(iob)%hin_d(in)%flo/86400
               trib_flo = trib1_flo + trib2_flo
               if (trib_flo < 1e-6) then             ! if it has tributaries but the flows are 0, estimate from old equation (to avoid division by 0)
@@ -442,7 +453,32 @@
       rttime = sd_ch_vel(ich)%rttime / 24   !routing time in days
               
       k_factor = 1000. * 4186. * dep_flow / 86400       ! E: Density*Spec_heat_water*water_depth / time_convers 
-      t_heat_exch = k_e * (t_equil - tw_init) / k_factor * rttime
+
+      !! Q403. The line below used to be an EXPLICIT (forward-Euler) step of an equilibrium
+      !! relaxation:  t_heat_exch = k_e * (t_equil - tw_init) / k_factor * rttime
+      !! Its dimensionless step factor is m_step = k_e*rttime/k_factor. Explicit relaxation is
+      !! stable only for m_step <= 1, oscillates for 1 < m_step < 2 and DIVERGES above 2 -- and
+      !! m_step exceeds 2 routinely here, because dep_flow is floored at 0.1 m (:436) and
+      !! rttime rises at low flow, so both drivers move together as a channel dries.
+      !! Measured on the White River build (2020-2024, 2,058 channels x 1,461 days): 33,542
+      !! channel-days above 60 degC (1.116 %), max 1,259.6 degC, the exceeding channels
+      !! carrying 8x less flow than the rest, and the worst channel alternating the sign of its
+      !! daily change on 64 % of days against 44 % for well-behaved ones -- the fingerprint of
+      !! an overshooting explicit step, not of a physical process.
+      !!
+      !! Replaced with the CLOSED-FORM solution of the same relaxation over the step:
+      !!     tw = t_equil + (tw_init - t_equil) * exp(-m_step)
+      !! exact for constant t_equil across the step, unconditionally stable for ANY m_step, and
+      !! identical to the explicit form to first order when m_step << 1, so well-behaved
+      !! channels barely move. This is the same form res_temp.f90 uses for impoundments.
+      !! NOT a clamp: an upper bound would hide the signal that found this. Boundedness is
+      !! structural -- the result lies between tw_init and t_equil by construction.
+      m_step = k_e * rttime / k_factor
+      if (m_step > 50.) then
+        t_heat_exch = t_equil - tw_init          !! fully equilibrated; exp(-m) underflows
+      else
+        t_heat_exch = (t_equil - tw_init) * (1. - Exp(-m_step))
+      end if
         
       ! =========================================================
       !  Step 6. Final output

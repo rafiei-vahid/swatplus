@@ -33,6 +33,7 @@
       integer :: isd_db !              |
       integer :: ipest !              |
       integer :: isalt !              |salt ion counter (rtb salt)
+      real :: tw_reported                 !degC |Q380: ch_temp's outflow temperature, preserved across the two struct copies
       real :: ebtm_m !m             |erosion of bottom of channel
       real :: ebank_m !m             |meander cut on one side
       real :: hc_sed !tons          |headcut erosion
@@ -455,6 +456,17 @@
       
       !! calculate stream temperature (component mixing model)
       call ch_temp
+      !! Q380. ch_temp has just written its answer to ch_out_d(ich)%temp. TWO whole-struct
+      !! copies below (:472 and :540, ich = isdch) overwrite ch_out_d from ob(icmd)%hd(1),
+      !! captured at :438 BEFORE ch_temp ran and carrying the air regression ch_watqual4 set
+      !! at :130-132. Without this the energy balance never reaches the reported outflow
+      !! column nor any downstream consumer: measured on the White River build, v58 was
+      !! byte-identical whether or not the balance ran, and the across-reach July spread was
+      !! 0.264 degF against 11.166 degF once restored.
+      !! Deliberately NOT sourced from ch_stor%temp: ch_temp is the last writer of ch_stor in
+      !! this routine (ch_rtmusk :206, ch_watqual4 :266, ch_temp :457) so it would work today,
+      !! but it would couple this fix to that ordering. Capturing the value directly does not.
+      tw_reported = ch_out_d(ich)%temp
       
       !! set constituents for routing
       if (cs_db%num_pests > 0) then
@@ -469,6 +481,7 @@
       
       !! output channel organic-mineral
       ch_out_d(isdch) = ob(icmd)%hd(1)                       !set outflow om hydrograph
+      ch_out_d(isdch)%temp = tw_reported                     !Q380: the copy must not discard the energy balance (1 of 2)
       ch_out_d(isdch)%flo = ob(icmd)%hd(1)%flo / 86400.      !m3 -> m3/s
       
       !! channel sediment budget for output
@@ -531,6 +544,7 @@
       chsd_d(ich)%dep_bf = sd_ch_vel(ich)%dep_bf
       chsd_d(ich)%velav_bf = sd_ch_vel(ich)%vel_bf
       ch_out_d(ich) = ob(icmd)%hd(1)                       !set outflow om hydrograph
+      ch_out_d(ich)%temp = tw_reported                     !Q380: the copy must not discard the energy balance (2 of 2)
       ch_out_d(ich)%flo = ob(icmd)%hd(1)%flo / 86400.      !m3 -> m3/s
    
       !! output flow to channel morphology

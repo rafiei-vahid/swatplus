@@ -69,6 +69,7 @@
                                                                    then
         !! update accumulated heat units for the plant
         delg = 0.
+        delg_p = 0.      !! Q1021: was never reset; with phumat <= 0.1 :79 added a stale value to phuacc_p
         if (pcom(j)%plcur(ipl)%phumat > 0.1) then
           delg = (w%tave - pldb(idp)%t_base) / pcom(j)%plcur(ipl)%phumat
           delg_p = (w%tave - pldb(idp)%t_base) / pcom(j)%plcur(ipl)%phumat_p

@@ -73,6 +73,9 @@
         hpfasb_d(j)%surq(k) = 0.
         hpfasb_d(j)%latq(k) = 0.
         hpfasb_d(j)%perc(k) = 0.
+        !! sediment-bound PFAS is set only on erosion days (pfas_sed, gated in hru_control), but
+        !! hru_hyds emits it EVERY day: zero it daily, or one storm's load is re-emitted undebited
+        hpfasb_d(j)%sed(k) = 0.
       end do
 
       do ly = 1, nly

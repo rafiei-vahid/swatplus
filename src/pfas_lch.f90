@@ -73,6 +73,7 @@
         hpfasb_d(j)%surq(k) = 0.
         hpfasb_d(j)%latq(k) = 0.
         hpfasb_d(j)%perc(k) = 0.
+        hpfasb_d(j)%sed(k) = 0.
       end do
 
       do ly = 1, nly

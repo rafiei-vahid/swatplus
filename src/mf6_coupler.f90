@@ -142,6 +142,11 @@
       integer :: cb_nrow = 0, cb_ncol = 0
       logical :: cb_reduced = .false., cb_ready = .false.
       integer :: cb_iu = 0                              !! mf6_floor.out (day, gis, m3); NEWUNIT gives a NEGATIVE unit, 0 = not open
+      !! Q1144: one coupled day may take several MF6 time steps (an ATS cut, NSTP > 1). The day's RECHARGE and SRC rates
+      !! are kept from its first sub-step and re-applied to every later one; mf6_clock.out records each coupled day.
+      real(c_double), allocatable :: rch_day(:), src_day(:)
+      integer :: clk_iu = 0                             !! mf6_clock.out (day, t_before, t_after, nsub); NEWUNIT is NEGATIVE, 0 = not open
+      integer :: clk_days = 0, clk_subdays = 0, clk_maxsub = 0
 
       !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
       integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
@@ -252,6 +257,10 @@
       call mf6_pfas_src_setup
       !! --- M4c: set up the GW PFAS discharge -> SWAT+ channel up-coupling ---
       call mf6_pfas_disch_setup
+      !! --- Q1144: the per-day MF6 clock record ---
+      open (newunit=clk_iu, file="mf6_clock.out", status="replace", action="write")
+      write (clk_iu,'(a)') "day t_before t_after nsub   (Q1144: MF6 time at the start and end of each coupled day; MF6 time steps it took)"
+      flush (clk_iu)
       end subroutine mf6_coupler_init
 
       !! ================================================================
@@ -371,17 +380,16 @@
 
       !! ================================================================
       subroutine mf6_coupler_step
-      !! Advance MF6 one coupling step in lockstep with the SWAT+ day.
-      !! M1: step flow when due and confirm MF6 time advances.
-      !! M2 will push recharge before the flow step; M3 will pull
-      !! baseflow + PFAS after it and trigger transport at gwt_cadence.
+      !! Advance MF6 through one coupled SWAT+ day, in as many MF6 time steps as MF6's own clock takes to reach
+      !! the day end (Q1144): push recharge (M2) + PFAS sources before the first step, hold them for the day,
+      !! and pull baseflow + PFAS (M3) after each step, weighted by its share of the day.
 #if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
       use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
 #endif
       implicit none
-      integer :: istat, ios
+      integer :: istat, ios, nsub, e
       logical :: halt_save(5)
-      real(c_double) :: tnow, dt0, tprev
+      real(c_double) :: tnow, dt0, tprev, tday, tsub, w
       character(len=256) :: cwd0
 
       if (.not. mf6_active) return
@@ -393,34 +401,80 @@
       call fpe_off(halt_save)
       ios = p_get_current_time(tnow)
       if (tnow < mf6_tend) then
-        tprev = tnow                          !! Q1040(c): MF6 time before this coupled step
-        !! granular step so we can inject recharge between prepare and solve
-        dt0 = 0.0_c_double
-        ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads recharge + sources
-        if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
-        if (bf_ready) call carry_back_unmet   !! Q1130 M2: take back what the channel floor discarded
-        if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
-        ios = p_do_time_step()
-        if (ios /= 0) then
-          write (*,*) "MF6 COUPLER: do_time_step failed day ", mf6_daycount, " status ", ios
-          call coupler_fatal("MF6 do_time_step failed on a coupled day")
-        end if
-        ios = p_finalize_time_step()
-        if (ios /= 0) then
-          !! Q1040(c): MF6 reports non-convergence here, not at do_time_step. Discarding it let a diverged
-          !! run print a full summary with rc 0 (Q1040(b) OAT: 6 of 13 gfortran cases).
-          write (*,*) "MF6 COUPLER: finalize_time_step failed day ", mf6_daycount, " status ", ios
-          call coupler_fatal("MF6 finalize_time_step failed on a coupled day (MF6 did not converge; see mfsim.lst)")
-        end if
-        if (bf_ready) call pull_baseflow      !! aggregate MF6 SFR baseflow -> channels
-        if (pdis_ready) call pull_pfas_discharge  !! GW PFAS discharge -> channels
-        ios = p_get_current_time(tnow)
-        !! Q1040(c): one coupled step must advance MF6 by exactly the coupling cadence. ATS re-solving a period
-        !! (or NSTP > 1) left MF6 up to 26 periods behind SWAT+ with rc 0 (Q1040(b) OAT).
-        if (abs((tnow - tprev) - real(gwf_cadence, c_double)) > 1.0e-6_c_double) then
-          write (*,'(a,i0,a,f14.6,a,f14.6,a,i0)') " MF6 COUPLER: clock check day ", mf6_daycount, &
-            "  MF6 t before ", tprev, "  after ", tnow, "  expected step (d) ", gwf_cadence
-          call coupler_fatal("MF6 clock out of step with SWAT+ (MF6 did not advance by the coupling step)")
+        tprev = tnow                          !! MF6 time at the start of this coupled day
+        !! Q1144: the coupled day ends here (or where MF6 ends, if sooner). MF6 is stepped until its OWN clock reaches it:
+        !! an ATS cut or NSTP > 1 gives the day several MF6 time steps. One step per day left MF6 up to 26 periods behind
+        !! SWAT+ with rc 0 (Q1040(b) OAT, Q1130 R7b-1); Q1040(c) stopped such a run at its first cut instead.
+        tday = min(tprev + real(gwf_cadence, c_double), mf6_tend)
+        nsub = 0
+        do
+          nsub = nsub + 1
+          tsub = tnow
+          !! granular step so we can inject recharge between prepare and solve
+          dt0 = 0.0_c_double
+          ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads recharge + sources
+          if (nsub == 1) then
+            if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
+            if (bf_ready) call carry_back_unmet   !! Q1130 M2: take back what the channel floor discarded
+            if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
+            !! Q1144: keep the day's rates, so each later sub-step of this day carries the same ones
+            if (rch_ready) then
+              if (.not. allocated(rch_day)) allocate (rch_day(n_rch))
+              rch_day(:) = rch_arr(1:n_rch)
+            end if
+            if (src_ready) then
+              if (.not. allocated(src_day)) allocate (src_day(n_src))
+              src_day(:) = src_arr(1:n_src)
+            end if
+          else
+            !! Q1144: MF6 may have reloaded its own recharge/sources at a period start; the day's rates go back in
+            if (rch_ready) rch_arr(1:n_rch) = rch_day(:)
+            if (src_ready) src_arr(1:n_src) = src_day(:)
+          end if
+          ios = p_do_time_step()
+          if (ios /= 0) then
+            write (*,*) "MF6 COUPLER: do_time_step failed day ", mf6_daycount, " status ", ios
+            call coupler_fatal("MF6 do_time_step failed on a coupled day")
+          end if
+          ios = p_finalize_time_step()
+          if (ios /= 0) then
+            !! Q1040(c): MF6 reports non-convergence here, not at do_time_step. Discarding it let a diverged
+            !! run print a full summary with rc 0 (Q1040(b) OAT: 6 of 13 gfortran cases).
+            write (*,*) "MF6 COUPLER: finalize_time_step failed day ", mf6_daycount, " status ", ios
+            call coupler_fatal("MF6 finalize_time_step failed on a coupled day (MF6 did not converge; see mfsim.lst)")
+          end if
+          ios = p_get_current_time(tnow)
+          if (.not. (tnow > tsub)) call clock_stop(tprev, tnow, tday, nsub, &
+            "MF6 clock did not advance within a coupled day")
+          if (tnow > tday + 1.0e-6_c_double) call clock_stop(tprev, tnow, tday, nsub, &
+            "MF6 clock overshot the SWAT+ day end (an MF6 time step is longer than the coupling step)")
+          if (nsub == 1 .and. tnow >= tday - 1.0e-6_c_double) then
+            !! the whole day in ONE MF6 step: the pulls are today's, unchanged
+            if (bf_ready) call pull_baseflow      !! aggregate MF6 SFR baseflow -> channels
+            if (pdis_ready) call pull_pfas_discharge  !! GW PFAS discharge -> channels
+            exit
+          end if
+          !! Q1144: a sub-step; its pulls count with its share of the day
+          w = (tnow - tsub) / (tday - tprev)
+          if (bf_ready) call pull_baseflow_part(w, nsub == 1)
+          if (pdis_ready) call pull_pfas_discharge_part(w, nsub == 1)
+          if (tnow >= tday - 1.0e-6_c_double) then
+            if (pdis_ready) then
+              do e = 0, max_gis
+                pfas_disch_cum = pfas_disch_cum + pfas_chan(e)
+              end do
+            end if
+            exit
+          end if
+          if (nsub >= 10000) call clock_stop(tprev, tnow, tday, nsub, &
+            "MF6 clock cannot reach the SWAT+ day end (more than 10000 sub-steps)")
+        end do
+        clk_days = clk_days + 1
+        if (nsub > 1) clk_subdays = clk_subdays + 1
+        clk_maxsub = max(clk_maxsub, nsub)
+        if (clk_iu /= 0) then
+          write (clk_iu,'(i0,1x,f18.8,1x,f18.8,1x,i0)') mf6_daycount, tprev, tnow, nsub
+          flush (clk_iu)
         end if
       end if
       call fpe_restore(halt_save)
@@ -532,6 +586,35 @@
       end subroutine pull_pfas_discharge
 
       !! ================================================================
+      subroutine pull_pfas_discharge_part(w, first)
+      !! Q1144: pull_pfas_discharge for ONE MF6 sub-step of a coupled day that took several. Each sub-step adds its
+      !! discharge with its share w of the day, so pfas_chan is the day's average (kg/day). The day's total goes into
+      !! pfas_disch_cum once, when the day completes (mf6_coupler_step). A one-step day uses pull_pfas_discharge.
+      implicit none
+      real(c_double), intent(in) :: w
+      logical, intent(in) :: first
+      integer :: e, r, node
+      real(c_double) :: bf, conc
+      if (first) pfas_chan = 0.0_c_double
+      do e = 1, n_bf
+        r = bf_reach(e)
+        if (r >= 0 .and. r < n_sfr) then
+          bf = -gwf_arr(r+1)                       ! baseflow, +ve = aquifer->stream
+          if (bf > 0.0_c_double) then
+            node = igwf(r+1)                        ! reach's GWF/GWT node (reduced)
+            if (node >= 1 .and. node <= size(gwt_conc)) then
+              conc = gwt_conc(node)                 ! ng/L
+              if (conc > 0.0_c_double) then
+                pfas_chan(bf_gis(e)) = pfas_chan(bf_gis(e)) &
+                  + bf * conc * 1.0e-9_c_double * w  ! kg/day, this sub-step's share
+              end if
+            end if
+          end if
+        end if
+      end do
+      end subroutine pull_pfas_discharge_part
+
+      !! ================================================================
       subroutine mf6_baseflow_setup
       !! Read mf6_baseflow.map (SFR reach -> SWAT+ channel gis id) and bind a
       !! pointer to the SFR GWFLOW array (per-reach groundwater<->stream
@@ -631,6 +714,36 @@
       end subroutine pull_baseflow
 
       !! ================================================================
+      subroutine pull_baseflow_part(w, first)
+      !! Q1144: pull_baseflow for ONE MF6 sub-step of a coupled day that took several. Each sub-step adds its exchange
+      !! with its share w of the day, so bf_chan is the day's time average (m3/day), the cumulative gain/loss counts
+      !! each sub-step's volume once, and gwf_prev (Q1130 M2's carry-back weights) is the day's average GWFLOW.
+      !! A one-step day uses pull_baseflow, unchanged.
+      implicit none
+      real(c_double), intent(in) :: w
+      logical, intent(in) :: first
+      integer :: e, r
+      real(c_double) :: bf
+      if (first) then
+        bf_chan = 0.0_c_double
+        gwf_prev(:) = 0.0_c_double
+      end if
+      gwf_prev(:) = gwf_prev(:) + w * gwf_arr(1:n_sfr)
+      do e = 1, n_bf
+        r = bf_reach(e)
+        if (r >= 0 .and. r < n_sfr) then
+          bf = -gwf_arr(r+1) * w              !! aquifer -> stream, +ve = gain; this sub-step's share
+          bf_chan(bf_gis(e)) = bf_chan(bf_gis(e)) + bf
+          if (bf > 0.0_c_double) then
+            bf_cum_gain = bf_cum_gain + bf
+          else
+            bf_cum_loss = bf_cum_loss + bf
+          end if
+        end if
+      end do
+      end subroutine pull_baseflow_part
+
+      !! ================================================================
       subroutine mf6_coupler_finalize
 #if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
       use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
@@ -661,6 +774,11 @@
           cb_carried, " m3, unplaced ", cb_unplaced, " m3, left at end ", sum(unmet_chan), " m3"
         write (*,'(a,i0)') "   channel floor: column-steps with negative RECHARGE after carry-back = ", cb_negrch
         if (cb_iu /= 0) close (cb_iu)
+      end if
+      if (clk_iu /= 0) then
+        write (*,'(a,i0,a,i0,a,i0)') "   MF6 clock: ", clk_days, " coupled days, ", clk_subdays, &
+          " with sub-steps, max ", clk_maxsub
+        close (clk_iu)
       end if
       if (src_ready) write (*,'(a,es12.4,a)') &
         "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
@@ -848,6 +966,18 @@
       logical, intent(in) :: saved(:)
       call ieee_set_halting_mode(ieee_all, saved)
       end subroutine fpe_restore
+
+      subroutine clock_stop(t0, tnow, tday, nsub, msg)
+      !! Q1144: this coupled day cannot be completed on MF6's own clock. Print where the clock stands, keep the
+      !! day rows already written, and stop with a named error.
+      real(c_double), intent(in) :: t0, tnow, tday
+      integer, intent(in) :: nsub
+      character(len=*), intent(in) :: msg
+      write (*,'(a,i0,a,f16.6,a,f16.6,a,f16.6,a,i0)') " MF6 COUPLER: clock day ", mf6_daycount, &
+        "  MF6 t before ", t0, "  now ", tnow, "  day end ", tday, "  sub-steps ", nsub
+      if (clk_iu /= 0) flush (clk_iu)
+      call coupler_fatal(msg)
+      end subroutine clock_stop
 
       subroutine coupler_fatal(msg)
       !! Q1040(a): mf6.con requested MODFLOW 6 coupling and it cannot be delivered. Stop with a named

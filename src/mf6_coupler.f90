@@ -141,7 +141,7 @@
       real(c_double), pointer :: cb_delr(:) => null(), cb_delc(:) => null()
       integer :: cb_nrow = 0, cb_ncol = 0
       logical :: cb_reduced = .false., cb_ready = .false.
-      integer :: cb_iu = 0                              !! mf6_floor.out (day, gis, m3)
+      integer :: cb_iu = 0                              !! mf6_floor.out (day, gis, m3); NEWUNIT gives a NEGATIVE unit, 0 = not open
 
       !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
       integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
@@ -653,7 +653,7 @@
         write (*,'(a,es12.4,a,es12.4,a,es12.4,a)') "   channel floor: unmet MF6 loss carried back to MF6 ", &
           cb_carried, " m3, unplaced ", cb_unplaced, " m3, left at end ", sum(unmet_chan), " m3"
         write (*,'(a,i0)') "   channel floor: column-steps with negative RECHARGE after carry-back = ", cb_negrch
-        if (cb_iu > 0) close (cb_iu)
+        if (cb_iu /= 0) close (cb_iu)
       end if
       if (src_ready) write (*,'(a,es12.4,a)') &
         "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
@@ -729,7 +729,7 @@
       real(c_double) :: tot, v
       do g = 0, max_gis
         if (unmet_chan(g) <= 0.0_c_double) cycle
-        if (cb_iu > 0) write (cb_iu,'(i0,1x,i0,1x,es16.8)') mf6_daycount, g, unmet_chan(g)
+        if (cb_iu /= 0) write (cb_iu,'(i0,1x,i0,1x,es16.8)') mf6_daycount, g, unmet_chan(g)
         tot = 0.0_c_double
         do e = 1, n_bf
           r = bf_reach(e)

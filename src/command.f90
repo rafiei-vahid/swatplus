@@ -30,6 +30,7 @@
       use recall_module
       use water_allocation_module
       use command_wave_module
+      use mf6_coupler, only : mf6_drive_capture
 !$    use omp_lib
       implicit none
       
@@ -392,6 +393,9 @@
           call recall_output (j)
         end do
 
+        !! Q1137: keep each driven channel's inflows of the day for the SFR drive; hydin_output adds ob%hin_d to the month
+        !! and ZEROES it, and MF6 is stepped only after command returns (no-op unless mf6_drive.map is present)
+        call mf6_drive_capture
         call hydin_output   !if all output is no, then don"t call
         !call hcsin_output  gives allocate error
         if (sp_ob%chandeg > 0 .and. cs_db%num_pests > 0) call basin_ch_pest_output  

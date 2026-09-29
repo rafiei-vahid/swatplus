@@ -36,6 +36,7 @@
       public :: mf6_active, mf6_baseflow_active, mf6_channel_baseflow
       public :: mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
       public :: mf6_withhold_aquifer, mf6_note_unmet
+      public :: mf6_drive_capture
 
       logical :: mf6_active = .false.    !! set .true. once MF6 is initialized
       character(len=256) :: mf6_ws = "." !! MF6 workspace (relative to TxtInOut)
@@ -172,6 +173,9 @@
       logical, allocatable :: ent_dyn(:)                 !! a two-exit entry whose source is ordered first: split by the day's water
       real(c_double), allocatable :: drv_s(:)            !! (1:n_sfr) the day's injection that drains to each exit reach
       real(c_double), allocatable :: inflow_day(:), runoff_day(:)
+      integer, allocatable :: drv_inptr(:)               !! (0:max_gis+1) each driven channel's slot in drv_hin, CSR over gis
+      real(c_double), allocatable :: drv_hin(:)          !! the day's inflow per source (m3), captured before hydin_output zeroes it
+      integer :: drv_capday = -1                         !! the coupled day the capture belongs to
       integer :: drv_iu = 0                              !! mf6_drive.out (day, gis, volumes); NEWUNIT is NEGATIVE, 0 = not open
       real(c_double) :: drv_cum_swat = 0.0_c_double, drv_cum_in = 0.0_c_double, drv_cum_ro = 0.0_c_double
       real(c_double) :: drv_cum_tolat = 0.0_c_double, drv_cum_aqu = 0.0_c_double, drv_cum_moved = 0.0_c_double
@@ -997,6 +1001,25 @@
       end function mf6_channel_pfas
 
       !! ================================================================
+      subroutine mf6_drive_capture
+      !! Q1137: keep each driven channel's inflow hydrographs of the day (m3), called from command before hydin_output, which
+      !! adds ob%hin_d to the monthly total and ZEROES it. The coupler steps MF6 after command returns, so reading ob%hin_d there
+      !! reads 0 for every channel (found by the smoke: day 1 injected nothing, DESIGN.txt Addendum 5). No-op without the drive.
+      use hydrograph_module, only : ob
+      implicit none
+      integer :: k, g, iob, in
+      if (.not. drv_ready) return
+      do k = 1, n_order
+        g = drv_order(k); iob = gis_ob(g)
+        if (iob == 0) cycle
+        do in = 1, ob(iob)%rcv_tot
+          drv_hin(drv_inptr(g) + in - 1) = real(ob(iob)%hin_d(in)%flo, c_double)
+        end do
+      end do
+      drv_capday = mf6_daycount + 1                    !! mf6_coupler_step counts this day when it runs, after command
+      end subroutine mf6_drive_capture
+
+      !! ================================================================
       subroutine drive_mode_line
       !! Q1137: print the run's SFR drive mode once, as the coupler's first line. The switch is the presence of mf6_drive.map,
       !! which a run's record does not show unless the run says which side it ran on (Lane S): ON names the map's sha256, computed
@@ -1170,6 +1193,14 @@
       do g = 0, max_gis
         if (drv_ptr(g + 1) > drv_ptr(g) .and. gis_ob(g) == 0) nnoob = nnoob + 1
       end do
+      !! the capture slots: one per inflow hydrograph of each driven channel (mf6_drive_capture)
+      allocate (drv_inptr(0:max_gis + 1)); drv_inptr(0) = 1
+      do g = 0, max_gis
+        k = 0
+        if (gis_ob(g) > 0) k = ob(gis_ob(g))%rcv_tot
+        drv_inptr(g + 1) = drv_inptr(g) + k
+      end do
+      allocate (drv_hin(max(1, drv_inptr(max_gis + 1) - 1))); drv_hin = 0.0_c_double
 
       !! the map: 'n_entries n_sfr', then per removed connection 'r0 h_gis w u0' (0-based reaches; DESIGN.txt Addenda 2, 3b)
       open (newunit=iu, file="mf6_drive.map", status="old", action="read")
@@ -1332,6 +1363,8 @@
         drv_runoff(1:n_sfr) = runoff_day(:)
         return
       end if
+      if (drv_capday /= mf6_daycount) call coupler_fatal( &
+        "SFR drive: no inflow capture for this coupled day (mf6_drive_capture must run in command before hydin_output)")
       if (any(drv_rain(1:n_sfr) /= 0.0_c_double)) drv_raindays = drv_raindays + 1
       drv_s(:) = 0.0_c_double
       do k = 1, size(drv_reach)
@@ -1342,9 +1375,9 @@
         g = drv_order(k); iob = gis_ob(g)
         swat = 0.0_c_double; lat = 0.0_c_double; tolat = 0.0_c_double; aqu = 0.0_c_double
         if (iob > 0) then
-          if (allocated(ob(iob)%hin_d)) then
+          if (ob(iob)%rcv_tot > 0) then
             do in = 1, ob(iob)%rcv_tot
-              q = real(ob(iob)%hin_d(in)%flo, c_double)
+              q = drv_hin(drv_inptr(g) + in - 1)      !! captured before hydin_output zeroed ob%hin_d
               swat = swat + q
               if (ob(iob)%obtyp_in(in) == "aqu") then
                 aqu = aqu + q                          !! Q1130 M1 withholds it (hin_d = 0): injected nowhere

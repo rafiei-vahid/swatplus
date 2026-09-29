@@ -148,6 +148,36 @@
       integer :: clk_iu = 0                             !! mf6_clock.out (day, t_before, t_after, nsub); NEWUNIT is NEGATIVE, 0 = not open
       integer :: clk_days = 0, clk_subdays = 0, clk_maxsub = 0
 
+      !! ---- Q1137: SWAT+ drives SFR's inflows, so SFR and SWAT+ route the same water ----
+      !! On exactly when mf6_drive.map is present. The deck is then cut at SWAT+ channel boundaries (Q1157), and the map names, for
+      !! every connection the cut removed into a mapped reach: the entry reach, its source channel, a static length weight and the
+      !! source channel's exit reach. Each coupled day every mapped reach takes its water from SWAT+ only: INFLOW at a channel's entry
+      !! reaches = SWAT+'s inflow from each upstream channel; RUNOFF on all of its reaches = its other (lateral) inflow, split by reach
+      !! LENGTH. SFR adds the day's groundwater gains itself (ob%hin_d excludes the channel's own MF6 exchange). Stock MF6 books each
+      !! cut channel outlet as EXT-OUTFLOW, so SFR's budget and SFT stay closed. Design: q1137/DESIGN.txt Addenda 1-3.
+      logical :: drv_ready = .false.
+      real(c_double), pointer :: drv_inflow(:) => null(), drv_runoff(:) => null()
+      real(c_double), pointer :: drv_length(:) => null(), drv_rain(:) => null()
+      integer(c_int), pointer :: drv_ia(:) => null(), drv_ja(:) => null(), drv_idir(:) => null()
+      integer, allocatable :: drv_key(:)                 !! (1:n_sfr) the reach's channel gis; -1 = unmapped (its own network)
+      integer, allocatable :: drv_exit(:)                !! (1:n_sfr) the reach by which its water leaves its network (1-based)
+      integer, allocatable :: drv_ptr(:), drv_reach(:)   !! each gis's reaches (1-based), CSR over gis 0..max_gis
+      real(c_double), allocatable :: drv_wlen(:)         !! those reaches' LENGTH shares of their channel
+      integer, allocatable :: gis_ob(:)                  !! (0:max_gis) SWAT+ object of the channel with this gis, 0 = none
+      integer, allocatable :: drv_order(:)               !! driven channels, upstream first (topological order of the map)
+      integer :: n_order = 0, n_ent = 0
+      integer, allocatable :: ent_ptr(:)                 !! map entries grouped by receiving gis, CSR over gis 0..max_gis
+      integer, allocatable :: ent_reach(:), ent_src(:), ent_exit(:)  !! entry reach (1-based), source gis, source exit reach (1-based)
+      real(c_double), allocatable :: ent_w(:)            !! the map's static length weight within its (source, receiver) pair
+      real(c_double), allocatable :: drv_s(:)            !! (1:n_sfr) the day's injection that drains to each exit reach
+      real(c_double), allocatable :: inflow_day(:), runoff_day(:)
+      integer :: drv_iu = 0                              !! mf6_drive.out (day, gis, volumes); NEWUNIT is NEGATIVE, 0 = not open
+      real(c_double) :: drv_cum_swat = 0.0_c_double, drv_cum_in = 0.0_c_double, drv_cum_ro = 0.0_c_double
+      real(c_double) :: drv_cum_tolat = 0.0_c_double, drv_cum_aqu = 0.0_c_double, drv_cum_moved = 0.0_c_double
+      integer :: drv_raindays = 0, drv_fallback = 0
+      logical :: drv_have_map = .false.
+      character(len=200) :: drv_mode = ""               !! the run's mode line: printed once, and first in mf6_drive.out
+
       !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
       integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
       integer :: n_src = 0          !! number of SRC cells (BOUND size)
@@ -244,6 +274,8 @@
       mf6_active = .true.
       mf6_daycount = 0
       write (*,'(a)')      " MF6 COUPLER: active (daily SWAT+ <-> MODFLOW 6)"
+      !! Q1137: the run states its SFR drive mode itself, as the coupler's first line (the switch is a file's presence)
+      call drive_mode_line
       write (*,'(a,a)')    "   workspace   : ", trim(mf6_ws)
       write (*,'(a,i0,a,i0,a)') "   cadence     : flow=", gwf_cadence, &
                                 " d, transport=", gwt_cadence, " d"
@@ -257,6 +289,8 @@
       call mf6_pfas_src_setup
       !! --- M4c: set up the GW PFAS discharge -> SWAT+ channel up-coupling ---
       call mf6_pfas_disch_setup
+      !! --- Q1137: SWAT+ drives SFR's inflows (mf6_drive.map), or check that the deck was not cut without its map ---
+      call mf6_drive_setup
       !! --- Q1144: the per-day MF6 clock record ---
       open (newunit=clk_iu, file="mf6_clock.out", status="replace", action="write")
       write (clk_iu,'(a)') "day t_before t_after nsub   (Q1144: MF6 time at the start and end of each coupled day; MF6 time steps it took)"
@@ -417,6 +451,7 @@
             if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
             if (bf_ready) call carry_back_unmet   !! Q1130 M2: take back what the channel floor discarded
             if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
+            if (drv_ready) call push_drive(.true.)  !! Q1137: SWAT+'s inflows of this day become SFR's INFLOW and RUNOFF
             !! Q1144: keep the day's rates, so each later sub-step of this day carries the same ones
             if (rch_ready) then
               if (.not. allocated(rch_day)) allocate (rch_day(n_rch))
@@ -430,6 +465,7 @@
             !! Q1144: MF6 may have reloaded its own recharge/sources at a period start; the day's rates go back in
             if (rch_ready) rch_arr(1:n_rch) = rch_day(:)
             if (src_ready) src_arr(1:n_src) = src_day(:)
+            if (drv_ready) call push_drive(.false.)
           end if
           ios = p_do_time_step()
           if (ios /= 0) then
@@ -780,6 +816,16 @@
           " with sub-steps, max ", clk_maxsub
         close (clk_iu)
       end if
+      if (drv_ready) then
+        !! Q1137: es16.8, so each total checks against the per-day file
+        write (*,'(a,es16.8,a,es16.8,a,es16.8,a)') "   SFR drive: SWAT+ channel inflow ", drv_cum_swat, &
+          " m3; injected INFLOW ", drv_cum_in, " m3, RUNOFF ", drv_cum_ro, " m3"
+        write (*,'(a,es16.8,a,es16.8,a)') "   SFR drive: channel inflow with no SFR entry (sent as RUNOFF) ", drv_cum_tolat, &
+          " m3; aquifer inflow seen (withheld by M1, so 0) ", drv_cum_aqu, " m3"
+        write (*,'(a,es16.8,a,i0,a,i0)') "   SFR drive: two-exit splits moved ", drv_cum_moved, &
+          " m3 away from the length split; length fallback pair-days ", drv_fallback, "; days with SFR RAIN /= 0 ", drv_raindays
+        if (drv_iu /= 0) close (drv_iu)
+      end if
       if (src_ready) write (*,'(a,es12.4,a)') &
         "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
       if (pdis_ready) write (*,'(a,es12.4,a)') &
@@ -948,6 +994,512 @@
       if (pdis_ready .and. gis >= 0 .and. gis <= max_gis) &
         mf6_channel_pfas = pfas_chan(gis)
       end function mf6_channel_pfas
+
+      !! ================================================================
+      subroutine drive_mode_line
+      !! Q1137: print the run's SFR drive mode once, as the coupler's first line. The switch is the presence of mf6_drive.map,
+      !! which a run's record does not show unless the run says which side it ran on (Lane S): ON names the map's sha256, computed
+      !! from the bytes read here, and its header's entry count. A run without this line is INDETERMINATE for every Q1137 row.
+      use iso_fortran_env, only : int64
+      implicit none
+      character(len=64) :: hx
+      integer(int64) :: nb
+      integer :: iu, ios, nent
+      inquire (file="mf6_drive.map", exist=drv_have_map)
+      if (.not. drv_have_map) then
+        drv_mode = " MF6 COUPLER: SFR drive OFF (no mf6_drive.map)"
+      else
+        call file_sha256("mf6_drive.map", hx, nb)
+        if (len_trim(hx) == 0) call coupler_fatal("mf6_drive.map is present but cannot be read")
+        nent = -1
+        open (newunit=iu, file="mf6_drive.map", status="old", action="read")
+        read (iu,*,iostat=ios) nent
+        close (iu)
+        if (ios /= 0 .or. nent < 0) call coupler_fatal("mf6_drive.map header unreadable")
+        write (drv_mode,'(a,a,a,i0,a)') " MF6 COUPLER: SFR drive ON, mf6_drive.map sha256 ", hx, ", ", nent, " entries"
+      end if
+      write (*,'(a)') trim(drv_mode)
+      end subroutine drive_mode_line
+
+      !! ================================================================
+      subroutine mf6_drive_setup
+      !! Q1137. With mf6_drive.map: bind SFR's INFLOW, RUNOFF, LENGTH, RAIN and connectivity, check that the deck is cut at channel
+      !! boundaries, read the map, and order the channels upstream first. Without it: check that the deck was not cut and its map
+      !! lost (Lane S). Every failure is a named stop, because a half-applied drive routes water twice or not at all.
+      use hydrograph_module, only : ob
+      implicit none
+      integer :: iu, ios, e, g, h, n, m, i, k, it, nja, nhdr, nsfr_hdr, r0, u0, ncross, nmulti, nnoob, nrain, nlinks
+      integer :: npair, ntwo, nmiss_swat, nmiss_map, ne, in
+      integer, allocatable :: cnt(:), t_reach(:), t_src(:), t_exit(:), t_g(:)
+      real(c_double), allocatable :: t_w(:)
+      logical, allocatable :: done(:)
+      logical :: progress, ready, found
+      real(c_double) :: lsum, w, wsum
+      character(len=240) :: msg
+
+      if (.not. bf_ready) then
+        if (drv_have_map) call coupler_fatal( &
+          "mf6_drive.map is present but mf6_baseflow.map is not: the SFR drive needs the reach -> channel map")
+        return
+      end if
+      !! connectivity, and each reach's key: its channel's gis if mapped, -1 if not (an unmapped reach is its own network)
+      call bind_sfr_int("IA", drv_ia, n_sfr + 1)
+      nja = drv_ia(n_sfr + 1) - 1
+      call bind_sfr_int("JA", drv_ja, nja)
+      call bind_sfr_int("IDIR", drv_idir, nja)
+      allocate (drv_key(n_sfr)); drv_key = -1
+      do e = 1, n_bf
+        n = bf_reach(e) + 1
+        if (n < 1 .or. n > n_sfr) call coupler_fatal("mf6_baseflow.map names a reach outside SFR")
+        if (drv_key(n) /= -1) call coupler_fatal("mf6_baseflow.map maps one SFR reach to two channels")
+        drv_key(n) = bf_gis(e)
+      end do
+      allocate (cnt(0:max_gis)); cnt = 0
+      do n = 1, n_sfr
+        if (drv_key(n) >= 0) cnt(drv_key(n)) = cnt(drv_key(n)) + 1
+      end do
+      !! connections between reaches of different keys (each is listed by both of its reaches), and reaches with > 1 downstream
+      ncross = 0; nmulti = 0
+      do n = 1, n_sfr
+        k = 0
+        do i = drv_ia(n) + 1, drv_ia(n + 1) - 1
+          m = drv_ja(i)
+          if (m < 1 .or. m > n_sfr) call coupler_fatal("MF6's SFR JA names a reach outside SFR")
+          if (drv_key(m) /= drv_key(n)) ncross = ncross + 1
+          if (drv_idir(i) < 0) k = k + 1
+        end do
+        if (k > 1) nmulti = nmulti + 1
+      end do
+      ncross = ncross / 2
+
+      if (.not. drv_have_map) then
+        !! Lane S: a cut deck whose map was lost. SWAT+ routes water between channels that both have SFR reaches, yet SFR connects
+        !! no reach across channels: its inter-channel routing is gone and nothing would replace it.
+        nlinks = 0
+        do i = 1, size(ob)
+          if (ob(i)%typ /= "chandeg" .and. ob(i)%typ /= "cha") cycle
+          g = int(ob(i)%gis_id)
+          if (g < 0 .or. g > max_gis) cycle
+          if (cnt(g) == 0) cycle
+          do in = 1, ob(i)%rcv_tot
+            if (ob(i)%obtyp_in(in) /= "chandeg" .and. ob(i)%obtyp_in(in) /= "cha") cycle
+            h = int(ob(ob(i)%obj_in(in))%gis_id)
+            if (h < 0 .or. h > max_gis .or. h == g) cycle
+            if (cnt(h) > 0) nlinks = nlinks + 1
+          end do
+        end do
+        if (nlinks > 0 .and. ncross == 0) then
+          write (msg,'(a,i0,a)') "SFR connects no reach across channels while SWAT+ routes ", nlinks, &
+            " links between channels with SFR reaches: a cut deck without its mf6_drive.map (Q1157 writes both)"
+          call coupler_fatal(trim(msg))
+        end if
+        deallocate (drv_key, cnt)
+        return
+      end if
+
+      if (gwf_cadence /= 1) call coupler_fatal( &
+        "the SFR drive sets one SWAT+ day's inflow per MF6 day; mf6.con gwf_cadence must be 1")
+      if (ncross > 0) then
+        write (msg,'(a,i0,a)') "mf6_drive.map is present but the deck still connects ", ncross, &
+          " SFR reach pairs across channels; a driven deck must be cut at channel boundaries (Q1157)"
+        call coupler_fatal(trim(msg))
+      end if
+      if (nmulti > 0) then
+        write (msg,'(a,i0,a)') "the SFR drive needs at most one downstream reach per reach; ", nmulti, " reaches have more"
+        call coupler_fatal(trim(msg))
+      end if
+      call bind_sfr_dbl("INFLOW", drv_inflow)
+      call bind_sfr_dbl("RUNOFF", drv_runoff)
+      call bind_sfr_dbl("LENGTH", drv_length)
+      call bind_sfr_dbl("RAIN", drv_rain)
+
+      !! each reach's exit: follow its single downstream link to the reach that has none
+      allocate (drv_exit(n_sfr))
+      do n = 1, n_sfr
+        m = n; k = 0
+        do it = 1, n_sfr
+          k = 0
+          do i = drv_ia(m) + 1, drv_ia(m + 1) - 1
+            if (drv_idir(i) < 0) k = drv_ja(i)
+          end do
+          if (k == 0) exit
+          m = k
+        end do
+        if (k /= 0) call coupler_fatal("SFR downstream links form a loop; the SFR drive cannot find a reach's exit")
+        drv_exit(n) = m
+      end do
+
+      !! each channel's reaches and their LENGTH shares (RUNOFF is split by length, DESIGN.txt 3.4)
+      allocate (drv_ptr(0:max_gis + 1)); drv_ptr(0) = 1
+      do g = 0, max_gis
+        drv_ptr(g + 1) = drv_ptr(g) + cnt(g)
+      end do
+      allocate (drv_reach(drv_ptr(max_gis + 1) - 1), drv_wlen(drv_ptr(max_gis + 1) - 1)); cnt = 0
+      do n = 1, n_sfr
+        g = drv_key(n)
+        if (g < 0) cycle
+        drv_reach(drv_ptr(g) + cnt(g)) = n; cnt(g) = cnt(g) + 1
+      end do
+      do g = 0, max_gis
+        if (drv_ptr(g + 1) == drv_ptr(g)) cycle
+        lsum = 0.0_c_double
+        do k = drv_ptr(g), drv_ptr(g + 1) - 1
+          lsum = lsum + drv_length(drv_reach(k))
+        end do
+        if (.not. (lsum > 0.0_c_double)) call coupler_fatal( &
+          "a channel's SFR reaches have no LENGTH; the SFR drive splits a channel's lateral inflow by reach length")
+        do k = drv_ptr(g), drv_ptr(g + 1) - 1
+          drv_wlen(k) = drv_length(drv_reach(k)) / lsum
+        end do
+      end do
+
+      !! the SWAT+ channel object of each driven gis
+      allocate (gis_ob(0:max_gis)); gis_ob = 0
+      do i = 1, size(ob)
+        if (ob(i)%typ /= "chandeg" .and. ob(i)%typ /= "cha") cycle
+        g = int(ob(i)%gis_id)
+        if (g < 0 .or. g > max_gis) cycle
+        if (drv_ptr(g + 1) == drv_ptr(g)) cycle
+        if (gis_ob(g) /= 0) call coupler_fatal("two SWAT+ channels carry the gis id of one driven SFR channel")
+        gis_ob(g) = i
+      end do
+      nnoob = 0
+      do g = 0, max_gis
+        if (drv_ptr(g + 1) > drv_ptr(g) .and. gis_ob(g) == 0) nnoob = nnoob + 1
+      end do
+
+      !! the map: 'n_entries n_sfr', then per removed connection 'r0 h_gis w u0' (0-based reaches; DESIGN.txt Addenda 2, 3b)
+      open (newunit=iu, file="mf6_drive.map", status="old", action="read")
+      read (iu,*,iostat=ios) nhdr, nsfr_hdr
+      if (ios /= 0 .or. nhdr < 0) call coupler_fatal("mf6_drive.map header unreadable")
+      if (nsfr_hdr /= n_sfr) call coupler_fatal("mf6_drive.map was written for another SFR (its reach count differs)")
+      n_ent = nhdr
+      allocate (t_reach(n_ent), t_src(n_ent), t_exit(n_ent), t_g(n_ent), t_w(n_ent))
+      do e = 1, n_ent
+        read (iu,*,iostat=ios) r0, h, w, u0
+        if (ios /= 0) call coupler_fatal("mf6_drive.map truncated or unreadable (fewer rows than its header count)")
+        if (r0 < 0 .or. r0 >= n_sfr .or. u0 < 0 .or. u0 >= n_sfr) call coupler_fatal("mf6_drive.map names a reach outside SFR")
+        g = drv_key(r0 + 1)
+        if (g < 0) call coupler_fatal("mf6_drive.map: an entry reach is not mapped to a SWAT+ channel")
+        if (h < 0 .or. drv_key(u0 + 1) /= h) call coupler_fatal("mf6_drive.map: an exit reach is not in its source channel")
+        if (h == g) call coupler_fatal("mf6_drive.map: an entry's source channel is its own channel")
+        if (drv_exit(u0 + 1) /= u0 + 1) call coupler_fatal("mf6_drive.map: an exit reach still has a downstream reach")
+        if (.not. (w > 0.0_c_double .and. w <= 1.0_c_double)) call coupler_fatal("mf6_drive.map: a weight is outside (0, 1]")
+        t_reach(e) = r0 + 1; t_src(e) = h; t_w(e) = w; t_exit(e) = u0 + 1; t_g(e) = g
+      end do
+      read (iu,*,iostat=ios) r0
+      if (ios == 0) call coupler_fatal("mf6_drive.map has more rows than its header count")
+      close (iu)
+      do e = 1, n_ent
+        do k = e + 1, n_ent
+          if (t_exit(k) == t_exit(e)) call coupler_fatal("mf6_drive.map: one exit reach feeds two entries")
+        end do
+      end do
+      !! group the entries by receiving channel
+      allocate (ent_ptr(0:max_gis + 1)); cnt = 0
+      do e = 1, n_ent
+        cnt(t_g(e)) = cnt(t_g(e)) + 1
+      end do
+      ent_ptr(0) = 1
+      do g = 0, max_gis
+        ent_ptr(g + 1) = ent_ptr(g) + cnt(g)
+      end do
+      allocate (ent_reach(n_ent), ent_src(n_ent), ent_exit(n_ent), ent_w(n_ent)); cnt = 0
+      do e = 1, n_ent
+        g = t_g(e); k = ent_ptr(g) + cnt(g); cnt(g) = cnt(g) + 1
+        ent_reach(k) = t_reach(e); ent_src(k) = t_src(e); ent_exit(k) = t_exit(e); ent_w(k) = t_w(e)
+      end do
+      !! each (source, receiver) pair's static weights sum to 1; count pairs, two-exit pairs and where the networks disagree
+      npair = 0; ntwo = 0; nmiss_map = 0
+      do g = 0, max_gis
+        do e = ent_ptr(g), ent_ptr(g + 1) - 1
+          found = .false.
+          do k = ent_ptr(g), e - 1
+            if (ent_src(k) == ent_src(e)) found = .true.
+          end do
+          if (found) cycle
+          npair = npair + 1; wsum = 0.0_c_double; ne = 0
+          do k = e, ent_ptr(g + 1) - 1
+            if (ent_src(k) /= ent_src(e)) cycle
+            wsum = wsum + ent_w(k); ne = ne + 1
+          end do
+          if (ne > 1) ntwo = ntwo + 1
+          if (abs(wsum - 1.0_c_double) > 1.0e-9_c_double) call coupler_fatal( &
+            "mf6_drive.map: the weights of a source -> receiver pair do not sum to 1")
+          found = .false.
+          if (gis_ob(g) > 0) then
+            i = gis_ob(g)
+            do in = 1, ob(i)%rcv_tot
+              if (ob(i)%obtyp_in(in) /= "chandeg" .and. ob(i)%obtyp_in(in) /= "cha") cycle
+              if (int(ob(ob(i)%obj_in(in))%gis_id) == ent_src(e)) found = .true.
+            end do
+          end if
+          if (.not. found) nmiss_map = nmiss_map + 1
+        end do
+      end do
+      nmiss_swat = 0
+      do g = 0, max_gis
+        if (gis_ob(g) == 0) cycle
+        i = gis_ob(g)
+        do in = 1, ob(i)%rcv_tot
+          if (ob(i)%obtyp_in(in) /= "chandeg" .and. ob(i)%obtyp_in(in) /= "cha") cycle
+          h = int(ob(ob(i)%obj_in(in))%gis_id)
+          found = .false.
+          do e = ent_ptr(g), ent_ptr(g + 1) - 1
+            if (ent_src(e) == h) found = .true.
+          end do
+          if (.not. found) nmiss_swat = nmiss_swat + 1
+        end do
+      end do
+      !! channels upstream first: a source channel's injection must be known before its receiver splits its inflow
+      allocate (done(0:max_gis), drv_order(max_gis + 1)); n_order = 0
+      do g = 0, max_gis
+        done(g) = (drv_ptr(g + 1) == drv_ptr(g))
+      end do
+      do
+        if (all(done)) exit
+        progress = .false.
+        do g = 0, max_gis
+          if (done(g)) cycle
+          ready = .true.
+          do e = ent_ptr(g), ent_ptr(g + 1) - 1
+            if (.not. done(ent_src(e))) ready = .false.
+          end do
+          if (.not. ready) cycle
+          done(g) = .true.; n_order = n_order + 1; drv_order(n_order) = g; progress = .true.
+        end do
+        if (.not. progress) call coupler_fatal("mf6_drive.map: the source -> receiver channel graph has a cycle")
+      end do
+      allocate (drv_s(n_sfr), inflow_day(n_sfr), runoff_day(n_sfr))
+      nrain = count(drv_rain(1:n_sfr) /= 0.0_c_double)
+      open (newunit=drv_iu, file="mf6_drive.out", status="replace", action="write")
+      write (drv_iu,'(a)') trim(adjustl(drv_mode))
+      write (drv_iu,'(a,i0,a)') "day gis swat_in_m3 inflow_m3 runoff_m3 chan_to_runoff_m3 aqu_m3   (Q1137, per MF6 day and " // &
+        "driven channel: SWAT+'s inflow of that day; inflow + runoff = swat_in - aqu; SFR reaches with RAIN /= 0 at setup: ", &
+        nrain, ")"
+      flush (drv_iu)
+      write (*,'(a,i0,a,i0,a,i0,a)') "   SFR drive: SWAT+ sets INFLOW/RUNOFF on ", size(drv_reach), " reaches of ", n_order, &
+        " channels (", nnoob, " of them have no SWAT+ channel object; their reaches get none)"
+      write (*,'(a,i0,a,i0,a,i0,a)') "   SFR drive: ", n_ent, " map entries in ", npair, " source -> receiver pairs, ", ntwo, &
+        " split over two or more exits"
+      write (*,'(a,i0,a,i0,a,i0)') "   SFR drive: the networks disagree on ", nmiss_swat, &
+        " SWAT+ channel links (sent as RUNOFF) and ", nmiss_map, " map pairs (no SWAT+ link); SFR reaches with RAIN /= 0: ", nrain
+      deallocate (cnt, t_reach, t_src, t_exit, t_g, t_w, done)
+      drv_ready = .true.
+      end subroutine mf6_drive_setup
+
+      !! ================================================================
+      subroutine push_drive(first)
+      !! Q1137: set SFR INFLOW and RUNOFF from SWAT+'s inflows of this day, after prepare_time_step and before the solve. The day's
+      !! first MF6 step computes them; its later sub-steps re-apply them (Q1144). Channels go upstream first, so a source split over
+      !! two exits follows the water injected into the source that day (DESIGN.txt Addendum 3b), with the map's length weight as the
+      !! counted fallback on a day the source received none.
+      use hydrograph_module, only : ob
+      implicit none
+      logical, intent(in) :: first
+      integer :: k, kk, g, iob, in, e, h, ne, r
+      real(c_double) :: q, swat, lat, tolat, aqu, ssum, wd, inj, ro
+      if (.not. first) then
+        drv_inflow(1:n_sfr) = inflow_day(:)
+        drv_runoff(1:n_sfr) = runoff_day(:)
+        return
+      end if
+      if (any(drv_rain(1:n_sfr) /= 0.0_c_double)) drv_raindays = drv_raindays + 1
+      drv_s(:) = 0.0_c_double
+      do k = 1, size(drv_reach)
+        drv_inflow(drv_reach(k)) = 0.0_c_double
+        drv_runoff(drv_reach(k)) = 0.0_c_double
+      end do
+      do k = 1, n_order
+        g = drv_order(k); iob = gis_ob(g)
+        swat = 0.0_c_double; lat = 0.0_c_double; tolat = 0.0_c_double; aqu = 0.0_c_double
+        if (iob > 0) then
+          if (allocated(ob(iob)%hin_d)) then
+            do in = 1, ob(iob)%rcv_tot
+              q = real(ob(iob)%hin_d(in)%flo, c_double)
+              swat = swat + q
+              if (ob(iob)%obtyp_in(in) == "aqu") then
+                aqu = aqu + q                          !! Q1130 M1 withholds it (hin_d = 0): injected nowhere
+                cycle
+              end if
+              if (ob(iob)%obtyp_in(in) /= "chandeg" .and. ob(iob)%obtyp_in(in) /= "cha") then
+                lat = lat + q                          !! hru, ru, res, recall, ...: lateral
+                cycle
+              end if
+              h = int(ob(ob(iob)%obj_in(in))%gis_id)
+              ne = 0; ssum = 0.0_c_double
+              do e = ent_ptr(g), ent_ptr(g + 1) - 1
+                if (ent_src(e) /= h) cycle
+                ne = ne + 1; ssum = ssum + drv_s(ent_exit(e))
+              end do
+              if (ne == 0) then
+                lat = lat + q; tolat = tolat + q       !! SWAT+ links h -> g, SFR has no entry for it: lateral, and counted
+                cycle
+              end if
+              if (ne > 1 .and. .not. (ssum > 0.0_c_double)) drv_fallback = drv_fallback + 1
+              do e = ent_ptr(g), ent_ptr(g + 1) - 1
+                if (ent_src(e) /= h) cycle
+                if (ne == 1) then
+                  wd = 1.0_c_double
+                else if (ssum > 0.0_c_double) then
+                  wd = drv_s(ent_exit(e)) / ssum
+                  drv_cum_moved = drv_cum_moved + 0.5_c_double * abs(wd - ent_w(e)) * q
+                else
+                  wd = ent_w(e)
+                end if
+                drv_inflow(ent_reach(e)) = drv_inflow(ent_reach(e)) + wd * q
+              end do
+            end do
+          end if
+        end if
+        inj = 0.0_c_double; ro = 0.0_c_double
+        do kk = drv_ptr(g), drv_ptr(g + 1) - 1
+          r = drv_reach(kk)
+          drv_runoff(r) = lat * drv_wlen(kk)
+          inj = inj + drv_inflow(r); ro = ro + drv_runoff(r)
+          drv_s(drv_exit(r)) = drv_s(drv_exit(r)) + drv_inflow(r) + drv_runoff(r)
+        end do
+        if (iob > 0) then
+          if (drv_iu /= 0) write (drv_iu,'(i0,1x,i0,5(1x,es16.8))') mf6_daycount, g, swat, inj, ro, tolat, aqu
+          drv_cum_swat = drv_cum_swat + swat; drv_cum_in = drv_cum_in + inj; drv_cum_ro = drv_cum_ro + ro
+          drv_cum_tolat = drv_cum_tolat + tolat; drv_cum_aqu = drv_cum_aqu + aqu
+        end if
+      end do
+      if (drv_iu /= 0) flush (drv_iu)
+      inflow_day(:) = drv_inflow(1:n_sfr)
+      runoff_day(:) = drv_runoff(1:n_sfr)
+      end subroutine push_drive
+
+      !! ================================================================
+      subroutine bind_sfr_dbl(name, p)
+      !! Q1137: bind a per-reach double array of the SFR package GWFLOW belongs to; a named stop if MF6 does not expose it.
+      character(len=*), intent(in) :: name
+      real(c_double), pointer, intent(inout) :: p(:)
+      type(c_ptr) :: cp
+      integer :: ios
+      character(len=256) :: addr
+      addr = gwf_addr(1:index(gwf_addr, "/", back=.true.))//name
+      cp = c_null_ptr
+      ios = p_get_value_ptr_double(trim(addr)//c_null_char, cp)
+      if (ios /= 0 .or. .not. c_associated(cp)) call coupler_fatal("SFR drive: cannot bind MF6 variable "//trim(addr))
+      call c_f_pointer(cp, p, [n_sfr])
+      end subroutine bind_sfr_dbl
+
+      subroutine bind_sfr_int(name, p, n)
+      !! Q1137: bind an integer array of that SFR package (IA, JA, IDIR) with n elements; a named stop if MF6 does not expose it.
+      character(len=*), intent(in) :: name
+      integer(c_int), pointer, intent(inout) :: p(:)
+      integer, intent(in) :: n
+      type(c_ptr) :: cp
+      integer :: ios
+      character(len=256) :: addr
+      addr = gwf_addr(1:index(gwf_addr, "/", back=.true.))//name
+      cp = c_null_ptr
+      ios = p_get_value_ptr_int(trim(addr)//c_null_char, cp)
+      if (ios /= 0 .or. .not. c_associated(cp)) call coupler_fatal("SFR drive: cannot bind MF6 variable "//trim(addr))
+      if (n < 1) call coupler_fatal("SFR drive: MF6 variable "//trim(addr)//" is empty")
+      call c_f_pointer(cp, p, [n])
+      end subroutine bind_sfr_int
+
+      !! ================================================================
+      subroutine file_sha256(path, hex, nbytes)
+      !! Q1137: SHA-256 (FIPS 180-4) of a file's bytes, as 64 lowercase hex characters, so the run log names the exact map the
+      !! coupler read. 32-bit words are held in int64 and masked, so no signed overflow can occur. hex = "" if the file cannot be
+      !! read. Checked against sha256sum on files of 0-100000 bytes, every padding boundary included (q1137 scratch test).
+      use iso_fortran_env, only : int8, int64
+      character(len=*), intent(in) :: path
+      character(len=64), intent(out) :: hex
+      integer(int64), intent(out) :: nbytes
+      integer(int64), parameter :: M32 = 4294967295_int64
+      integer(int64), parameter :: K(64) = [ &
+        int(z'428a2f98',int64), int(z'71374491',int64), int(z'b5c0fbcf',int64), int(z'e9b5dba5',int64), &
+        int(z'3956c25b',int64), int(z'59f111f1',int64), int(z'923f82a4',int64), int(z'ab1c5ed5',int64), &
+        int(z'd807aa98',int64), int(z'12835b01',int64), int(z'243185be',int64), int(z'550c7dc3',int64), &
+        int(z'72be5d74',int64), int(z'80deb1fe',int64), int(z'9bdc06a7',int64), int(z'c19bf174',int64), &
+        int(z'e49b69c1',int64), int(z'efbe4786',int64), int(z'0fc19dc6',int64), int(z'240ca1cc',int64), &
+        int(z'2de92c6f',int64), int(z'4a7484aa',int64), int(z'5cb0a9dc',int64), int(z'76f988da',int64), &
+        int(z'983e5152',int64), int(z'a831c66d',int64), int(z'b00327c8',int64), int(z'bf597fc7',int64), &
+        int(z'c6e00bf3',int64), int(z'd5a79147',int64), int(z'06ca6351',int64), int(z'14292967',int64), &
+        int(z'27b70a85',int64), int(z'2e1b2138',int64), int(z'4d2c6dfc',int64), int(z'53380d13',int64), &
+        int(z'650a7354',int64), int(z'766a0abb',int64), int(z'81c2c92e',int64), int(z'92722c85',int64), &
+        int(z'a2bfe8a1',int64), int(z'a81a664b',int64), int(z'c24b8b70',int64), int(z'c76c51a3',int64), &
+        int(z'd192e819',int64), int(z'd6990624',int64), int(z'f40e3585',int64), int(z'106aa070',int64), &
+        int(z'19a4c116',int64), int(z'1e376c08',int64), int(z'2748774c',int64), int(z'34b0bcb5',int64), &
+        int(z'391c0cb3',int64), int(z'4ed8aa4a',int64), int(z'5b9cca4f',int64), int(z'682e6ff3',int64), &
+        int(z'748f82ee',int64), int(z'78a5636f',int64), int(z'84c87814',int64), int(z'8cc70208',int64), &
+        int(z'90befffa',int64), int(z'a4506ceb',int64), int(z'bef9a3f7',int64), int(z'c67178f2',int64) ]
+      character(len=16), parameter :: HD = "0123456789abcdef"
+      integer(int64) :: H(8), W(64), a, b, c, d, e, f, g, hh, t1, t2, fsize, total, bitlen
+      integer(int8), allocatable :: buf(:)
+      integer(int64), allocatable :: m(:)
+      integer :: iu, ios, i, j, blk, o
+      hex = ""; nbytes = -1
+      open (newunit=iu, file=path, access="stream", form="unformatted", action="read", status="old", iostat=ios)
+      if (ios /= 0) return
+      inquire (unit=iu, size=fsize)
+      allocate (buf(max(fsize, 1_int64)))
+      if (fsize > 0) read (iu, iostat=ios) buf(1:fsize)
+      close (iu)
+      if (ios /= 0 .or. fsize < 0) return
+      nbytes = fsize
+      total = ((fsize + 8) / 64 + 1) * 64                    !! message + 0x80 + zeros + 8-byte length, a multiple of 64
+      allocate (m(total)); m = 0
+      do i = 1, int(fsize)
+        m(i) = iand(int(buf(i), int64), 255_int64)
+      end do
+      m(fsize + 1) = 128
+      bitlen = fsize * 8
+      do j = 0, 7
+        m(total - j) = iand(ishft(bitlen, -8 * j), 255_int64)
+      end do
+      H = [ int(z'6a09e667',int64), int(z'bb67ae85',int64), int(z'3c6ef372',int64), int(z'a54ff53a',int64), &
+            int(z'510e527f',int64), int(z'9b05688c',int64), int(z'1f83d9ab',int64), int(z'5be0cd19',int64) ]
+      do blk = 0, int(total / 64) - 1
+        o = blk * 64
+        do i = 1, 16
+          W(i) = ior(ior(ishft(m(o+4*i-3), 24), ishft(m(o+4*i-2), 16)), ior(ishft(m(o+4*i-1), 8), m(o+4*i)))
+        end do
+        do i = 17, 64
+          W(i) = iand(sig1(W(i-2)) + W(i-7) + sig0(W(i-15)) + W(i-16), M32)
+        end do
+        a = H(1); b = H(2); c = H(3); d = H(4); e = H(5); f = H(6); g = H(7); hh = H(8)
+        do i = 1, 64
+          t1 = iand(hh + bsig1(e) + ieor(iand(e, f), iand(iand(not(e), M32), g)) + K(i) + W(i), M32)
+          t2 = iand(bsig0(a) + ieor(ieor(iand(a, b), iand(a, c)), iand(b, c)), M32)
+          hh = g; g = f; f = e; e = iand(d + t1, M32); d = c; c = b; b = a; a = iand(t1 + t2, M32)
+        end do
+        H(1) = iand(H(1) + a, M32); H(2) = iand(H(2) + b, M32); H(3) = iand(H(3) + c, M32); H(4) = iand(H(4) + d, M32)
+        H(5) = iand(H(5) + e, M32); H(6) = iand(H(6) + f, M32); H(7) = iand(H(7) + g, M32); H(8) = iand(H(8) + hh, M32)
+      end do
+      do i = 1, 8
+        do j = 1, 8
+          o = int(iand(ishft(H(i), -4 * (8 - j)), 15_int64)) + 1
+          hex(8*(i-1)+j:8*(i-1)+j) = HD(o:o)
+        end do
+      end do
+      contains
+        integer(int64) function rotr(x, n)
+          integer(int64), intent(in) :: x
+          integer, intent(in) :: n
+          rotr = iand(ior(ishft(x, -n), ishft(x, 32 - n)), M32)
+        end function rotr
+        integer(int64) function bsig0(x)
+          integer(int64), intent(in) :: x
+          bsig0 = ieor(ieor(rotr(x, 2), rotr(x, 13)), rotr(x, 22))
+        end function bsig0
+        integer(int64) function bsig1(x)
+          integer(int64), intent(in) :: x
+          bsig1 = ieor(ieor(rotr(x, 6), rotr(x, 11)), rotr(x, 25))
+        end function bsig1
+        integer(int64) function sig0(x)
+          integer(int64), intent(in) :: x
+          sig0 = ieor(ieor(rotr(x, 7), rotr(x, 18)), ishft(x, -3))
+        end function sig0
+        integer(int64) function sig1(x)
+          integer(int64), intent(in) :: x
+          sig1 = ieor(ieor(rotr(x, 17), rotr(x, 19)), ishft(x, -10))
+        end function sig1
+      end subroutine file_sha256
 
       !! ---- helpers --------------------------------------------------
       subroutine fpe_off(saved)

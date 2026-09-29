@@ -132,8 +132,12 @@
       end if
             
       !! MF6 coupling: groundwater<->stream exchange supplied by MODFLOW 6
-      !! (from the previous day's MF6 solve).  Replaces the native SWAT+
-      !! aquifer return flow so baseflow is not double counted.
+      !! (from the previous day's MF6 solve).  MF6 REPLACES the native SWAT+
+      !! aquifer return at channels by two skips: command_object adds no
+      !! aquifer hydrograph to a channel's hin while this is active (Q1130;
+      !! before that fix the aquifer.con return was still in ht1 and this
+      !! block ADDED MF6 baseflow on top), and the aqu_cha.lin branch below
+      !! is not taken.
       if (mf6_baseflow_active()) then
         aqu_inflo = real(mf6_channel_baseflow(int(ob(icmd)%gis_id)))   !m3/day, +ve=gain
         chsd_d(ich)%aqu_in = aqu_inflo / 86400.

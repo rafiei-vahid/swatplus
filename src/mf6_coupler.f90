@@ -35,6 +35,7 @@
       public :: mf6_coupler_init, mf6_coupler_step, mf6_coupler_finalize
       public :: mf6_active, mf6_baseflow_active, mf6_channel_baseflow
       public :: mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
+      public :: mf6_withhold_aquifer
 
       logical :: mf6_active = .false.    !! set .true. once MF6 is initialized
       character(len=256) :: mf6_ws = "." !! MF6 workspace (relative to TxtInOut)
@@ -123,6 +124,10 @@
       logical :: bf_ready = .false.
       character(len=256) :: gwf_addr = "MODFLOW_SFR/SFR_0/GWFLOW"
       real(c_double) :: bf_cum_gain = 0.0_c_double, bf_cum_loss = 0.0_c_double
+      !! Q1130 M1: SWAT+ aquifer return NOT added to channels while coupled (MF6
+      !! carries that groundwater), accumulated per receiving object (m3) so each
+      !! channel writes only its own element when channels run in parallel.
+      real(c_double), allocatable :: aq_withheld_ob(:)
 
       !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
       integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
@@ -508,9 +513,11 @@
       !! Read mf6_baseflow.map (SFR reach -> SWAT+ channel gis id) and bind a
       !! pointer to the SFR GWFLOW array (per-reach groundwater<->stream
       !! exchange, m3/day).  No-op if the map is absent or the pointer fails.
+      use hydrograph_module, only : sp_ob
       implicit none
-      integer :: iu, ios, e, rea, gis, nbf, nsfr
+      integer :: iu, ios, e, rea, gis, nbf, nsfr, nhru_cov
       logical :: have_map
+      logical, allocatable :: hru_seen(:)
       type(c_ptr) :: cptr
 
       inquire (file="mf6_baseflow.map", exist=have_map)
@@ -543,9 +550,33 @@
       end if
       call c_f_pointer(cptr, gwf_arr, [n_sfr])
       allocate (bf_chan(0:max_gis)); bf_chan = 0.0_c_double
+      allocate (aq_withheld_ob(sp_ob%objs)); aq_withheld_ob = 0.0_c_double
       bf_ready = .true.
       write (*,'(a,i0,a,i0,a)') "   baseflow map: ", n_bf, &
         " SFR reaches -> SWAT+ channels (gis 1..", max_gis, ")"
+      !! Q1130 M1 replaces the SWAT+ aquifer return for the WHOLE model, which is right
+      !! only when MF6 receives the recharge of every HRU; print the coverage so a
+      !! partial MF6 domain is visible.
+      if (rch_ready) then
+        nhru_cov = 0
+        allocate (hru_seen(sp_ob%hru)); hru_seen = .false.
+        do e = 1, n_map
+          if (map_hru(e) >= 1 .and. map_hru(e) <= sp_ob%hru) hru_seen(map_hru(e)) = .true.
+        end do
+        nhru_cov = count(hru_seen)
+        deallocate (hru_seen)
+        write (*,'(a,i0,a,i0,a)') "   aquifer return: replaced by MF6 at channels (recharge map covers ", &
+          nhru_cov, " of ", sp_ob%hru, " HRUs)"
+        if (nhru_cov < sp_ob%hru) then
+          !! Q1130: an uncovered HRU recharges only the SWAT+ aquifer, whose return is no longer
+          !! added to channels, so coupling a partial domain would silently drop that baseflow.
+          write (*,'(a,i0,a,i0,a)') " MF6 COUPLER: ERROR recharge map covers ", nhru_cov, " of ", &
+            sp_ob%hru, " HRUs; the aquifer return of the rest would be dropped. Refusing to couple."
+          error stop 3
+        end if
+      else
+        write (*,'(a)') "   aquifer return: replaced by MF6 at channels (WARNING: no recharge map, MF6 recharge is its own)"
+      end if
       end subroutine mf6_baseflow_setup
 
       !! ================================================================
@@ -597,12 +628,28 @@
         "   recharge (sum of daily basin depths) = ", rch_depth_cum, " m"
       if (bf_ready) write (*,'(a,es12.4,a,es12.4,a)') &
         "   SFR exchange: gaining ", bf_cum_gain, "  losing ", bf_cum_loss, " m3"
+      if (bf_ready) write (*,'(a,es12.4,a)') &
+        "   SWAT+ aquifer return withheld from channels (replaced by MF6) = ", sum(aq_withheld_ob), " m3"
       if (src_ready) write (*,'(a,es12.4,a)') &
         "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
       if (pdis_ready) write (*,'(a,es12.4,a)') &
         "   PFAS discharged to stream = ", pfas_disch_cum, " kg"
       mf6_active = .false.
       end subroutine mf6_coupler_finalize
+
+      !! ================================================================
+      subroutine mf6_withhold_aquifer(iobj, vol)
+      !! Q1130 M1: record an aquifer hydrograph (m3) that command_object did NOT add to
+      !! channel object iobj because MF6 supplies that channel's groundwater exchange.
+      !! One element per receiving object, so parallel channel routing never shares one.
+      implicit none
+      integer, intent(in) :: iobj
+      real, intent(in) :: vol
+      if (allocated(aq_withheld_ob)) then
+        if (iobj >= 1 .and. iobj <= size(aq_withheld_ob)) &
+          aq_withheld_ob(iobj) = aq_withheld_ob(iobj) + real(vol, c_double)
+      end if
+      end subroutine mf6_withhold_aquifer
 
       !! ================================================================
       logical function mf6_baseflow_active()

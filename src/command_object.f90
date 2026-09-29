@@ -22,6 +22,7 @@
       use soil_module
       use recall_module
       use water_allocation_module
+      use mf6_coupler, only : mf6_baseflow_active, mf6_withhold_aquifer
       implicit none
       
       external :: aqu_1d_control, aqu_cs_output, aqu_pesticide_output, aqu_salt_output, aquifer_output, &
@@ -56,6 +57,7 @@
       integer :: iwro !              |
       real :: conv !              |
       real :: frac_in !              |
+      logical :: mf6_repl !          |Q1130: MF6 replaces the aquifer return at this channel
       integer :: ts1
       integer :: ts2
       integer :: iw !              |counter for water allocation object
@@ -114,11 +116,22 @@
           hyd_flo = 0.
           
           if (ob(icmd)%rcv_tot > 0) then
+          !! Q1130: with the MF6 coupler supplying channel baseflow, MF6 REPLACES the SWAT+
+          !! aquifer return at channels: MF6 receives the same HRU percolation as recharge
+          !! (mf6_coupler push_recharge), so an aquifer hydrograph added here would be a
+          !! second copy of groundwater MF6 already discharges through SFR.
+          mf6_repl = mf6_baseflow_active() .and. (ob(icmd)%typ == "chandeg" .or. ob(icmd)%typ == "cha")
           do in = 1, ob(icmd)%rcv_tot
             iob = ob(icmd)%obj_in(in)
             ihyd = ob(icmd)%ihtyp_in(in)
             frac_in = ob(icmd)%frac_in(in)
             ob(icmd)%peakrate = ob(iob)%peakrate
+            if (mf6_repl .and. ob(icmd)%obtyp_in(in) == "aqu") then
+              call mf6_withhold_aquifer (icmd, frac_in * ob(iob)%hd(ihyd)%flo)
+              ob(icmd)%hin_d(in) = hz
+              if (cs_db%num_tot > 0 .and. obcs_alloc(icmd).eq.1) obcs(icmd)%hcsin_d(in) = hin_csz
+              cycle
+            end if
             
             ! if object is not an hru, need ht1, don't need %hin_sur and %hin_lat
             ! don't have to check if it's in an ru - only hru's can be routed over

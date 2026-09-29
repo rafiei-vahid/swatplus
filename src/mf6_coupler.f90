@@ -35,7 +35,7 @@
       public :: mf6_coupler_init, mf6_coupler_step, mf6_coupler_finalize
       public :: mf6_active, mf6_baseflow_active, mf6_channel_baseflow
       public :: mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
-      public :: mf6_withhold_aquifer
+      public :: mf6_withhold_aquifer, mf6_note_unmet
 
       logical :: mf6_active = .false.    !! set .true. once MF6 is initialized
       character(len=256) :: mf6_ws = "." !! MF6 workspace (relative to TxtInOut)
@@ -128,6 +128,20 @@
       !! carries that groundwater), accumulated per receiving object (m3) so each
       !! channel writes only its own element when channels run in parallel.
       real(c_double), allocatable :: aq_withheld_ob(:)
+      !! Q1130 M2: the channel floor (sd_channel_control3) discards the part of an MF6
+      !! loss that the SWAT+ channel could not supply; MF6 had already moved that water
+      !! into the aquifer, so without a return it is created. It is recorded per channel
+      !! gis and taken back from MF6 RECHARGE at the next MF6 step, in the columns of that
+      !! channel's losing reaches, in proportion to their loss.
+      real(c_double), allocatable :: unmet_chan(:)      !! (0:max_gis) unmet m3 since last step
+      real(c_double), allocatable :: gwf_prev(:)        !! GWFLOW of the last pulled step
+      real(c_double) :: cb_carried = 0.0_c_double, cb_unplaced = 0.0_c_double
+      integer :: cb_negrch = 0                          !! column-steps with RECHARGE < 0
+      integer(c_int), pointer :: cb_igwf(:) => null(), cb_nodeuser(:) => null()
+      real(c_double), pointer :: cb_delr(:) => null(), cb_delc(:) => null()
+      integer :: cb_nrow = 0, cb_ncol = 0
+      logical :: cb_reduced = .false., cb_ready = .false.
+      integer :: cb_iu = 0                              !! mf6_floor.out (day, gis, m3)
 
       !! ---- PFAS down-coupling (M4b): SWAT+ leaching -> GWT SRC mass source --
       integer :: n_leach = 0        !! number of HRU->SRC-cell leaching links
@@ -391,6 +405,7 @@
         dt0 = 0.0_c_double
         ios = p_prepare_time_step(dt0)        !! rp: MF6 (re)loads recharge + sources
         if (rch_ready) call push_recharge     !! overwrite recharge with SWAT+ percolation
+        if (bf_ready) call carry_back_unmet   !! Q1130 M2: take back what the channel floor discarded
         if (src_ready) call push_pfas_src     !! overwrite GWT source with SWAT+ PFAS leaching
         ios = p_do_time_step()
         if (ios /= 0) write (*,*) "MF6 COUPLER: do_time_step failed day ", &
@@ -551,7 +566,10 @@
       call c_f_pointer(cptr, gwf_arr, [n_sfr])
       allocate (bf_chan(0:max_gis)); bf_chan = 0.0_c_double
       allocate (aq_withheld_ob(sp_ob%objs)); aq_withheld_ob = 0.0_c_double
+      allocate (unmet_chan(0:max_gis)); unmet_chan = 0.0_c_double
+      allocate (gwf_prev(n_sfr)); gwf_prev = 0.0_c_double
       bf_ready = .true.
+      call mf6_carryback_setup
       write (*,'(a,i0,a,i0,a)') "   baseflow map: ", n_bf, &
         " SFR reaches -> SWAT+ channels (gis 1..", max_gis, ")"
       !! Q1130 M1 replaces the SWAT+ aquifer return for the WHOLE model, which is right
@@ -591,6 +609,7 @@
       integer :: e, r
       real(c_double) :: bf
       bf_chan = 0.0_c_double
+      gwf_prev(:) = gwf_arr(1:n_sfr)          !! Q1130 M2: the losses the next carry-back is weighted by
       do e = 1, n_bf
         r = bf_reach(e)
         if (r >= 0 .and. r < n_sfr) then
@@ -630,12 +649,130 @@
         "   SFR exchange: gaining ", bf_cum_gain, "  losing ", bf_cum_loss, " m3"
       if (bf_ready) write (*,'(a,es12.4,a)') &
         "   SWAT+ aquifer return withheld from channels (replaced by MF6) = ", sum(aq_withheld_ob), " m3"
+      if (bf_ready) then
+        write (*,'(a,es12.4,a,es12.4,a,es12.4,a)') "   channel floor: unmet MF6 loss carried back to MF6 ", &
+          cb_carried, " m3, unplaced ", cb_unplaced, " m3, left at end ", sum(unmet_chan), " m3"
+        write (*,'(a,i0)') "   channel floor: column-steps with negative RECHARGE after carry-back = ", cb_negrch
+        if (cb_iu > 0) close (cb_iu)
+      end if
       if (src_ready) write (*,'(a,es12.4,a)') &
         "   PFAS loaded to aquifer    = ", pfas_src_cum, " ug"
       if (pdis_ready) write (*,'(a,es12.4,a)') &
         "   PFAS discharged to stream = ", pfas_disch_cum, " kg"
       mf6_active = .false.
       end subroutine mf6_coupler_finalize
+
+      !! ================================================================
+      subroutine mf6_carryback_setup
+      !! Q1130 M2: bind what the carry-back needs to place a reach's volume in its RECHARGE
+      !! column: SFR reach -> GWF node (IGWFNODE), reduced -> user node (NODEUSER), grid
+      !! size and cell widths. If any is missing the carry-back is off and every unmet
+      !! volume is reported as UNPLACED (created water), never silently dropped.
+      implicit none
+      integer :: ios, nodes, nodesuser
+      type(c_ptr) :: cp
+      integer(c_int), pointer :: sc(:)
+      open (newunit=cb_iu, file="mf6_floor.out", status="replace", action="write")
+      write (cb_iu,'(a)') "day gis unmet_m3   (Q1130: MF6 loss the SWAT+ channel could not supply)"
+      if (.not. rch_ready) then
+        write (*,'(a)') "   channel floor: WARNING no RECHARGE binding, unmet loss is reported, not returned"
+        return
+      end if
+      nodes = int_scalar("MODFLOW_SFR/DIS/NODES", ios);         if (ios /= 0) return
+      nodesuser = int_scalar("MODFLOW_SFR/DIS/NODESUSER", ios); if (ios /= 0) return
+      cb_nrow = int_scalar("MODFLOW_SFR/DIS/NROW", ios);        if (ios /= 0) return
+      cb_ncol = int_scalar("MODFLOW_SFR/DIS/NCOL", ios);        if (ios /= 0) return
+      if (cb_nrow * cb_ncol /= n_rch) then
+        write (*,'(a)') "   channel floor: WARNING NROW*NCOL /= RECHARGE size, carry-back off"
+        return
+      end if
+      cp = c_null_ptr; ios = p_get_value_ptr_int("MODFLOW_SFR/SFR_0/IGWFNODE"//c_null_char, cp)
+      if (ios /= 0 .or. .not. c_associated(cp)) return
+      call c_f_pointer(cp, cb_igwf, [n_sfr])
+      cb_reduced = (nodes < nodesuser)
+      if (cb_reduced) then
+        cp = c_null_ptr; ios = p_get_value_ptr_int("MODFLOW_SFR/DIS/NODEUSER"//c_null_char, cp)
+        if (ios /= 0 .or. .not. c_associated(cp)) return
+        call c_f_pointer(cp, cb_nodeuser, [nodes])
+      end if
+      cp = c_null_ptr; ios = p_get_value_ptr_double("MODFLOW_SFR/DIS/DELR"//c_null_char, cp)
+      if (ios /= 0 .or. .not. c_associated(cp)) return
+      call c_f_pointer(cp, cb_delr, [cb_ncol])
+      cp = c_null_ptr; ios = p_get_value_ptr_double("MODFLOW_SFR/DIS/DELC"//c_null_char, cp)
+      if (ios /= 0 .or. .not. c_associated(cp)) return
+      call c_f_pointer(cp, cb_delc, [cb_nrow])
+      cb_ready = .true.
+      write (*,'(a)') "   channel floor: unmet MF6 loss is carried back to MF6 RECHARGE at the next step"
+      contains
+        integer function int_scalar(addr, ist)
+          character(len=*), intent(in) :: addr
+          integer, intent(out) :: ist
+          type(c_ptr) :: p
+          p = c_null_ptr
+          ist = p_get_value_ptr_int(trim(addr)//c_null_char, p)
+          int_scalar = 0
+          if (ist /= 0 .or. .not. c_associated(p)) then
+            ist = 1; call trace("carry-back: no "//trim(addr)); return
+          end if
+          call c_f_pointer(p, sc, [1])
+          int_scalar = int(sc(1))
+        end function int_scalar
+      end subroutine mf6_carryback_setup
+
+      !! ================================================================
+      subroutine carry_back_unmet
+      !! Q1130 M2: before MF6 solves this step, subtract each channel's unmet volume from
+      !! the RECHARGE of the columns under that channel's LOSING reaches of the previous
+      !! step (GWFLOW > 0), weighted by their loss. Writes mf6_floor.out.
+      implicit none
+      integer :: g, e, r, node, un, rc, i, j
+      real(c_double) :: tot, v
+      do g = 0, max_gis
+        if (unmet_chan(g) <= 0.0_c_double) cycle
+        if (cb_iu > 0) write (cb_iu,'(i0,1x,i0,1x,es16.8)') mf6_daycount, g, unmet_chan(g)
+        tot = 0.0_c_double
+        do e = 1, n_bf
+          r = bf_reach(e)
+          if (bf_gis(e) == g .and. r >= 0 .and. r < n_sfr) then
+            if (gwf_prev(r+1) > 0.0_c_double) tot = tot + gwf_prev(r+1)
+          end if
+        end do
+        if (.not. cb_ready .or. tot <= 0.0_c_double) then
+          cb_unplaced = cb_unplaced + unmet_chan(g)
+        else
+          do e = 1, n_bf
+            r = bf_reach(e)
+            if (bf_gis(e) /= g .or. r < 0 .or. r >= n_sfr) cycle
+            if (gwf_prev(r+1) <= 0.0_c_double) cycle
+            v = unmet_chan(g) * gwf_prev(r+1) / tot
+            node = cb_igwf(r+1)
+            if (node < 1) then
+              cb_unplaced = cb_unplaced + v; cycle
+            end if
+            un = node
+            if (cb_reduced) un = cb_nodeuser(node)
+            rc = mod(un - 1, cb_nrow * cb_ncol)            !! 0-based cell within its layer
+            i = rc / cb_ncol + 1; j = mod(rc, cb_ncol) + 1
+            rch_arr(rc+1) = rch_arr(rc+1) - v / (cb_delr(j) * cb_delc(i))
+            cb_carried = cb_carried + v
+          end do
+        end if
+        unmet_chan(g) = 0.0_c_double
+      end do
+      cb_negrch = cb_negrch + count(rch_arr(1:n_rch) < 0.0_c_double)
+      end subroutine carry_back_unmet
+
+      !! ================================================================
+      subroutine mf6_note_unmet(gis, vol)
+      !! Q1130 M2: the channel with this gis floored its flow, discarding vol m3 of MF6
+      !! loss. One element per channel gis, so parallel channel routing never shares one.
+      implicit none
+      integer, intent(in) :: gis
+      real, intent(in) :: vol
+      if (allocated(unmet_chan)) then
+        if (gis >= 0 .and. gis <= max_gis) unmet_chan(gis) = unmet_chan(gis) + real(vol, c_double)
+      end if
+      end subroutine mf6_note_unmet
 
       !! ================================================================
       subroutine mf6_withhold_aquifer(iobj, vol)

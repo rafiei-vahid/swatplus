@@ -22,7 +22,8 @@
       use pfas_module, only : npfas
       use pfas_cha_module, only : pfas_src_load, pfdiag_src
       use mf6_coupler, only : mf6_baseflow_active, mf6_channel_baseflow, &
-                              mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound
+                              mf6_pfas_disch_active, mf6_channel_pfas, mf6_pfas_compound, &
+                              mf6_note_unmet
 
       implicit none
 
@@ -137,7 +138,8 @@
       !! aquifer hydrograph to a channel's hin while this is active (Q1130;
       !! before that fix the aquifer.con return was still in ht1 and this
       !! block ADDED MF6 baseflow on top), and the aqu_cha.lin branch below
-      !! is not taken.
+      !! is not taken. A loss larger than the channel's water is floored at 0
+      !! and the unmet part is carried back to MF6 (mf6_coupler carry_back_unmet).
       if (mf6_baseflow_active()) then
         aqu_inflo = real(mf6_channel_baseflow(int(ob(icmd)%gis_id)))   !m3/day, +ve=gain
         chsd_d(ich)%aqu_in = aqu_inflo / 86400.
@@ -147,7 +149,12 @@
           ob(icmd)%tsin(:) = (1. + rto) * ob(icmd)%tsin(:)
         end if
         ht1%flo = ht1%flo + aqu_inflo          !! +ve adds baseflow, -ve seepage
-        if (ht1%flo < 0.) ht1%flo = 0.
+        !! the channel cannot carry negative flow; the part of MF6's loss it could not supply
+        !! is recorded and taken back from MF6 at its next step (Q1130), so it is not created
+        if (ht1%flo < 0.) then
+          call mf6_note_unmet (int(ob(icmd)%gis_id), -ht1%flo)
+          ht1%flo = 0.
+        end if
         !! groundwater PFAS discharge (kg/day) from MF6 GWT into the channel
         if (mf6_pfas_disch_active() .and. npfas > 0 .and. cs_db%num_tot > 0) then
           ipf = mf6_pfas_compound()

@@ -647,10 +647,11 @@
         "   recharge (sum of daily basin depths) = ", rch_depth_cum, " m"
       if (bf_ready) write (*,'(a,es12.4,a,es12.4,a)') &
         "   SFR exchange: gaining ", bf_cum_gain, "  losing ", bf_cum_loss, " m3"
-      if (bf_ready) write (*,'(a,es12.4,a)') &
+      !! Q1130: es16.8 (9 significant digits) so each summary number checks against the per-day file and MF6's listing
+      if (bf_ready) write (*,'(a,es16.8,a)') &
         "   SWAT+ aquifer return withheld from channels (replaced by MF6) = ", sum(aq_withheld_ob), " m3"
       if (bf_ready) then
-        write (*,'(a,es12.4,a,es12.4,a,es12.4,a)') "   channel floor: unmet MF6 loss carried back to MF6 ", &
+        write (*,'(a,es16.8,a,es16.8,a,es16.8,a)') "   channel floor: unmet MF6 loss carried back to MF6 ", &
           cb_carried, " m3, unplaced ", cb_unplaced, " m3, left at end ", sum(unmet_chan), " m3"
         write (*,'(a,i0)') "   channel floor: column-steps with negative RECHARGE after carry-back = ", cb_negrch
         if (cb_iu /= 0) close (cb_iu)

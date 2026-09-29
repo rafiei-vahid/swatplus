@@ -164,11 +164,12 @@
       integer, allocatable :: drv_ptr(:), drv_reach(:)   !! each gis's reaches (1-based), CSR over gis 0..max_gis
       real(c_double), allocatable :: drv_wlen(:)         !! those reaches' LENGTH shares of their channel
       integer, allocatable :: gis_ob(:)                  !! (0:max_gis) SWAT+ object of the channel with this gis, 0 = none
-      integer, allocatable :: drv_order(:)               !! driven channels, upstream first (topological order of the map)
+      integer, allocatable :: drv_order(:)               !! driven channels, each two-exit source before its receiver where possible
       integer :: n_order = 0, n_ent = 0
       integer, allocatable :: ent_ptr(:)                 !! map entries grouped by receiving gis, CSR over gis 0..max_gis
       integer, allocatable :: ent_reach(:), ent_src(:), ent_exit(:)  !! entry reach (1-based), source gis, source exit reach (1-based)
       real(c_double), allocatable :: ent_w(:)            !! the map's static length weight within its (source, receiver) pair
+      logical, allocatable :: ent_dyn(:)                 !! a two-exit entry whose source is ordered first: split by the day's water
       real(c_double), allocatable :: drv_s(:)            !! (1:n_sfr) the day's injection that drains to each exit reach
       real(c_double), allocatable :: inflow_day(:), runoff_day(:)
       integer :: drv_iu = 0                              !! mf6_drive.out (day, gis, volumes); NEWUNIT is NEGATIVE, 0 = not open
@@ -1029,7 +1030,9 @@
       use hydrograph_module, only : ob
       implicit none
       integer :: iu, ios, e, g, h, n, m, i, k, it, nja, nhdr, nsfr_hdr, r0, u0, ncross, nmulti, nnoob, nrain, nlinks
-      integer :: npair, ntwo, nmiss_swat, nmiss_map, ne, in
+      integer :: npair, ntwo, nmiss_swat, nmiss_map, ne, in, nforced, ndyn, nstat
+      integer, allocatable :: pos(:)
+      logical, allocatable :: two(:)
       integer, allocatable :: cnt(:), t_reach(:), t_src(:), t_exit(:), t_g(:)
       real(c_double), allocatable :: t_w(:)
       logical, allocatable :: done(:)
@@ -1211,6 +1214,7 @@
       end do
       !! each (source, receiver) pair's static weights sum to 1; count pairs, two-exit pairs and where the networks disagree
       npair = 0; ntwo = 0; nmiss_map = 0
+      allocate (two(n_ent)); two = .false.
       do g = 0, max_gis
         do e = ent_ptr(g), ent_ptr(g + 1) - 1
           found = .false.
@@ -1223,7 +1227,12 @@
             if (ent_src(k) /= ent_src(e)) cycle
             wsum = wsum + ent_w(k); ne = ne + 1
           end do
-          if (ne > 1) ntwo = ntwo + 1
+          if (ne > 1) then
+            ntwo = ntwo + 1
+            do k = e, ent_ptr(g + 1) - 1
+              if (ent_src(k) == ent_src(e)) two(k) = .true.
+            end do
+          end if
           if (abs(wsum - 1.0_c_double) > 1.0e-9_c_double) call coupler_fatal( &
             "mf6_drive.map: the weights of a source -> receiver pair do not sum to 1")
           found = .false.
@@ -1251,8 +1260,12 @@
           if (.not. found) nmiss_swat = nmiss_swat + 1
         end do
       end do
-      !! channels upstream first: a source channel's injection must be known before its receiver splits its inflow
-      allocate (done(0:max_gis), drv_order(max_gis + 1)); n_order = 0
+      !! the order: a two-exit pair splits by the water injected into its source that day, so that source must be complete (every
+      !! inflow of its own set) before the receiver is. Only the two-exit pairs impose order; single-exit pairs need nothing. SFR's
+      !! reaches can leave a SWAT+ channel and re-enter it (the rogue deck: 234 channels in cycles of its h -> g graph), so a cycle
+      !! can remain among these dependencies too. It is broken deterministically (the smallest gis waiting goes next), and a pair
+      !! whose source is not yet complete keeps the map's static length weight on every day: counted and reported (Addendum 4).
+      allocate (done(0:max_gis), drv_order(max_gis + 1), pos(0:max_gis)); n_order = 0; nforced = 0; pos = 0
       do g = 0, max_gis
         done(g) = (drv_ptr(g + 1) == drv_ptr(g))
       end do
@@ -1263,12 +1276,23 @@
           if (done(g)) cycle
           ready = .true.
           do e = ent_ptr(g), ent_ptr(g + 1) - 1
-            if (.not. done(ent_src(e))) ready = .false.
+            if (two(e) .and. .not. done(ent_src(e))) ready = .false.
           end do
           if (.not. ready) cycle
-          done(g) = .true.; n_order = n_order + 1; drv_order(n_order) = g; progress = .true.
+          done(g) = .true.; n_order = n_order + 1; drv_order(n_order) = g; pos(g) = n_order; progress = .true.
         end do
-        if (.not. progress) call coupler_fatal("mf6_drive.map: the source -> receiver channel graph has a cycle")
+        if (.not. progress) then
+          g = findloc(done, .false., dim=1) - 1         !! done is (0:max_gis); findloc counts from 1
+          done(g) = .true.; n_order = n_order + 1; drv_order(n_order) = g; pos(g) = n_order; nforced = nforced + 1
+        end if
+      end do
+      allocate (ent_dyn(n_ent)); ndyn = 0; nstat = 0
+      do g = 0, max_gis
+        do e = ent_ptr(g), ent_ptr(g + 1) - 1
+          ent_dyn(e) = two(e) .and. pos(ent_src(e)) < pos(g)
+          if (two(e) .and. ent_dyn(e)) ndyn = ndyn + 1
+          if (two(e) .and. .not. ent_dyn(e)) nstat = nstat + 1
+        end do
       end do
       allocate (drv_s(n_sfr), inflow_day(n_sfr), runoff_day(n_sfr))
       nrain = count(drv_rain(1:n_sfr) /= 0.0_c_double)
@@ -1282,23 +1306,27 @@
         " channels (", nnoob, " of them have no SWAT+ channel object; their reaches get none)"
       write (*,'(a,i0,a,i0,a,i0,a)') "   SFR drive: ", n_ent, " map entries in ", npair, " source -> receiver pairs, ", ntwo, &
         " split over two or more exits"
+      write (*,'(a,i0,a,i0,a,i0,a)') "   SFR drive: two-exit entries split by the day's water ", ndyn, &
+        ", by the static length weight ", nstat, " (their source waits on them; ", nforced, " dependency cycles broken)"
       write (*,'(a,i0,a,i0,a,i0)') "   SFR drive: the networks disagree on ", nmiss_swat, &
         " SWAT+ channel links (sent as RUNOFF) and ", nmiss_map, " map pairs (no SWAT+ link); SFR reaches with RAIN /= 0: ", nrain
-      deallocate (cnt, t_reach, t_src, t_exit, t_g, t_w, done)
+      deallocate (cnt, t_reach, t_src, t_exit, t_g, t_w, done, pos, two)
       drv_ready = .true.
       end subroutine mf6_drive_setup
 
       !! ================================================================
       subroutine push_drive(first)
       !! Q1137: set SFR INFLOW and RUNOFF from SWAT+'s inflows of this day, after prepare_time_step and before the solve. The day's
-      !! first MF6 step computes them; its later sub-steps re-apply them (Q1144). Channels go upstream first, so a source split over
-      !! two exits follows the water injected into the source that day (DESIGN.txt Addendum 3b), with the map's length weight as the
-      !! counted fallback on a day the source received none.
+      !! first MF6 step computes them; its later sub-steps re-apply them (Q1144). Each two-exit source is processed before its
+      !! receiver where the dependencies allow, so its split follows the water injected into the source that day (DESIGN.txt
+      !! Addendum 3b); the map's length weight is used for a pair whose source waits on it (a cycle, Addendum 4) and, counted, on a
+      !! day the source received none.
       use hydrograph_module, only : ob
       implicit none
       logical, intent(in) :: first
       integer :: k, kk, g, iob, in, e, h, ne, r
       real(c_double) :: q, swat, lat, tolat, aqu, ssum, wd, inj, ro
+      logical :: dyn
       if (.not. first) then
         drv_inflow(1:n_sfr) = inflow_day(:)
         drv_runoff(1:n_sfr) = runoff_day(:)
@@ -1327,21 +1355,21 @@
                 cycle
               end if
               h = int(ob(ob(iob)%obj_in(in))%gis_id)
-              ne = 0; ssum = 0.0_c_double
+              ne = 0; ssum = 0.0_c_double; dyn = .false.
               do e = ent_ptr(g), ent_ptr(g + 1) - 1
                 if (ent_src(e) /= h) cycle
-                ne = ne + 1; ssum = ssum + drv_s(ent_exit(e))
+                ne = ne + 1; ssum = ssum + drv_s(ent_exit(e)); dyn = ent_dyn(e)   !! one pair: one flag
               end do
               if (ne == 0) then
                 lat = lat + q; tolat = tolat + q       !! SWAT+ links h -> g, SFR has no entry for it: lateral, and counted
                 cycle
               end if
-              if (ne > 1 .and. .not. (ssum > 0.0_c_double)) drv_fallback = drv_fallback + 1
+              if (ne > 1 .and. dyn .and. .not. (ssum > 0.0_c_double)) drv_fallback = drv_fallback + 1
               do e = ent_ptr(g), ent_ptr(g + 1) - 1
                 if (ent_src(e) /= h) cycle
                 if (ne == 1) then
                   wd = 1.0_c_double
-                else if (ssum > 0.0_c_double) then
+                else if (ent_dyn(e) .and. ssum > 0.0_c_double) then
                   wd = drv_s(ent_exit(e)) / ssum
                   drv_cum_moved = drv_cum_moved + 0.5_c_double * abs(wd - ent_w(e)) * q
                 else

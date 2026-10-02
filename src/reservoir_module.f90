@@ -51,7 +51,7 @@
       type (reservoir), dimension(:),allocatable :: res_ob
       
       type wetland
-        integer :: iweir = 1                !       !weir ID   Jaehak 2022
+        integer :: iweir = 0                !       !weir ID   Jaehak 2022; 0 = no weir unless a 'weir' mgt op sets it (mgt_sched)
         real :: psa = 0.                    !ha     |res surface area when res is filled to princ spillway
         real :: pvol = 0.                   !m^3    |vol of water needed to fill the res to the princ spillway (read in as ha-m and converted to m^3)
         real :: esa = 0.                    !ha     |res surface area when res is filled to emerg spillway 

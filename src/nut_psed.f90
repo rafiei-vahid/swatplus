@@ -54,6 +54,13 @@
 
         !! HRU sediment calculations
         sedp_attach = soil1(j)%hsta(1)%p + soil1(j)%man(1)%p + soil1(j)%man(1)%p + soil1(j)%mp(1)%sta + soil1(j)%mp(1)%act
+        !! Q1279: the three fractions are set below only when sedp_attach > 1.e-9, but they are read
+        !! whenever sedp > 1.e-9 (the sedp test divides by the HRU area, so a tiny steep HRU with exhausted
+        !! layer-1 P passes it while failing this one). They are locals with no initializer (8fa9083 removed
+        !! the implicit-SAVE '= 0.' for thread safety), so zero them on every call.
+        fr_orgp = 0.
+        fr_actmin = 0.
+        fr_stamin = 0.
         if (sedp_attach > 1.e-9) then
           fr_orgp = (soil1(j)%hsta(1)%p + soil1(j)%man(1)%p  + soil1(j)%man(1)%p) / sedp_attach
           fr_actmin = soil1(j)%mp(1)%sta / sedp_attach

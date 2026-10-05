@@ -57,13 +57,8 @@
       real :: sin_sl !           |
       real :: ch_len !           |
       real :: ch_sl !           | 
-      real :: sd_sl !           |
       integer :: msd_h !           |
       
-      !! Q1281: sd_sl is never assigned, yet the Kirpich tc below reads it whenever tc < 1.e-6 (ch_sl is the slope
-      !! assigned there). The OpenMP strip removed its implicit-SAVE '= 0.'; restore upstream's 0. as an assignment.
-      sd_sl = 0.
-
       eof = 0
       imax = 0
 
@@ -251,9 +246,11 @@
         ! compute time of concentration using Kirpich equation
         IF (hlt_db(idb)%tc < 1.e-6) THEN
          ch_len = hlt_db(idb)%dakm2
-         ch_sl = hlt_db(idb)%slope
-         hlt_db(idb)%tc = .0078 * (ch_len * 3210.) ** .77 * sd_sl        &   
-                                                        ** (-.385)
+         !! Q1281 follow-up: the slope term read sd_sl, which is never assigned; ch_sl, set here, is the
+         !! Kirpich slope. A zero slope would make S**(-.385) divide by zero, so floor S at 0.001, the
+         !! same 0.001 that time_conc_init adds to the HRU channel slope.
+         ch_sl = max(hlt_db(idb)%slope, 0.001)
+         hlt_db(idb)%tc = .0078 * (ch_len * 3210.) ** .77 * ch_sl ** (-.385)
         END IF
         
         !! xwalk with soil_lte

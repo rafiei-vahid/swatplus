@@ -66,6 +66,12 @@
       real :: xrem !              | 
       integer :: k !m^3/s         |Total number of HRUs plus this HRU number
       
+      !! Q1281: rcharea is assigned only when the depth iteration runs (qp_cms > 0), and sf_depth/sf_sed only when
+      !! sf_area > 1.e-6, but they are read when sf_area > 0. The OpenMP strip removed their implicit-SAVE '= 0.'.
+      rcharea = 0.
+      sf_depth = 0.
+      sf_sed = 0.
+
       !!  set variables
       j = ihru
                                 

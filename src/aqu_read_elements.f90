@@ -26,6 +26,10 @@
       integer :: iaqu !none         |counter
       integer :: ireg !none         |counter
                 
+      !! Q1281: ihru indexes acu_reg(i)%num in the nspu == 0 branch of the region block but is never assigned on
+      !! that path. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+      ihru = 0
+
       mreg = 0
       imax = 0
       mcal = 0

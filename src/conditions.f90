@@ -248,7 +248,11 @@
           end do
           !plant not in community of ipl = 0
           if (ipl == 0) then
-            act_hit_tl(ialt) = "n"
+            !! Q1281 follow-up: the plant is not in the community, so it is not growing; treat it as the
+            !! gro == "n" case below. This used to write act_hit_tl(ialt) with a stale or zero ialt.
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) == "=") act_hit_tl(ialt) = "n"
+            end do
           else 
             !if plant is in the community - check to see if it is growing
             do ialt = 1, d_tbl%alts

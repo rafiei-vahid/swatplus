@@ -55,6 +55,10 @@
       real :: c_microb_sed !              |
       real :: c_ly1
       
+      !! Q1281: koc is assigned only when layer-1 microbial C > .01 but read in the lower-layer loop. prmt_21 is
+      !! the only value it is ever given, so assigning it here is a no-op wherever that branch runs.
+      koc = cb_wtr_coef%prmt_21
+
       j = ihru
       
       latc_clyr = 0.        

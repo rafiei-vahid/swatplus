@@ -75,6 +75,13 @@
       integer :: mon !           |Month of year
       integer :: end_of_mo !           |End of month flag
 
+      !! Q1281: assigned only on some release branches but read outside them: ic (dyrt1 file_pointer not con1-3),
+      !! b_lo (dyrt1 lim_op outside = * + - /), demand (irrig_trn file_pointer not wro/hru). The OpenMP strip
+      !! removed their implicit-SAVE initializers; reset them per call (upstream's 0).
+      ic = 0
+      b_lo = 0.
+      demand = 0.
+
       dom          = time%day_mo
       mon          = time%mo
       end_of_mo    = time%end_mo

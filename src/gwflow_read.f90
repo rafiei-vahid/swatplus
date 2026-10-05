@@ -503,7 +503,11 @@
       allocate(gw_bound_dist(ncell), source = 0.)
       do i=1,ncell
         if(gw_state(i)%stat == 2) then
-          min_dist = 1000000.
+          !! Q1281 follow-up: 1.0e6 m stood in for "infinity". With no active cell inside it, active_cell kept the
+          !! previous boundary cell's answer, or 0, an out-of-bounds index in gwflow_rech. Search without a cap
+          !! and start each boundary cell at 0 ("none"). The nearest cell is unchanged whenever one is within 1.0e6 m.
+          min_dist = huge(min_dist)
+          active_cell = 0
           do j=1,ncell
             if(gw_state(j)%stat == 1) then
               dist_x = gw_state(i)%xcrd - gw_state(j)%xcrd

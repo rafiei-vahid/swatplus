@@ -159,6 +159,10 @@
           wet_ob(iihru)%weir_wid = 2.5  !m
         endif
 
+        !! Q1281 follow-up: iprop stays 0 when the HRU's surf_stor name matches no wetland.wet entry (the
+        !! "not found (wetland.wet)" line above). wet_dat is allocated from 1 when that file exists, so
+        !! skip the initial-concentration lookups in that case; when it does not exist wet_dat(0) is valid.
+        if (iprop >= lbound(wet_dat, 1)) then
         !!set initial n and p concentrations --> (ppm) * (m^3) / 1000 = kg    !! ppm = t/m^3 * 10^6
         init = wet_dat(iprop)%init
         init_om = wet_init(init)%org_min
@@ -206,6 +210,7 @@
             wet_water(iihru)%cs(3) = 0.
           endif
         endif
+        end if
           
         !wet(iihru)%flo = om_init_water(init_om)%flo * wet_ob(iihru)%pvol !Jaehak 2022
         wet_om_init(iihru) = wet(iihru)

@@ -35,6 +35,10 @@
       integer :: ics !none       |counter
       integer :: isstor !none       |counter
   
+      !! Q1281: iprop is assigned only when the HRU's surf_stor name matches a wetland.wet entry, but the
+      !! initial-concentration lookup reads wet_dat(iprop) regardless. Reset per call (upstream's 0).
+      iprop = 0
+
       iweir = wet_ob(iihru)%iweir
         
       !! check if hru can store surface water

@@ -60,6 +60,10 @@
       real :: sd_sl !           |
       integer :: msd_h !           |
       
+      !! Q1281: sd_sl is never assigned, yet the Kirpich tc below reads it whenever tc < 1.e-6 (ch_sl is the slope
+      !! assigned there). The OpenMP strip removed its implicit-SAVE '= 0.'; restore upstream's 0. as an assignment.
+      sd_sl = 0.
+
       eof = 0
       imax = 0
 

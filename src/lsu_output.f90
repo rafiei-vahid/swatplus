@@ -35,10 +35,12 @@
       end do
                      
       do ilsu = 1, db_mx%lsu_out
+        !! Q1281 follow-up: iob depends only on ilsu, so set it here. Inside the element loop an LSU with no
+        !! elements printed the previous LSU's gis_id, or read ob(0) when it came first.
+        iob = sp_ob1%ru + ilsu - 1
         ! summing HRU output for the landscape unit
         do ielem = 1, lsu_out(ilsu)%num_tot
           ihru = lsu_out(ilsu)%num(ielem)
-          iob = sp_ob1%ru + ilsu - 1
           if (lsu_elem(ihru)%ru_frac > 1.e-9) then
             const = lsu_elem(ihru)%ru_frac
             if (lsu_elem(ihru)%obtyp == "hru") then

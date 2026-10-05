@@ -48,6 +48,12 @@
       real :: soil_heat !J      |heat in soil water of soil layer
 
 
+      !! Q1281: ob_id_src is never assigned (upstream's '= 0' made every call take the self-supply branches), and
+      !! cell_id is set only for structured grids before the single-cell branches read it. The OpenMP strip removed
+      !! both implicit-SAVE initializers; reset them per call.
+      ob_id_src = 0
+      cell_id = 0
+
       !zero out the total met and unmet demand
       extracted = 0.
       dmd_unmet = 0.

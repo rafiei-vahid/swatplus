@@ -170,9 +170,16 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%phubase0, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: these weather conditions are defined only for hru and hlt objects. For any other
+          !! ob, iob was stale or 0 (ob(0) is out of bounds), so treat the condition as not met.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%phubase0, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                          
         !precip on current day
         case ("precip_cur")
@@ -185,9 +192,15 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%precip, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: hru/hlt only; see phu_base0 above.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%precip, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                                       
         !precip on next day day
         case ("precip_next")
@@ -200,9 +213,15 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%precip_next, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: hru/hlt only; see phu_base0 above.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%precip_next, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                       
         !plant growing
         case ("plant_gro")

@@ -67,11 +67,14 @@
           ccu_out(i)%num_tot = ielem1
           deallocate (defunit_num)
         else
-          !!all hrus are in region 
-          allocate (ccu_out(i)%num(sp_ob%hru), source = 0)
-          ccu_out(i)%num_tot = sp_ob%res
+          !!all channels are in region
+          !! Q1281 follow-up: this loop is over channels but stored into num(ires), and ires is never set in this
+          !! routine: always out of bounds (num_tot was also sp_ob%res). Store each channel number at its own
+          !! index. ccu_out%num is not read anywhere else in the engine.
+          allocate (ccu_out(i)%num(sp_ob%chan), source = 0)
+          ccu_out(i)%num_tot = sp_ob%chan
           do icha = 1, sp_ob%chan
-            ccu_out(i)%num(ires) = icha
+            ccu_out(i)%num(icha) = icha
           end do      
         end if
 

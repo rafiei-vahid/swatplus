@@ -61,6 +61,11 @@
       integer :: itr
       integer :: iwr !none     |weir counter Chawanda 2025
 
+      !! Q1281: idp is assigned only by the plnt/harv/kill cases but read by the dwm mgt.out write, and ipud only
+      !! when a puddle.ops name matches but always read by pudl. Reset per call (upstream's 0).
+      idp = 0
+      ipud = 0
+
       j = ihru
       ires= hru(j)%dbs%surf_stor ! for paddy management Jaehak 2022
       iob = hru(j)%obj_no

@@ -195,6 +195,10 @@
       logical, allocatable :: cell_tile_depth_set(:), cell_tile_area_set(:), cell_tile_K_set(:)
 
 
+      !! Q1281: active_cell is assigned only when an active cell lies within min_dist of a boundary cell, but it
+      !! is stored for every boundary cell. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call.
+      active_cell = 0
+
       !write message to screen
       call DATE_AND_TIME (b(1), b(2), b(3), date_time)
       write (*,111) "reading from groundwater file      ", date_time(5), date_time(6), date_time(7)

@@ -35,6 +35,47 @@ Branch `fix/q1281-uninit-locals` of rafiei-vahid/swatplus, based on `7eca087` (t
 
 The merge removes exactly the uninitialised-variable warnings of both branches: 63 at `7eca087` (the 60 audited + nut_psed's 3) become 19 on the merged branch, which are the 18 false positives and `res_control`. Every other class is unchanged.
 
+## Follow-ups branch: `fix/q1281-followups` (Lane P, step 2)
+
+Branched from `fix/q1281-q1279-merged`, one commit per site (18). Each guard runs only where the old code read an unset or out-of-bounds value, so a deck that never reaches the path is unchanged. Upstream main (`97ca231`) still has the original code at all 18 sites, so there was no upstream fix to copy; each guard follows the code's own intent. Three sites now stop with a named error on invalid input (written to the screen and diagnostics.out, the fork's convention for a bad input file): hyd_read_connect, res_hydro and unit_hyd. None of the 18 is left as a pure limit; where part of a site still needs Vahid's ruling, it is in the last column.
+
+| # | Site (7eca087 line) | Variable | Was | Commit | Guard on the path | Decks that change | Still open (Vahid rules) |
+|---|---|---|---|---|---|---|---|
+| 1 | `aqu_read_elements.f90:117` | `ihru` | out-of-bounds write | `d9fda3b` | Store `num(iaqu)` in an array sized `sp_ob%aqu`. | None: `acu_reg%num` is read nowhere else. | - |
+| 2 | `ch_read_elements.f90:70` | `ires` | out-of-bounds write | `159bac3` | Store `num(icha)` in an array sized `sp_ob%chan`. | None: `ccu_out%num` is read nowhere else. | - |
+| 3 | `command_object.f90:370` | `iob` | out-of-bounds read | `94240a0` | A dr object with no inflows uses its own `props`. | None: with no inflows `hin` is zero, so the result is zero either way. | With inflows the LAST inflow's props are still used (upstream logic). |
+| 4 | `conditions.f90:148` | `ipl` | out-of-bounds read | `857a71f` | Skip `cond_real` when `npl = 0` (or `ipl = 0`). | None: every alternative is already "n" there. | - |
+| 5 | `conditions.f90:191` (and 161, 176) | `iob` | out-of-bounds read | `5234386` | `phu_base0`/`precip_cur`/`precip_next` on an object other than hru/hlt is not met. | Tables using these conditions on other object types. | Mapping other object types to a weather station would be new behaviour. |
+| 6 | `conditions.f90:220` | `ialt` | out-of-bounds write | `a1fe5e5` | An absent plant counts as not growing: every `=` alternative becomes "n". | Tables with `plant_name_gro` on an absent plant: actions gated on it growing stop firing. | - |
+| 7 | `gwflow_read.f90:514` | `active_cell` | out-of-bounds write (in gwflow_rech) | `1145324` | Nearest active cell found without the 1.0e6 m cap; recharge stays in the cell only if the grid has no active cell. | Grids with a boundary cell more than 1.0e6 m from every active cell. | - |
+| 8 | `header_cs.f90:421` | `ipest` | out-of-bounds read | `9730ec9` | Index the pathogen aa headers by `ipath` (and the csv one at 426). | None: header_cs is not called at 7eca087. | - |
+| 9 | `hru_lte_read.f90:252` | `sd_sl` | -fpe0 trap | `0eba3c2` | Kirpich tc uses `ch_sl`, floored at 0.001. | HRU-lte with input tc < 1.e-6 (tc is now computed). | The 0.001 floor is a choice; it is the engine's own `time_conc_init` offset. |
+| 10 | `hyd_read_connect.f90:33` (read at 337) | `ob1`, `ob2` | out-of-bounds write | `4bd1663` | Named `error stop` when a connect file is missing or ends before its header. | Such decks now stop with the file name. | - |
+| 11 | `lsu_output.f90:76` | `iob` | out-of-bounds read | `be8d390` | Set `iob` once per LSU, before the element loop. | LSU output with an empty LSU: it now prints its own gis_id. | - |
+| 12 | `recall_read_cs.f90:200` | `istep` | out-of-bounds index | `5a5fe91` | Skip the data read when no start-year record set `istep`. | None: not called at 7eca087. | - |
+| 13 | `recall_read_salt.f90:201` | `istep` | out-of-bounds index | `d68b707` | Same as recall_read_cs. | None: not called at 7eca087. | - |
+| 14 | `res_hydro.f90:172` | `ic` | out-of-bounds read | `f0343c0` | Named `error stop` when the dyrt1 condition index is outside 1..`conds`. | Decks with an unknown dyrt1 `file_pointer`, or con1-3 past the table's conditions, now stop. | The hard-coded 5/4/3 ("NAM setup") stay. |
+| 15 | `smp_grass_wway.f90:124` | `sf_depth` (and `sf_sed` at 128) | -fpe0 trap | `3494490` | Filter removal only when `sf_depth > 0`. | HRUs with 0 < sheet-flow area <= 1.e-6 m2 get no removal. | - |
+| 16 | `unit_hyd.f90:109` | `q` | -fpe0 trap | `f5f1c7e` | Named `error stop` for `uhyd` other than 0/1. | Sub-daily decks with an invalid uhyd now stop. | - |
+| 17 | `wet_initial.f90:152` | `iprop` | out-of-bounds read | `f1b189c` | Skip the initial-concentration lookups when `iprop < lbound(wet_dat,1)`. | HRUs naming a wetland that wetland.wet lacks: that wetland starts with no initial concentrations. | `impound_on` cannot attach a wetland: its crosswalk compares `wet_dat%name`, which is never assigned. |
+| 18 | `wet_irrp.f90:48` | `iob` | out-of-bounds read | `1913766` | Skip the source search for an HRU in no routing unit (it keeps the `unlim` source). | Paddy HRUs in no routing unit with `irr_isc = 0`. | - |
+
+Clean builds, same flags as the merged-branch table (`-O2 -Wall -Wuninitialized`, `-finit-local-zero` removed):
+
+| Warning class | `7eca087` | `fix/q1281-q1279-merged` | `fix/q1281-followups` |
+|---|---|---|---|
+| `-Wmaybe-uninitialized` | 62 | 19 | 19 |
+| `-Wuninitialized` | 1 | 0 | 0 |
+| `-Wunused-variable` | 207 | 207 | 207 |
+| `-Wconversion` | 211 | 211 | 211 |
+| `-Wtabs` | 531 | 531 | 531 |
+| **total** | **1119** | **1075** | **1075** |
+| errors | 0 | 0 | 0 |
+
+Uninitialised-variable warnings on the follow-ups branch: 19, the same (file, variable) pairs as on the merged branch.
+
+**Correction (wet_initial, path (b)).** The Q1281 commit `52689c2` and the first version of this file said an `impound_on` action on an HRU without an hru-data wetland reaches the uninitialised `iprop` read. It does not: the whole routine body sits inside `if (hru(iihru)%dbsc%surf_stor /= "null")` (lines 41-218 at 7eca087), so that HRU skips it. Only path (a), a name that matches no wetland.wet entry, reaches the read. Separately, `impound_on`'s own crosswalk (`actions.f90`) compares `wet_dat(ires)%name`, which nothing assigns (it stays "default"), so the action never attaches a wetland. That is a logic bug for Vahid, not an uninitialised read.
+
 ## Method
 
 1. Source: `7eca087` with `c80ab8ce` (nut_psed, Q1279) cherry-picked on top. The fix/q1279 branch tip also carries five Q1072 commits (`c56f19e`..`173befc`); they are not included, so this is exactly "7eca087 plus c80ab8ce".
@@ -112,7 +153,7 @@ Line numbers are gfortran's, in `7eca087` numbering (c80ab8ce touches only nut_p
 | 56 | `urban_parm_read.f90:53` | `imax` | REAL | `2c9a4c7` | `urban.urb` exists but ends before its header line. | `aeebf09` (earlier: removed `7e1a882`, restored `ef4dcc4`) |  |
 | 57 | `wet_cs.f90:96` | `v_settle` | FALSE POSITIVE | none needed | Same as res_cs `v_settle`. | `8fa9083` |  |
 | 58 | `wet_cs.f90:112` | `k_react` | FALSE POSITIVE | none needed | Same as res_cs `k_react`. | `8fa9083` |  |
-| 59 | `wet_initial.f90:152` | `iprop` | REAL | `52689c2` | (a) The HRU's hru-data `surf_stor` name matches no wetland.wet entry; (b) an `impound_on` action on an HRU whose hru-data `surf_stor` is "null" (actions sets `dbs%surf_stor`, but wet_initial crosswalks by the name). Reads at 152, 159, 177. | `8fa9083` | OOB-0 |
+| 59 | `wet_initial.f90:152` | `iprop` | REAL | `52689c2` | The HRU's hru-data `surf_stor` name matches no wetland.wet entry (reads at 152, 159, 177). Corrected: an `impound_on` action on an HRU without an hru-data wetland does NOT reach it; the body is inside `if (dbsc%surf_stor /= "null")`. | `8fa9083` | OOB-0 |
 | 60 | `wet_irrp.f90:48` | `iob` | REAL | `093af86` | A paddy-irrigated HRU (`paddy_irr > 0`, ponding below `irr_hmin`) that is in no routing unit and has no irrigation source in its management (`irr_isc = 0`). | `8fa9083` | OOB-0 |
 
 ### Read in the same statements but not flagged by gfortran
@@ -199,6 +240,8 @@ violations: 0
 
 ## Follow-ups (not done here: each one changes behaviour)
 
+The 18 below are fixed on `fix/q1281-followups`; see that section for each commit and guard. This list is the record as written for `fix/q1281-uninit-locals`.
+
 **Index 0 is still out of bounds** on the uninitialised path. The upstream value was restored as ruled; the intended logic is a separate change:
 
 - `aqu_read_elements.f90:117`: `acu_reg(i)%num(0)` is a write below `num(1:sp_ob%hru)`. The loop presumably meant `num(iaqu)`, with an allocation sized by `sp_ob%aqu`.
@@ -214,7 +257,7 @@ violations: 0
 - `recall_read_cs.f90:200`: `hd_cs(0, iyrs)` is below the allocation, which starts at 1. Dead code at 7eca087.
 - `recall_read_salt.f90:201`: `hd_salt(0, iyrs)` is below the allocation, which starts at 1. Dead code at 7eca087.
 - `res_hydro.f90:172`: `d_tbl%cond(0)` is a read below `cond(1:conds)`. An unknown `dyrt1` `file_pointer` should be rejected when the decision tables are read.
-- `wet_initial.f90:152`: `wet_dat(0)` is a read below `wet_dat(1:imax)` when wetland.wet exists. For path (b), `hru(iihru)%dbs%surf_stor`, set by `impound_on`, holds the intended index.
+- `wet_initial.f90:152`: `wet_dat(0)` is a read below `wet_dat(1:imax)` when wetland.wet exists. (Corrected: there is no path (b); see the follow-ups section.) Guarded on `fix/q1281-followups`.
 - `wet_irrp.f90:48`: `ob(0)%src_tot` is a read below `ob(1:)`, and it then bounds a loop over `ob(0)%obtyp_out`. With no routing unit the code has already set the `unlim` source, which is presumably what should be used.
 
 **Traps under `-fpe0`** on the uninitialised path (measured as above):

@@ -7,10 +7,33 @@ Branch `fix/q1281-uninit-locals` of rafiei-vahid/swatplus, based on `7eca087` (t
 - gfortran 13.3.0 with `-O2 -Wmaybe-uninitialized -Wuninitialized` on `7eca087` + `c80ab8ce` reports **60 uninitialised-variable warnings in 43 files** (0 errors).
 - **42 are REAL** (set on a branch and read outside it) and **18 are false positives**.
 - 41 REAL warnings are fixed in **30 commits, one per routine**: an executable assignment at the top of the routine, never a declaration initializer (which would imply SAVE and break OpenMP thread privacy). Two variables gfortran did not flag but that are read uninitialised in the same statements are fixed in the same commits: `istr1` (actions) and `ob2` (hyd_read_connect).
-- 1 REAL site is reported and not fixed: `res_control` `irrig_track_b` is cross-call state, not a scratch local (see Follow-ups). That was Vahid's ruling.
+- 1 REAL site is reported and not fixed: `res_control` `irrig_track_b` is cross-call state, not a scratch local (see Follow-ups). That was Vahid's ruling. Per Lane O, it is not static in the shipped binary either, so there it is undefined on every call (see Follow-ups).
 - After the fixes the same build reports **19 warnings**: 19 expected (the 18 false positives + res_control), 0 new, and 0 on a fixed variable.
 - 4 REAL sites are in routines that nothing calls at `7eca087` (header_cs, recall_read_cs, recall_read_salt, reg_read_elements). The linker discards them under `--gc-sections`. They are fixed anyway so they stay safe if re-enabled.
 - Per Vahid's ruling, every fix restores upstream's own initial value. On the uninitialised path **18 fixed sites are still wrong**: 15 index 0 out of bounds and 3 trap under `-fpe0`. The fix makes them deterministic and loud, not correct. Each is listed under Follow-ups.
+
+## Merged branch: `fix/q1281-q1279-merged` (Lane P, step 1)
+
+- Merge commit `28d25c9` joins `fix/q1281-uninit-locals` (`2de4bec`) and `fix/q1279-nut-psed-fractions` (`c80ab8c`) with `--no-ff`. **The merge was clean**: no conflicts, and no file is changed by both branches. Neither source branch was rewritten or force-pushed.
+- The q1279 branch carries 5 Q1072 `plant_parm_read` commits beneath `c80ab8ce`, so they come along with the merge. They are not in `7eca087` (they are in `ship/q1130-q1139-combined`): `173befc`; `3115eb3`; `2e0b97e`; `9c4710e`; `c56f19e`.
+- Clean builds (fresh build directory, serial `make`) with gfortran 13.3.0, the repo's CMake Release flags minus `-finit-local-zero`, and `-O2 -Wall -Wuninitialized`. Counts are diagnostic lines that start with `Warning:`:
+
+| Warning class | `7eca087` (deployed) | `fix/q1281-uninit-locals` | `fix/q1279-nut-psed-fractions` | `fix/q1281-q1279-merged` |
+|---|---|---|---|---|
+| `-Wmaybe-uninitialized` | 62 | 22 | 59 | 19 |
+| `-Wuninitialized` | 1 | 0 | 1 | 0 |
+| `-Wtabs` | 531 | 531 | 531 | 531 |
+| `-Wconversion` | 211 | 211 | 211 | 211 |
+| `-Wunused-variable` | 207 | 207 | 207 | 207 |
+| `-Wunused-label` | 34 | 34 | 34 | 34 |
+| `-Wcharacter-truncation` | 12 | 12 | 12 | 12 |
+| `-Wunused-dummy-argument` | 7 | 7 | 7 | 7 |
+| `-Wunused-function` | 1 | 1 | 1 | 1 |
+| legacy/extension/deleted-feature notices | 53 | 53 | 53 | 53 |
+| **total** | **1119** | **1078** | **1116** | **1075** |
+| errors | 0 | 0 | 0 | 0 |
+
+The merge removes exactly the uninitialised-variable warnings of both branches: 63 at `7eca087` (the 60 audited + nut_psed's 3) become 19 on the merged branch, which are the 18 false positives and `res_control`. Every other class is unchanged.
 
 ## Method
 
@@ -74,7 +97,7 @@ Line numbers are gfortran's, in `7eca087` numbering (c80ab8ce touches only nut_p
 | 41 | `recall_read_cs.f90:200` | `istep` | REAL | `1c80240` | Would be reached (a) with no record for the first simulation year (EOF; gfortran's implied-do is guarded and does not evaluate `istep`), or (b) `typ` outside 0-3 with a matching record. recall_read_cs is not called at 7eca087. | `7e1a882` | OOB-0, dead@7eca087 |
 | 42 | `recall_read_salt.f90:201` | `istep` | REAL | `0241473` | Same two paths as recall_read_cs. recall_read_salt is not called at 7eca087. | `7e1a882` | OOB-0, dead@7eca087 |
 | 43 | `reg_read_elements.f90:71` | `ireg` | REAL | `90474ff` | Would be reached on every pass that reads `in_regs%def_reg` past its count line. reg_read_elements is not called at 7eca087 (its call in proc_cal.f90:25 is commented out). | `7e1a882` | dead@7eca087 |
-| 44 | `res_control.f90:83` | `irrig_track_b` | REAL (report only) | not fixed (follow-up) | Every call: `irrig_track_b` is cross-call state (the last demand tracker) that upstream kept through SAVE. A reset at entry would change release numerics for models using `res_irr_dmd`, so per Vahid's ruling it is reported, not fixed. | `8fa9083` | follow-up |
+| 44 | `res_control.f90:83` | `irrig_track_b` | REAL (report only) | not fixed (follow-up) | Every call: `irrig_track_b` is cross-call state (the last demand tracker) that upstream kept through SAVE. A reset at entry would change release numerics for models using `res_irr_dmd`, so per Vahid's ruling it is reported, not fixed. **Lane O:** in the shipped ifx binary it is not static, so there it is undefined on every call. | `8fa9083` | follow-up |
 | 45 | `res_cs.f90:93` | `v_settle` | FALSE POSITIVE | none needed | Assigned for `ics` = 1, 2, 3 on every iteration; the loop always runs 1 to n, so for `ics >= 4` it holds iteration 3's value and is never undefined. | `8fa9083` |  |
 | 46 | `res_cs.f90:109` | `k_react` | FALSE POSITIVE | none needed | Same as `v_settle` (assigned for `ics` 1-3, loop runs in order). | `8fa9083` |  |
 | 47 | `res_hydro.f90:172` | `ic` | REAL | `2166d18` | A `dyrt1` release whose `file_pointer` is not con1/con2/con3 (reads at 172-182). | `8fa9083` | OOB-0 |
@@ -200,7 +223,7 @@ violations: 0
 - `smp_grass_wway.f90:124`: `Log(sf_depth)` with `sf_depth = 0.` raises divide-by-zero when `0 < sf_area <= 1.e-6` (without traps, -Inf, and `surq_remove` is clamped to 95). The assignment guard and the read guard should agree.
 - `unit_hyd.f90:109`: With `q = 0`, `sumq = 0` and the normalisation `uh / sumq` is 0/0, which raises invalid (NaN without traps). `bsn_cc%uhyd` should be validated where codes.bsn is read.
 
-**Report only:** `res_control.f90:83` `irrig_track_b` is cross-call state: the last `res_ob(jres)%irrig_track` seen, which upstream kept through SAVE. It is shared across reservoirs even upstream. Every call at 7eca087 reads it before setting it. A reset at entry would count `res_irr_dmd` demand every day once the tracker has advanced, and `daily_demand` feeds `d_mon_past`, which the `res_hydro` release rule reads, so that is a numerics change. The thread-safe fix is a per-reservoir tracker component in `res_ob`, which is a reservoir_module type change.
+**Report only:** `res_control.f90:83` `irrig_track_b` is cross-call state: the last `res_ob(jres)%irrig_track` seen, which upstream kept through SAVE. It is shared across reservoirs even upstream. Every call at 7eca087 reads it before setting it. A reset at entry would count `res_irr_dmd` demand every day once the tracker has advanced, and `daily_demand` feeds `d_mon_past`, which the `res_hydro` release rule reads, so that is a numerics change. The thread-safe fix is a per-reservoir tracker component in `res_ob`, which is a reservoir_module type change. **Lane O (engine), relayed by Lane P on 2026-10-05:** in the shipped ifx binary built from `7eca087` none of the 44 routine/variable pairs is static, `irrig_track_b` included. So "kept across calls" describes upstream, not what we ship: there the value is undefined on every call. Not verified here (ifx is not installed in this session). Not changed; Vahid rules.
 
 **Seen in passing, not uninitialised reads:** `swift_output` writes the last channel's name on every `chan_dr.swf` row (`idb` from the previous loop). `lsu_output` prints the previous LSU's `gis_id` for an LSU with no elements. `calsoft_sed` compares `hru(ihru)` (the module-level `ihru`) where `iihru` is meant. `res_cs`/`wet_cs` reuse constituent 3's rates for any constituent beyond 3. `aqu_read_elements` inquires `def_aqu_reg` but opens `def_aqu`.
 

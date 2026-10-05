@@ -153,7 +153,11 @@
             end if
           end do
             
+          !! Q1281 follow-up: with no plants (npl = 0) every alternative is already "n" above and plcur has no
+          !! valid index, so skip the comparison (cond_real only ever sets "n"). ipl > 0 also covers alts = 0.
+          if (pcom(ob_num)%npl > 0 .and. ipl > 0) then
             call cond_real (ic, pcom(ob_num)%plcur(ipl)%phuacc, d_tbl%cond(ic)%lim_const, idtbl)
+          end if
             
         !potential heat units - base zero
         case ("phu_base0")

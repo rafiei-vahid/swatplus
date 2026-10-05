@@ -11,6 +11,10 @@
      integer :: imet
      integer :: isalt
            
+     !! Q1281: ipest is the pesticide implied-do index, defined only after a pesticide header is written, but the
+     !! average-annual pathogen header reads cs_path_solsor(ipest). Reset per call (upstream's 0).
+     ipest = 0
+
      !! daily - HYDIN
      if (pco%hyd%d == "y") then   
         if (cs_db%num_pests > 0) then

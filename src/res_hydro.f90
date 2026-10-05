@@ -174,7 +174,20 @@
                   ic = 4    !NAM setup
                 case ("con3")
                   ic = 3    !NAM setup
+                case default
+                  ic = 0
               end select
+              !! Q1281 follow-up: an unknown file_pointer left ic unset (0 since Q1281; cond(0) is out of bounds),
+              !! and the hard-coded 5/4/3 can exceed a table's condition count. Stop with the reason instead.
+              if (ic < 1 .or. ic > d_tbl%conds) then
+                write (*,*) "ERROR: dyrt1 action ", trim(d_tbl%act(iac)%name), " in decision table ", trim(d_tbl%name), &
+                            ": file_pointer ", trim(d_tbl%act(iac)%file_pointer), " gives condition ", ic, &
+                            " but the table has ", d_tbl%conds, " (Q1281)"
+                write (9001,*) "ERROR: dyrt1 action ", trim(d_tbl%act(iac)%name), " in decision table ", trim(d_tbl%name), &
+                            ": file_pointer ", trim(d_tbl%act(iac)%file_pointer), " gives condition ", ic, &
+                            " but the table has ", d_tbl%conds, " (Q1281)"
+                error stop
+              end if
               !perform operation on target variable to get target
               select case ((d_tbl%cond(ic)%lim_op))
               case ('=') 

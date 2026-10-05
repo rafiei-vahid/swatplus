@@ -18,6 +18,10 @@
       real :: sw_init !           |
       real :: sno_init !           |
           
+      !! Q1281: iob is assigned only inside each LSU's element loop, but every LSU output write reads
+      !! ob(iob)%gis_id, so a leading LSU with no elements read it undefined. Reset per call (upstream's 0).
+      iob = 0
+
       !! zero daily outputs before summing
       do ilsu = 1, db_mx%lsu_out
         sw_init = ruwb_d(ilsu)%sw_init

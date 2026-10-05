@@ -21,6 +21,10 @@
       integer :: i
       real :: rto
       
+      !! Q1281: iob is assigned only when the HRU belongs to a routing unit, but the source search reads ob(iob)
+      !! when irr_isc == 0. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call.
+      iob = 0
+
       j = ihru
       wsa1 = hru(j)%area_ha * 10.
       

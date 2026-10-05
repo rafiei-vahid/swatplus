@@ -12,6 +12,10 @@
       integer :: mchp !             |ending of loop
       integer :: i !none         |counter 
        
+       !! Q1281: mchp bounds the read loop below even when the file ends before its count line.
+       !! The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+       mchp = 0
+
        eof = 0
        
       inquire (file=in_chg%ch_sed_parms_sft, exist=i_exist)

@@ -174,6 +174,7 @@
               iyrs = 1
               iyr_prev = jday
             else
+              istep = 0      !! Q1281 follow-up: per recall object; set below only when the start year is found
               do 
                 read (108,*,iostat=eof) jday, mo, day_mo, iyr
                 if (eof < 0) exit
@@ -196,6 +197,9 @@
               iyrs = 1
             end if
        
+            !! Q1281 follow-up: with no record for the first simulation year, or typ outside 1-3, istep was never
+            !! set and the read below indexed the data array with it. Store nothing for this object instead.
+            if (rec_salt(i)%typ == 0 .or. istep > 0) then
             do
               iyr_prev = iyr
               if (rec_salt(i)%typ == 0) then
@@ -232,6 +236,7 @@
              end select
            
             end do   
+            end if
             close (108)
           else
           

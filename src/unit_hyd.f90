@@ -70,6 +70,14 @@
       !! implicit-SAVE '= 0.'; reset it per call (upstream's value).
       q = 0.
 
+      !! Q1281 follow-up: only uhyd 0 (triangular) and 1 (gamma) define q; any other value left the hydrograph all
+      !! zero and the normalisation by sumq below divided 0 by 0. Stop with the reason instead.
+      if (bsn_cc%uhyd /= 0 .and. bsn_cc%uhyd /= 1) then
+        write (*,*) "ERROR: codes.bsn uhyd = ", bsn_cc%uhyd, " is not 0 (triangular) or 1 (gamma) (Q1281)"
+        write (9001,*) "ERROR: codes.bsn uhyd = ", bsn_cc%uhyd, " is not 0 (triangular) or 1 (gamma) (Q1281)"
+        error stop
+      end if
+
       !! compute unit hydrograph for computing hydrograph from direct runoff
       ql = 0.
       sumq = 0.

@@ -60,6 +60,14 @@
 !! initialized local => implicit SAVE => shared across threads (see res_hydro.f90)
 !$omp threadprivate(pl_chk)
       
+      !! Q1281: assigned only on some condition branches but read outside them: ipl (phu_plant, empty community),
+      !! iob (phu_base0/precip_cur/precip_next with ob not hru/hlt), ialt (plant_name_gro, plant not in the
+      !! community), targ_val (vol_wet, lim_var not pvol/evol). Reset per call (upstream's values).
+      ipl = 0
+      iob = 0
+      ialt = 0
+      targ_val = 0.
+
       !! swatplus_perf OpenMP: per-thread act_hit scratch, grown to this table's alts.
       if (allocated(act_hit_tl)) then
         if (size(act_hit_tl) < d_tbl%alts) deallocate(act_hit_tl)

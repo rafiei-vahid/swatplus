@@ -11,8 +11,8 @@
      integer :: imet
      integer :: isalt
            
-     !! Q1281: ipest is the pesticide implied-do index, defined only after a pesticide header is written, but the
-     !! average-annual pathogen header reads cs_path_solsor(ipest). Reset per call (upstream's 0).
+     !! Q1281: ipest is the pesticide implied-do index, defined only after a pesticide header is written. The
+     !! average-annual pathogen headers indexed cs_path_solsor by it; they now use their own ipath. Reset per call.
      ipest = 0
 
      !! daily - HYDIN
@@ -422,12 +422,12 @@
           call open_output_file(2747, "hydout_paths_aa.txt", 800)
              write (9000,*) "HYDOUT_PATHS              hydout_paths_aa.txt"
              write (2747,*) bsn%name, prog
-             write (2747,*) csout_hyd_hdr, (cs_path_solsor(ipest), ipath = 1, cs_db%num_paths)
+             write (2747,*) csout_hyd_hdr, (cs_path_solsor(ipath), ipath = 1, cs_db%num_paths)
             if (pco%csvout == "y") then
               call open_output_file(2763, "hydout_paths_aa.csv", 800)
                 write (9000,*) "HYDOUT_PATHS              hydout_paths_aa.csv"
                 write (2763,*) bsn%name, prog
-                write (2763,*) csout_hyd_hdr, (cs_path_solsor(ipest), ipath = 1, cs_db%num_paths)
+                write (2763,*) csout_hyd_hdr, (cs_path_solsor(ipath), ipath = 1, cs_db%num_paths)
             end if
         end if
         

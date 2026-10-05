@@ -26,6 +26,10 @@
       integer :: ireg !none      |counter
       integer :: ires !none      |counter
      
+      !! Q1281: ires indexes ccu_out(i)%num in the nspu == 0 branch but is never assigned in this routine.
+      !! The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+      ires = 0
+
       imax = 0
       mcal = 0
       mreg = 0

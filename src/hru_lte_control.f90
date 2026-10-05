@@ -91,6 +91,10 @@
       real :: qssub !             |
       real :: cnv !none         |conversion factor (mm => m^3)
         
+      !! Q1281: r2 is assigned only when sw + exp(xx) > 0.001 but always read by max(3., r2) below.
+      !! The OpenMP strip removed its implicit-SAVE '= 0.'; reset it per call (upstream's value).
+      r2 = 0.
+
       ihlt_db = ob(icmd)%props
       iwst = ob(icmd)%wst
       iwgn = wst(iwst)%wco%wgn

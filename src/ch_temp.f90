@@ -108,6 +108,11 @@
       !  Step 1. Initialization and setup
       ! =========================================================
       
+      !! Q1281: ilsu is assigned only inside the routing-unit loop but read by the shade-factor lookup, so a channel
+      !! with no incoming 'ru' read it undefined (no initializer upstream either). 0 matches no shf_db%lsu, so ssff
+      !! keeps the basin default.
+      ilsu = 0
+
       ! get jday and year
       jday = time%day 
       

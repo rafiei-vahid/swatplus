@@ -88,7 +88,7 @@
           !map recharge from LSU to grid cells connected to the LSU
           do i=1,lsu_num_cells(k)
             cell_id = lsu_cells(k,i)
-						if(gw_state(cell_id)%stat == 2) then !if boundary cell, give recharge to nearest active cell
+						if(gw_state(cell_id)%stat == 2 .and. gw_bound_near(cell_id) > 0) then !if boundary cell, give recharge to nearest active cell (Q1281: if it has one)
 						  cell_id = gw_bound_near(cell_id)
 						endif
             cell_rech_volume = rech_volume * lsu_cells_fract(k,i)
@@ -124,7 +124,7 @@
           endif
           do i=1,hru_num_cells(k)
             cell_id = hru_cells(k,i)
-						if(gw_state(cell_id)%stat == 2) then !if boundary cell, give recharge to nearest active cell
+						if(gw_state(cell_id)%stat == 2 .and. gw_bound_near(cell_id) > 0) then !if boundary cell, give recharge to nearest active cell (Q1281: if it has one)
 						  cell_id = gw_bound_near(cell_id)
 						endif
             cell_rech_volume = rech_volume * hru_cells_fract(k,i)

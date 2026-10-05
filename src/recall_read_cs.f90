@@ -33,6 +33,10 @@
       integer :: jj
       integer :: kk
       
+      !! Q1281: istep is assigned only when a record for the first simulation year is found (typ 1-3), but the
+      !! data read below indexes hd_cs(istep, ...). The OpenMP strip removed its implicit-SAVE '= 0'; reset it.
+      istep = 0
+
       eof = 0
       imax = 0
 

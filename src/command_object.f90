@@ -67,6 +67,10 @@
       real :: sumflo
       integer, intent(in) :: ic
 
+      !! Q1281: iob is assigned only in the incoming-hydrograph loop but read by the constituent branch of the
+      !! "dr" case, so a delivery-ratio object with no inflows read it undefined. Reset per call (upstream's 0).
+      iob = 0
+
       icmd = ic
 
         !! allocate water for transfers that don't include a channel as a source

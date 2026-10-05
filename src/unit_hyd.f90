@@ -66,6 +66,10 @@
       real, intent (in)  :: tc
       real, intent (out), dimension(bsn_prm%day_lag_mx,time%step) :: uh
 
+      !! Q1281: q is assigned only for uhyd 0 or 1 but always read below. The OpenMP strip removed its
+      !! implicit-SAVE '= 0.'; reset it per call (upstream's value).
+      q = 0.
+
       !! compute unit hydrograph for computing hydrograph from direct runoff
       ql = 0.
       sumq = 0.

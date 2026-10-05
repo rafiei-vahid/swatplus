@@ -45,6 +45,11 @@
       integer :: ncs !           |constituent counter
       integer :: aqu_found !           |rtb gwflow
       
+      !! Q1281: ob1 and ob2 are assigned only when the connect file is read with nspu > 0, but the weather
+      !! crosswalk loop at the end reads both. The OpenMP strip removed their implicit-SAVE '= 0'; reset per call.
+      ob1 = 0
+      ob2 = 0
+
       eof = 0
       imax = 0
       cmd_prev = 0

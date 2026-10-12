@@ -32,6 +32,7 @@
       integer :: ipest = 0            !              |
       integer :: ipf = 0              !              |PFAS compound counter
       integer :: isalt = 0            !              |salt ion counter (rtb salt)
+      real :: tw_reported              !degC          |Q380: ch_temp's outflow temperature, preserved across the two struct copies
       real :: ebtm_m = 0.             !m             |erosion of bottom of channel
       real :: ebank_m = 0.            !m             |meander cut on one side
       real :: hc_sed = 0.             !tons          |headcut erosion
@@ -379,6 +380,10 @@
       
       !! calculate stream temperature (component mixing model)
       call ch_temp
+      !! Q380 (port of 237348b onto the PFAS line). ch_temp writes its answer to ch_out_d(ich)%temp; the two
+      !! whole-struct copies below overwrite ch_out_d from ob(icmd)%hd(1), which was set from ht2 BEFORE
+      !! ch_temp ran, so without this the energy balance reaches no reported outflow column.
+      tw_reported = ch_out_d(ich)%temp
       
       !! set constituents for routing
       if (cs_db%num_pests > 0) then
@@ -393,6 +398,7 @@
       
       !! output channel organic-mineral
       ch_out_d(isdch) = ob(icmd)%hd(1)                       !set outflow om hydrograph
+      ch_out_d(isdch)%temp = tw_reported                     !Q380: the copy must not discard the energy balance (1 of 2)
       ch_out_d(isdch)%flo = ob(icmd)%hd(1)%flo / 86400.      !m3 -> m3/s
       
       !! channel sediment budget for output
@@ -455,6 +461,7 @@
       chsd_d(ich)%dep_bf = sd_ch_vel(ich)%dep_bf
       chsd_d(ich)%velav_bf = sd_ch_vel(ich)%vel_bf
       ch_out_d(ich) = ob(icmd)%hd(1)                       !set outflow om hydrograph
+      ch_out_d(ich)%temp = tw_reported                       !Q380: the copy must not discard the energy balance (2 of 2)
       ch_out_d(ich)%flo = ob(icmd)%hd(1)%flo / 86400.      !m3 -> m3/s
    
       !! output flow to channel morphology

@@ -384,6 +384,10 @@
       !! whole-struct copies below overwrite ch_out_d from ob(icmd)%hd(1), which was set from ht2 BEFORE
       !! ch_temp ran, so without this the energy balance reaches no reported outflow column.
       tw_reported = ch_out_d(ich)%temp
+      !! Q462 (port of 0e1db00). The answer must ALSO travel downstream: the next channel's inflow
+      !! temperature hin_d(in)%temp is built from ob(iob)%hd(1) (command_object.f90), and hd(1)%temp
+      !! still held the pre-ch_temp value because hd(1) = ht2 was set before ch_temp ran.
+      ob(icmd)%hd(1)%temp = tw_reported
       
       !! set constituents for routing
       if (cs_db%num_pests > 0) then

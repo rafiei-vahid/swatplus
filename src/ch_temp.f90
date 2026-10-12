@@ -99,6 +99,7 @@
       real :: bulk_co
       real :: eps 
       real :: tdx_cal
+      real :: trib_heat            !Q462: sum over channel inflows of temp * flow, for the flow-weighted mix
       integer :: in
 
       
@@ -137,29 +138,33 @@
       !  Step 2. Tributary mixing
       ! =========================================================
       
-      ! summing the temperature of the incoming tributaries (maximum 2)    
-      
+      ! flow-weighted mixing over ALL channel inflows (Q462, 2026-09-05). The previous form,
+      ! written for "maximum 2" tributaries, (a) read hin_d(in-1) -- index 0 on the first inflow,
+      ! while hin_d is allocated 1..nspu (hyd_connect.f90:345): an out-of-bounds read in a release
+      ! build with no bounds checking; (b) assigned ht1%temp on EVERY inflow with no accumulation,
+      ! so the last inflow won; (c) fell to the air regression whenever that last inflow was not a
+      ! channel (routing units are expected here -- the same loop collects their ids below).
+      ! Now: one pass, heat and flow summed over the channel inflows, air regression only when there
+      ! is no channel inflow or it is dry. With exactly two wet tributaries this equals the old
+      ! intent; with one it equals that tributary's temperature instead of mixing it with hin_d(0).
       ht1 = ob(iob)%hd(1)
+      trib_flo = 0.
+      trib_heat = 0.
       do in = 1, ob(iob)%rcv_tot
           if (ob(iob)%obtyp_in(in) == "chandeg") then
-              trib1_temp = ob(iob)%hin_d(in-1)%temp
-              trib2_temp = ob(iob)%hin_d(in)%temp
-              trib1_flo = ob(iob)%hin_d(in-1)%flo/86400
-              trib2_flo = ob(iob)%hin_d(in)%flo/86400
-              trib_flo = trib1_flo + trib2_flo
-              if (trib_flo < 1e-6) then             ! if it has tributaries but the flows are 0, estimate from old equation (to avoid division by 0)
-                  ht1%temp = 5.0 + 0.75 * w%tave
-              else
-                  ht1%temp = (trib1_temp * trib1_flo + trib2_temp * trib2_flo) / trib_flo
-              end if
-          else                  ! if it does not have any tributaries, also use old equation to avoid 0
-              ht1%temp = 5.0 + 0.75 * w%tave
+              trib_flo = trib_flo + ob(iob)%hin_d(in)%flo / 86400.
+              trib_heat = trib_heat + ob(iob)%hin_d(in)%temp * ob(iob)%hin_d(in)%flo / 86400.
           end if
-          if (ob(iob)%obtyp_in(in) == "ru") then            ! get lsu ID 
+          if (ob(iob)%obtyp_in(in) == "ru") then            ! get lsu ID
               ruid_array(ru_index) = ob(iob)%obtypno_in(in)
               ru_index = ru_index + 1
           end if
-      end do  
+      end do
+      if (trib_flo < 1e-6) then             ! no channel tributary, or all of them dry: old equation, as before
+          ht1%temp = 5.0 + 0.75 * w%tave
+      else
+          ht1%temp = trib_heat / trib_flo
+      end if
       
       ! =========================================================
       !  Step 3. mixing of components

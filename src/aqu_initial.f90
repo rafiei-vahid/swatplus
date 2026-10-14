@@ -126,7 +126,9 @@
         end if
         !salts !rtb salt
         if (cs_db%num_salts > 0) then
-          allocate (cs_aqu(iaq)%salt(cs_db%num_salts), source = 0.) !salt ion mass (kg)
+          !! the pesticide branch above already allocates cs_aqu(iaq)%salt(num_salts) when the deck has a pesticide; allocating it
+          !! again stopped every salt + pesticide deck ('already allocated', SALT finding F8). Same size, zeroed below either way.
+          if (.not. allocated(cs_aqu(iaq)%salt)) allocate (cs_aqu(iaq)%salt(cs_db%num_salts), source = 0.) !salt ion mass (kg)
 
           allocate (cs_aqu(iaq)%salt_min(5), source = 0.)  !salt mineral fractions
 

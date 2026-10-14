@@ -30,6 +30,9 @@
       npmx = cs_db%num_salts
       do ihru = 1, sp_ob%hru
         if (npmx > 0) then
+          !! cs_soil(ihru)%ly is allocated in pesticide_init only when the deck has a pesticide; a salt-only deck reached the
+          !! next line with it unallocated (SIGSEGV, SALT finding F8). pesticide_init runs first, so a deck with both is unchanged.
+          if (.not. allocated(cs_soil(ihru)%ly)) allocate (cs_soil(ihru)%ly(soil(ihru)%nly))
           do ly = 1, soil(ihru)%nly
             allocate (cs_soil(ihru)%ly(ly)%salt(npmx), source = 0.)
             allocate (cs_soil(ihru)%ly(ly)%salt_min(5), source = 0.)

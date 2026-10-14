@@ -105,10 +105,11 @@
             end if
           end if
           if (pco%pw_hru%d == "y") then
+            !! set before the NetCDF / text branch, so both outputs print the same record (the text branch alone set it)
+            hpw_d(j)%bm_max = hpw_d(j)%bioms
             if (pco%cdfout == "y") then
               call nc_stage_hru_pw(j, hpw_d(j))
             else
-            hpw_d(j)%bm_max = hpw_d(j)%bioms
             write (2040,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_d(j),                  & 
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather day 
               if (pco%csvout == "y") then 
@@ -179,11 +180,13 @@
            end if
            
            if (pco%pw_hru%m == "y") then
+             !! month-end plant N and P, set before the NetCDF / text branch (the text branch alone set them, so NetCDF printed
+             !! the monthly mean of nplnt and a zero pplnt)
+             hpw_m(j)%nplnt = pl_mass(j)%tot_com%n
+             hpw_m(j)%pplnt = pl_mass(j)%tot_com%p
              if (pco%cdfout == "y") then
                call nc_stage_hru_pw_mon(j, hpw_m(j))
              else
-             hpw_m(j)%nplnt = pl_mass(j)%tot_com%n
-             hpw_m(j)%pplnt = pl_mass(j)%tot_com%p
              write (2041,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_m(j),         &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather mon
                if (pco%csvout == "y") then 
@@ -266,11 +269,12 @@
            end if
            
            if (pco%pw_hru%y == "y") then
+             !! year-end plant N and P, set before the NetCDF / text branch (as monthly above)
+             hpw_y(j)%nplnt = pl_mass(j)%tot_com%n
+             hpw_y(j)%pplnt = pl_mass(j)%tot_com%p
              if (pco%cdfout == "y") then
                call nc_stage_hru_pw_yr(j, hpw_y(j))
              else
-             hpw_y(j)%nplnt = pl_mass(j)%tot_com%n
-             hpw_y(j)%pplnt = pl_mass(j)%tot_com%p
              write (2042,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_y(j),        &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather yr             
                if (pco%csvout == "y") then 

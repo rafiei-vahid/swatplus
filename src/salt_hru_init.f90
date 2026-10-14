@@ -13,6 +13,7 @@
       use plant_module
       use pesticide_data_module
       use salt_module
+      use salt_engine_module, only : road_timing_hru_gauge, salt_road_timing_check
       
       implicit none 
         
@@ -70,5 +71,9 @@
 
       end do !hru loop
                                    
+      !! road_timing hru_gauge: stop on any weather station without measured gauges, naming the HRUs that use it (the HRUs are
+      !! tied to their stations by now: hyd_connect and hrudb_init run before this)
+      if (road_timing_hru_gauge) call salt_road_timing_check
+
       return
       end subroutine salt_hru_init

@@ -7,6 +7,7 @@
       use time_module
       use maximum_data_module
       use constituent_mass_module
+      use salt_engine_module
       
       implicit none
       
@@ -30,6 +31,21 @@
            
       eof = 0
 
+      !! optional salt-engine switches: salt_engine.ctl is read only when it exists (salt_engine_module)
+      call salt_engine_ctl_read
+      if (road_timing_hru_gauge) then
+        inquire (file='salt_road',exist=i_exist)
+        if (cs_db%num_salts == 0 .or. .not. i_exist) then
+          write (*,"(a)") "salt_engine.ctl road_timing hru_gauge: the deck has no salt ions or no salt_road file"
+          error stop "road_timing hru_gauge needs salt ions and a salt_road file"
+        end if
+        if (atmodep_cont%timestep /= "yr") then
+          write (*,"(3a)") "salt_engine.ctl road_timing hru_gauge: the deposition timestep is '",                &
+                           trim(atmodep_cont%timestep), "'; it applies to the yearly form 'yr' only"
+          error stop "road_timing hru_gauge needs the yearly road-salt form"
+        end if
+      end if
+
       !only proceed if there are salt ions in the simulation
       if(cs_db%num_salts > 0) then
       
@@ -45,6 +61,9 @@
       
         !allocate arrays
         allocate (rdapp_salt(0:atmodep_cont%num_sta))
+
+        !! road_timing hru_gauge: the daily weights of each weather station's own gauges, built before the stations' loads
+        if (road_timing_hru_gauge) call salt_road_timing_build
 
         !loop through the stations (num_sta is set in cli_read_atmodep subroutine)
         do iadep = 1, atmodep_cont%num_sta
@@ -82,6 +101,9 @@
               allocate (rdapp_salt(iadep)%salt(isalt)%roadday(366,atmodep_cont%num), source = 0.)
               rdapp_salt(iadep)%salt(isalt)%roadday = 0.
                                     enddo
+            !! with road_timing hru_gauge the applier reads salt_engine_module's weights, never roadday, so this partition
+            !! (the deposition index read as a gauge index) is not computed
+            if (.not. road_timing_hru_gauge) then
             year_index = atmodep_cont%yr_init
             yr_weat = 1 !weather year index
             do iyr=1,atmodep_cont%num
@@ -125,6 +147,7 @@
               endif
               year_index = year_index + 1
             enddo 
+            end if
           end if
           
         end do !go to next station

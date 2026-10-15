@@ -22,6 +22,12 @@
 !!    road_load hru_file (E1, needs road_timing hru_gauge): each HRU's yearly road salt per ion comes from salt_road_hru (kg/ha;
 !!    line 2 'yr_init num', line 3 'hru year' + the ion names in constituents.cs order, then one row per HRU and year) instead
 !!    of its deposition station's salt_road load; timing stays E3's. An HRU without rows gets zero and is counted.
+!!
+!!    road_washoff impervious (E2, needs road_timing hru_gauge, daily runs): on an urban HRU the share frac_dc_imp
+!!    (urban.urb, urbdb%fcimp) of each day's road salt goes to an impervious store instead of soil layer 1; on a day
+!!    hru_urban washes urban solids off, the same fraction 1 - Exp(-xx) of the store washes into urbqsalt (build-up/wash-off),
+!!    or the whole store on a USGS-regression runoff day. The store and the washed mass are printed as extra columns of the
+!!    HRU and basin salt files only with the key.
 
       implicit none
 
@@ -33,6 +39,18 @@
       logical, dimension(:), allocatable :: rdhru_has   !! E1 (hru) the file gives this HRU a load
       integer :: rdhru_yr0 = 0                          !! E1 first calendar year of the file's series
       integer :: rdhru_num = 0                          !! E1 number of years in the file's series
+
+      logical :: road_washoff_imp = .false.             !! E2 key: road_washoff impervious
+      integer :: road_washoff_lines = 0                 !! E2 road_washoff lines in salt_engine.ctl (more than one stops)
+      real, dimension(:,:), allocatable :: rdimp        !! E2 (ion, hru) road salt on directly connected impervious area, kg/ha
+      integer :: n_e2 = 0                               !! E2 ions printed per extra HRU column group (0 without the key)
+      integer :: n_e2b = 0                              !! E2 extra basin columns (0 without the key, else 2)
+      character(len=16), dimension(16) :: e2_hdr_hru = ""  !! E2 HRU header names: imps_<ion> then impw_<ion>
+      character(len=16), dimension(2) :: e2_hdr_bsn = (/"        impst_kg", "        impwo_kg"/)
+      real, dimension(2) :: impb = 0.                   !! E2 basin, day: store (kg), washed (kg)
+      real, dimension(2) :: impb_mo = 0.
+      real, dimension(2) :: impb_yr = 0.
+      real, dimension(2) :: impb_aa = 0.
 
       type road_timing_weights
         real, dimension(:,:), allocatable :: w                  !! (day, road-salt year) fraction of the yearly load
@@ -96,14 +114,51 @@
                                    trim(line)
             error stop "salt_engine.ctl: unknown value"
           end if
+        case ("road_washoff")
+          road_washoff_lines = road_washoff_lines + 1
+          if (road_washoff_lines > 1) then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": road_washoff given twice: ", trim(line)
+            error stop "salt_engine.ctl: road_washoff given twice"
+          end if
+          if (trim(val) == "impervious") then
+            road_washoff_imp = .true.
+          else
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown value for road_washoff (known: impervious): ", &
+                                   trim(line)
+            error stop "salt_engine.ctl: unknown value"
+          end if
         case default
-          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown key (known: road_timing, salt_chemistry, road_load): ", &
+          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline,                                                        &
+                                 ": unknown key (known: road_timing, salt_chemistry, road_load, road_washoff): ", &
                                  trim(line)
           error stop "salt_engine.ctl: unknown key"
         end select
       end do
       close (iu)
       end subroutine salt_engine_ctl_read
+
+      subroutine salt_imp_init
+!!    E2 init (serial, from salt_hru_init): the impervious store, zero at the start; every urban HRU's frac_dc_imp must lie
+!!    in [0, 1]
+      use hru_module, only : hru
+      use hydrograph_module, only : sp_ob
+      use urban_data_module, only : urbdb
+      use constituent_mass_module, only : cs_db
+
+      integer :: j
+      integer :: ulu
+
+      allocate (rdimp(cs_db%num_salts, sp_ob%hru), source = 0.)
+      do j = 1, sp_ob%hru
+        ulu = hru(j)%luse%urb_lu
+        if (ulu > 0) then
+          if (urbdb(ulu)%fcimp < 0. .or. urbdb(ulu)%fcimp > 1.) then
+            write (*, "(a,i0,a,f0.6)") "road_washoff impervious: HRU ", j, " has frac_dc_imp outside [0, 1]: ", urbdb(ulu)%fcimp
+            error stop "road_washoff impervious: frac_dc_imp outside [0, 1]"
+          end if
+        end if
+      end do
+      end subroutine salt_imp_init
 
       subroutine salt_road_timing_build
 !!    E3 read phase (serial): the weights of every weather station with measured gauges, for every simulated year, plus

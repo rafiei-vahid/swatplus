@@ -9,8 +9,11 @@
      use salt_module
      use salt_aquifer
      use output_path_module
+     use salt_engine_module, only : n_e2, n_e2b, e2_hdr_hru, e2_hdr_bsn
      
      implicit none 
+
+     integer :: ie2
 
 
      !basin - daily -----------------------------------------------------------------------------------------------------------------------
@@ -51,8 +54,10 @@
        write(5080,*) 'soilmn_kg:    kg      total salt mineral mass in soil profile'
        write(5080,*) 'aquds_kg:     kg      total dissolved salt mass in groundwater'
        write(5080,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer'
+       if (n_e2b > 0) write(5080,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
+       if (n_e2b > 0) write(5080,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
        write(5080,*)
-       write(5080,*) saltb_hdr
+       write(5080,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
      endif
      
      !basin - monthly
@@ -93,8 +98,10 @@
        write(5082,*) 'soilmn_kg:    kg      total salt mineral mass in soil profile   (averaged over month)'
        write(5082,*) 'aquds_kg:     kg      total dissolved salt mass in groundwater  (averaged over month)'
        write(5082,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer        (averaged over month)'
+       if (n_e2b > 0) write(5082,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
+       if (n_e2b > 0) write(5082,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
        write(5082,*)
-       write(5082,*) saltb_hdr
+       write(5082,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
      endif
      
      !basin - yearly
@@ -135,8 +142,10 @@
        write(5084,*) 'soilmn_kg:    kg      total salt mineral mass in soil profile   (averaged over year)'
        write(5084,*) 'aquds_kg:     kg      total dissolved salt mass in groundwater  (averaged over year)'
        write(5084,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer        (averaged over year)'
+       if (n_e2b > 0) write(5084,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
+       if (n_e2b > 0) write(5084,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
        write(5084,*)
-       write(5084,*) saltb_hdr
+       write(5084,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
      endif
      
      !basin - ave annual
@@ -177,8 +186,10 @@
        write(5086,*) 'soilmn_kg:    kg/yr   total salt mineral mass in soil profile   (averaged over years)'
        write(5086,*) 'aquds_kg:     kg/yr   total dissolved salt mass in groundwater  (averaged over years)'
        write(5086,*) 'aqumn_kg:     kg/yr   total salt mineral mass in aquifer        (averaged over years)'
+       if (n_e2b > 0) write(5086,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
+       if (n_e2b > 0) write(5086,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
        write(5086,*)
-       write(5086,*) saltb_hdr
+       write(5086,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
      endif
      
      !hru - daily -------------------------------------------------------------------------------------------------------------------------
@@ -211,8 +222,10 @@
        write(5021,*) 'uptk:         kg/ha   salt mass in plant uptake              (soil --> outside)'
        write(5021,*) 'conc:         g/m3    salt concentration in soil water (averaged over soil layers)'
        write(5021,*) 'dssl:         kg/ha   salt mineral dissolution (summed over soil layers)'
+       if (n_e2 > 0) write(5021,*) 'imps:         kg/ha   E2 road salt held on directly connected impervious area'
+       if (n_e2 > 0) write(5021,*) 'impw:         kg/ha   E2 road salt washed off that store, before the surface lag'
        write(5021,*) 
-       write(5021,*) salt_hdr_hru
+       write(5021,*) salt_hdr_hru, (e2_hdr_hru(ie2), ie2 = 1, 2 * n_e2)
        if (pco%csvout == "y") then
          call open_output_file(5022, "hru_salt_day.csv", 3000)
          write (5022,*) bsn%name, prog
@@ -251,8 +264,10 @@
        write(5023,*) 'uptk:         kg/ha   salt mass in plant uptake              (soil --> outside)'
        write(5023,*) 'conc:         g/m3    salt concentration in soil water (averaged over soil layers)'
        write(5023,*) 'dssl:         kg/ha   salt mineral dissolution (summed over soil layers)'
+       if (n_e2 > 0) write(5023,*) 'imps:         kg/ha   E2 road salt held on directly connected impervious area'
+       if (n_e2 > 0) write(5023,*) 'impw:         kg/ha   E2 road salt washed off that store, before the surface lag'
        write(5023,*) 
-       write(5023,*) salt_hdr_hru
+       write(5023,*) salt_hdr_hru, (e2_hdr_hru(ie2), ie2 = 1, 2 * n_e2)
        if (pco%csvout == "y") then
          call open_output_file(5024, "hru_salt_mon.csv", 3000)
          write (5024,*) bsn%name, prog
@@ -291,8 +306,10 @@
        write(5025,*) 'uptk:         kg/ha   salt mass in plant uptake              (soil --> outside)'
        write(5025,*) 'conc:         g/m3    salt concentration in soil water (averaged over soil layers)'
        write(5025,*) 'dssl:         kg/ha   salt mineral dissolution (summed over soil layers)'
+       if (n_e2 > 0) write(5025,*) 'imps:         kg/ha   E2 road salt held on directly connected impervious area'
+       if (n_e2 > 0) write(5025,*) 'impw:         kg/ha   E2 road salt washed off that store, before the surface lag'
        write(5025,*) 
-       write(5025,*) salt_hdr_hru
+       write(5025,*) salt_hdr_hru, (e2_hdr_hru(ie2), ie2 = 1, 2 * n_e2)
        if (pco%csvout == "y") then
          call open_output_file(5026, "hru_salt_yr.csv", 3000)
          write (5026,*) bsn%name, prog
@@ -331,8 +348,10 @@
        write(5027,*) 'uptk:         kg/ha/yr   salt mass in plant uptake              (soil --> outside)'
        write(5027,*) 'conc:         g/m3       salt concentration in soil water (averaged over soil layers)'
        write(5027,*) 'dssl:         kg/ha      salt mineral dissolution (summed over soil layers)'
+       if (n_e2 > 0) write(5027,*) 'imps:         kg/ha   E2 road salt held on directly connected impervious area'
+       if (n_e2 > 0) write(5027,*) 'impw:         kg/ha   E2 road salt washed off that store, before the surface lag'
        write(5027,*) 
-       write(5027,*) salt_hdr_hru
+       write(5027,*) salt_hdr_hru, (e2_hdr_hru(ie2), ie2 = 1, 2 * n_e2)
        if (pco%csvout == "y") then
          call open_output_file(5028, "hru_salt_aa.csv", 3000)
          write (5028,*) bsn%name, prog

@@ -26,6 +26,8 @@
         real :: amnd = 0.            !! |kg/ha       |salt ion mass added to soil via salt amendments
         real :: uptk = 0.            !! |kg/ha       |salt ion mass taken up by crop roots
         real :: conc = 0.            !! |mg/L        |salt ion concentration in soil water (averaged over all soil layers)
+        real :: imps = 0.            !! |kg/ha       |E2: road salt held on directly connected impervious area (stock)
+        real :: impw = 0.            !! |kg/ha       |E2: road salt washed off that store (before the surface lag)
       end type salt_balance
       
       type object_salt_balance

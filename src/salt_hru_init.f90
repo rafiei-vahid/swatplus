@@ -13,7 +13,8 @@
       use plant_module
       use pesticide_data_module
       use salt_module
-      use salt_engine_module, only : road_timing_hru_gauge, salt_road_timing_check, road_load_hru_file, salt_road_hru_read
+      use salt_engine_module, only : road_timing_hru_gauge, salt_road_timing_check, road_load_hru_file, salt_road_hru_read,     &
+                                     road_washoff_imp, salt_imp_init
       
       implicit none 
         
@@ -76,6 +77,7 @@
       if (road_timing_hru_gauge) call salt_road_timing_check
       !! road_load hru_file (E1): each HRU's own yearly load, read now that the HRU count and areas are known
       if (road_load_hru_file) call salt_road_hru_read
+      if (road_washoff_imp) call salt_imp_init
 
       return
       end subroutine salt_hru_init

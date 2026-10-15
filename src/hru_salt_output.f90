@@ -5,6 +5,7 @@
       use hydrograph_module, only : ob, sp_ob1
       use salt_module
       use constituent_mass_module
+      use salt_engine_module, only : road_washoff_imp, rdimp, n_e2
       
       implicit none
       
@@ -19,6 +20,17 @@
 
       j = ihru
       iob = sp_ob1%hru + j - 1
+
+      !E2 (road_washoff impervious): the store's stock for output; imps follows soil (a mean over the period), impw urbq (a sum)
+      if (road_washoff_imp) then
+        do isalt = 1, cs_db%num_salts
+          hsaltb_d(j)%salt(isalt)%imps = rdimp(isalt, j)
+        enddo
+      end if
+      do isalt = 1, n_e2
+        hsaltb_m(j)%salt(isalt)%imps = hsaltb_m(j)%salt(isalt)%imps + hsaltb_d(j)%salt(isalt)%imps
+        hsaltb_m(j)%salt(isalt)%impw = hsaltb_m(j)%salt(isalt)%impw + hsaltb_d(j)%salt(isalt)%impw
+      enddo
       
       !add daily values to monthly values
       do isalt=1,cs_db%num_salts
@@ -64,7 +76,8 @@
                          (hsaltb_d(j)%salt(isalt)%amnd,isalt=1,cs_db%num_salts), &
                          (hsaltb_d(j)%salt(isalt)%uptk,isalt=1,cs_db%num_salts), &
                          (hsaltb_d(j)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                          hsaltb_d(j)%salt(1)%diss
+                          hsaltb_d(j)%salt(1)%diss, &
+                         (hsaltb_d(j)%salt(isalt)%imps,isalt=1,n_e2), (hsaltb_d(j)%salt(isalt)%impw,isalt=1,n_e2)
         if (pco%csvout == "y") then
           write (5022,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, & 
                                                                             (hsaltb_d(j)%salt(isalt)%soil,isalt=1,cs_db%num_salts), &
@@ -114,6 +127,11 @@
           hsaltb_y(j)%salt(isalt)%conc = hsaltb_y(j)%salt(isalt)%conc + hsaltb_m(j)%salt(isalt)%conc
         enddo
         hsaltb_y(j)%salt(1)%diss = hsaltb_y(j)%salt(1)%diss + hsaltb_m(j)%salt(1)%diss
+        do isalt = 1, n_e2
+          hsaltb_y(j)%salt(isalt)%imps = hsaltb_y(j)%salt(isalt)%imps + hsaltb_m(j)%salt(isalt)%imps
+          hsaltb_y(j)%salt(isalt)%impw = hsaltb_y(j)%salt(isalt)%impw + hsaltb_m(j)%salt(isalt)%impw
+          hsaltb_m(j)%salt(isalt)%imps = hsaltb_m(j)%salt(isalt)%imps / float (ndays(time%mo + 1) - ndays(time%mo))
+        enddo
         const = float (ndays(time%mo + 1) - ndays(time%mo))
         do isalt=1,cs_db%num_salts !average mass and concentration
           hsaltb_m(j)%salt(isalt)%soil = hsaltb_m(j)%salt(isalt)%soil / const
@@ -139,7 +157,8 @@
                            (hsaltb_m(j)%salt(isalt)%amnd,isalt=1,cs_db%num_salts), &
                            (hsaltb_m(j)%salt(isalt)%uptk,isalt=1,cs_db%num_salts), &
                            (hsaltb_m(j)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                            hsaltb_m(j)%salt(1)%diss
+                            hsaltb_m(j)%salt(1)%diss, &
+                         (hsaltb_m(j)%salt(isalt)%imps,isalt=1,n_e2), (hsaltb_m(j)%salt(isalt)%impw,isalt=1,n_e2)
           if (pco%csvout == "y") then
             write (5024,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, & 
                                           (hsaltb_m(j)%salt(isalt)%soil,isalt=1,cs_db%num_salts), &
@@ -166,6 +185,8 @@
         !zero out
         do isalt = 1, cs_db%num_salts
           hsaltb_m(j)%salt(isalt)%soil = 0.
+          hsaltb_m(j)%salt(isalt)%imps = 0.
+          hsaltb_m(j)%salt(isalt)%impw = 0.
           hsaltb_m(j)%salt(isalt)%surq = 0.
           hsaltb_m(j)%salt(isalt)%latq = 0.
           hsaltb_m(j)%salt(isalt)%urbq = 0.
@@ -211,6 +232,11 @@
           hsaltb_a(j)%salt(isalt)%conc = hsaltb_a(j)%salt(isalt)%conc + hsaltb_y(j)%salt(isalt)%conc
         enddo
         hsaltb_a(j)%salt(1)%diss = hsaltb_a(j)%salt(1)%diss + hsaltb_y(j)%salt(1)%diss
+        do isalt = 1, n_e2
+          hsaltb_a(j)%salt(isalt)%imps = hsaltb_a(j)%salt(isalt)%imps + hsaltb_y(j)%salt(isalt)%imps
+          hsaltb_a(j)%salt(isalt)%impw = hsaltb_a(j)%salt(isalt)%impw + hsaltb_y(j)%salt(isalt)%impw
+          hsaltb_y(j)%salt(isalt)%imps = hsaltb_y(j)%salt(isalt)%imps / time%day_end_yr
+        enddo
         const = time%day_end_yr
         do isalt=1,cs_db%num_salts !average mass and concentration
           hsaltb_y(j)%salt(isalt)%soil = hsaltb_y(j)%salt(isalt)%soil / const
@@ -236,7 +262,8 @@
                            (hsaltb_y(j)%salt(isalt)%amnd,isalt=1,cs_db%num_salts), &
                            (hsaltb_y(j)%salt(isalt)%uptk,isalt=1,cs_db%num_salts), &
                            (hsaltb_y(j)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                            hsaltb_y(j)%salt(1)%diss
+                            hsaltb_y(j)%salt(1)%diss, &
+                         (hsaltb_y(j)%salt(isalt)%imps,isalt=1,n_e2), (hsaltb_y(j)%salt(isalt)%impw,isalt=1,n_e2)
           if (pco%csvout == "y") then
             write (5026,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, & 
                                           (hsaltb_y(j)%salt(isalt)%soil,isalt=1,cs_db%num_salts), &
@@ -263,6 +290,8 @@
         !zero out
         do isalt = 1, cs_db%num_salts
           hsaltb_y(j)%salt(isalt)%soil = 0.
+          hsaltb_y(j)%salt(isalt)%imps = 0.
+          hsaltb_y(j)%salt(isalt)%impw = 0.
           hsaltb_y(j)%salt(isalt)%surq = 0.
           hsaltb_y(j)%salt(isalt)%latq = 0.
           hsaltb_y(j)%salt(isalt)%urbq = 0.
@@ -289,6 +318,8 @@
         !calculate average annual values
         do isalt = 1, cs_db%num_salts
           hsaltb_a(j)%salt(isalt)%soil = hsaltb_a(j)%salt(isalt)%soil / time%nbyr
+          hsaltb_a(j)%salt(isalt)%imps = hsaltb_a(j)%salt(isalt)%imps / time%nbyr
+          hsaltb_a(j)%salt(isalt)%impw = hsaltb_a(j)%salt(isalt)%impw / time%nbyr
           hsaltb_a(j)%salt(isalt)%surq = hsaltb_a(j)%salt(isalt)%surq / time%nbyr
           hsaltb_a(j)%salt(isalt)%latq = hsaltb_a(j)%salt(isalt)%latq / time%nbyr
           hsaltb_a(j)%salt(isalt)%urbq = hsaltb_a(j)%salt(isalt)%urbq / time%nbyr
@@ -326,7 +357,8 @@
                          (hsaltb_a(j)%salt(isalt)%amnd,isalt=1,cs_db%num_salts), &
                          (hsaltb_a(j)%salt(isalt)%uptk,isalt=1,cs_db%num_salts), &
                          (hsaltb_a(j)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                         hsaltb_a(j)%salt(1)%diss
+                         hsaltb_a(j)%salt(1)%diss, &
+                         (hsaltb_a(j)%salt(isalt)%imps,isalt=1,n_e2), (hsaltb_a(j)%salt(isalt)%impw,isalt=1,n_e2)
         if (pco%csvout == "y") then
           write (5028,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, & 
                                         (hsaltb_a(j)%salt(isalt)%soil,isalt=1,cs_db%num_salts), &

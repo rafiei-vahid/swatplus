@@ -23,6 +23,7 @@
       integer :: yr_weat
       integer :: year_days
       integer :: iday
+      integer :: ie2
       integer :: day_flag(366)
       real :: day_precip
       real :: day_temp
@@ -48,6 +49,26 @@
       if (road_load_hru_file .and. .not. road_timing_hru_gauge) then
         write (*,"(a)") "salt_engine.ctl road_load hru_file: it takes E3's timing, so it needs road_timing hru_gauge too"
         error stop "road_load hru_file needs road_timing hru_gauge"
+      end if
+      if (road_washoff_imp) then
+        if (.not. road_timing_hru_gauge) then
+          write (*,"(a)") "salt_engine.ctl road_washoff impervious: it splits E3's daily load, so it needs road_timing hru_gauge too"
+          error stop "road_washoff impervious needs road_timing hru_gauge"
+        end if
+        if (time%step > 1) then
+          write (*,"(a)") "salt_engine.ctl road_washoff impervious: daily runs only (hru_urbanhr has no impervious store)"
+          error stop "road_washoff impervious needs a daily time step"
+        end if
+        if (cs_db%num_salts < 1 .or. cs_db%num_salts > 8) then
+          write (*,"(a,i0)") "salt_engine.ctl road_washoff impervious: salt ions must number 1 to 8, the deck has ", cs_db%num_salts
+          error stop "road_washoff impervious needs 1 to 8 salt ions"
+        end if
+        n_e2 = cs_db%num_salts
+        n_e2b = 2
+        do ie2 = 1, n_e2
+          e2_hdr_hru(ie2) = "  imps_" // trim(cs_db%salts(ie2))
+          e2_hdr_hru(n_e2 + ie2) = "  impw_" // trim(cs_db%salts(ie2))
+        end do
       end if
       if (salt_chemistry_off .and. cs_db%num_salts == 0) then
         write (*,"(a)") "salt_engine.ctl salt_chemistry off: the deck has no salt ions"

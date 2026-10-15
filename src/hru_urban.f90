@@ -55,10 +55,12 @@
       use urban_data_module
       use hydrograph_module
       use climate_module
+      use salt_engine_module, only : road_washoff_imp
       
       implicit none
       
       real, external :: regres
+      external :: salt_imp_wash
 
       real :: cod !kg            |carbonaceous biological oxygen demand of 
                            !              |surface runoff from urban area
@@ -82,6 +84,7 @@
       real :: xx !              |
       real :: exp          !              |
       real :: tno3 !              |
+      real :: fw !none          |E2: wash-off fraction of the impervious road-salt store
 
       j = ihru
       ulu = hru(j)%luse%urb_lu
@@ -92,6 +95,7 @@
 
         case ("usgs_reg")                         !! USGS regression equations
         if (w%precip > .1 .and. surfq(j) > .1) then
+          if (road_washoff_imp) call salt_imp_wash (j, 1.)
           cod = Regres(1)
           sus_sol = Regres(2)
           tn = Regres(3)
@@ -137,6 +141,10 @@
           if (turo > 24.) turo = 24.
           xx = urbk * turo
           if (xx > 24.) xx = 24.
+          if (road_washoff_imp) then
+            fw = 1. - Exp (-xx)
+            call salt_imp_wash (j, fw)
+          end if
           dirt = dirt * Exp (-xx)
           if (dirt < 1.e-6) dirt = 0.0
 

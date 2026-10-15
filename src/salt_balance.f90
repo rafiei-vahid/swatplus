@@ -17,6 +17,7 @@
       use res_salt_module, only : wetsalt_d,ressalt_d
       use ch_salt_module, only : chsalt_d
       use gwflow_module, only : gw_solute_flag,gwsol_ss,ncell,gw_state,gwsol_state
+      use salt_engine_module, only : n_e2b, impb, impb_mo, impb_yr, impb_aa
 
       implicit none
       
@@ -369,14 +370,30 @@
       enddo
       salt_basin(28) = saltsum
       
+      !E2 (road_washoff impervious): the impervious store (stock) and the day's wash-off, kg; printed only with the key
+      if (n_e2b > 0) then
+        impb = 0.
+        do i=1,sp_ob%hru
+          do m=1,cs_db%num_salts
+            impb(1) = impb(1) + hsaltb_d(i)%salt(m)%imps * hru(i)%area_ha
+            impb(2) = impb(2) + hsaltb_d(i)%salt(m)%impw * hru(i)%area_ha
+          enddo
+        enddo
+      endif
+      
       !write out basin-wide salinity fluxes to file
-      write(5080,7000) time%yrc,time%mo,time%day,(salt_basin(i),i=1,28)
+      write(5080,7000) time%yrc,time%mo,time%day,(salt_basin(i),i=1,28),(impb(i),i=1,n_e2b)
       
       !save fluxes for monthly, yearly, and ave annual output
       do i=1,28
         salt_basin_mo(i) = salt_basin_mo(i) + salt_basin(i)
         salt_basin_yr(i) = salt_basin_yr(i) + salt_basin(i)
         salt_basin_aa(i) = salt_basin_aa(i) + salt_basin(i)
+      enddo
+      do i=1,n_e2b
+        impb_mo(i) = impb_mo(i) + impb(i)
+        impb_yr(i) = impb_yr(i) + impb(i)
+        impb_aa(i) = impb_aa(i) + impb(i)
       enddo
       
       !monthly print
@@ -386,8 +403,10 @@
         salt_basin_mo(26) = salt_basin_mo(26) / num_days
         salt_basin_mo(27) = salt_basin_mo(27) / num_days
         salt_basin_mo(28) = salt_basin_mo(28) / num_days
-        write(5082,7000) time%yrc,time%mo,time%day,(salt_basin_mo(i),i=1,28)
+        if (n_e2b > 0) impb_mo(1) = impb_mo(1) / num_days
+        write(5082,7000) time%yrc,time%mo,time%day,(salt_basin_mo(i),i=1,28),(impb_mo(i),i=1,n_e2b)
         salt_basin_mo = 0.
+        impb_mo = 0.
       endif
       
       !yearly print
@@ -397,8 +416,10 @@
         salt_basin_yr(26) = salt_basin_yr(26) / num_days
         salt_basin_yr(27) = salt_basin_yr(27) / num_days
         salt_basin_yr(28) = salt_basin_yr(28) / num_days
-        write(5084,7000) time%yrc,time%mo,time%day,(salt_basin_yr(i),i=1,28)
+        if (n_e2b > 0) impb_yr(1) = impb_yr(1) / num_days
+        write(5084,7000) time%yrc,time%mo,time%day,(salt_basin_yr(i),i=1,28),(impb_yr(i),i=1,n_e2b)
         salt_basin_yr = 0.
+        impb_yr = 0.
       endif
       
       !average annual print
@@ -411,7 +432,11 @@
         salt_basin_aa(26) = salt_basin_aa(26) / num_days
         salt_basin_aa(27) = salt_basin_aa(27) / num_days
         salt_basin_aa(28) = salt_basin_aa(28) / num_days      
-        write(5086,7000) time%yrc,time%mo,time%day,(salt_basin_aa(i),i=1,28)
+        if (n_e2b > 0) then
+          impb_aa(1) = impb_aa(1) / num_days
+          impb_aa(2) = impb_aa(2) / time%nbyr
+        endif
+        write(5086,7000) time%yrc,time%mo,time%day,(salt_basin_aa(i),i=1,28),(impb_aa(i),i=1,n_e2b)
       endif
       
       
@@ -438,6 +463,7 @@
           hsaltb_d(i)%salt(m)%fert = 0.
           hsaltb_d(i)%salt(m)%amnd = 0.
           hsaltb_d(i)%salt(m)%uptk = 0.
+          hsaltb_d(i)%salt(m)%impw = 0.
           !wetlands
           wetsalt_d(i)%salt(m)%inflow = 0.
           wetsalt_d(i)%salt(m)%outflow = 0.

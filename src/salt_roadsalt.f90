@@ -18,7 +18,8 @@
       use salt_module
       use constituent_mass_module
       use time_module, only : time
-      use salt_engine_module, only : road_timing_hru_gauge, rdw, road_load_hru_file, rdhru, rdhru_yr0
+      use salt_engine_module, only : road_timing_hru_gauge, rdw, road_load_hru_file, rdhru, rdhru_yr0, road_washoff_imp, rdimp
+      use urban_data_module, only : urbdb
       
       implicit none
 
@@ -29,6 +30,7 @@
       integer :: isalt !            |salt ion counter
       integer :: iyr_road !       |road-salt year of this calendar year (road_timing hru_gauge)
       real :: const !            |constant used for rate, days, etc
+      real :: fdc !none          |E2: share of the day's road salt held on directly connected impervious area
 
       j = ihru
       
@@ -43,19 +45,33 @@
       !! the year comes from the calendar, not from atmodep_cont%ts (every simulated year was checked at read)
       if (road_timing_hru_gauge) then
         iyr_road = time%yrc - atmodep_cont%yr_init + 1
+        fdc = 0.
+        if (road_washoff_imp .and. hru(j)%luse%urb_lu > 0) then
+          fdc = urbdb(hru(j)%luse%urb_lu)%fcimp
+        end if
         if (road_load_hru_file) then
           !! road_load hru_file (E1): this HRU's own load for the year (zero when the file gives it none), same timing
           do isalt = 1, cs_db%num_salts
             hsaltb_d(j)%salt(isalt)%road = rdhru(isalt, j, time%yrc - rdhru_yr0 + 1) *                           &
                                            rdw(iwst)%w(time%day, iyr_road)  !kg/ha
-            cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road
+            if (fdc > 0.) then
+              rdimp(isalt, j) = rdimp(isalt, j) + hsaltb_d(j)%salt(isalt)%road * fdc
+              cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road * (1. - fdc)
+            else
+              cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road
+            end if
           enddo
           return
         end if
         do isalt = 1, cs_db%num_salts
           hsaltb_d(j)%salt(isalt)%road = rdapp_salt(iadep)%salt(isalt)%roadyr(iyr_road) *                     &
                                          rdw(iwst)%w(time%day, iyr_road)  !kg/ha
-          cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road
+          if (fdc > 0.) then
+            rdimp(isalt, j) = rdimp(isalt, j) + hsaltb_d(j)%salt(isalt)%road * fdc
+            cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road * (1. - fdc)
+          else
+            cs_soil(j)%ly(1)%salt(isalt) = cs_soil(j)%ly(1)%salt(isalt) + hsaltb_d(j)%salt(isalt)%road
+          end if
         enddo
         return
       end if

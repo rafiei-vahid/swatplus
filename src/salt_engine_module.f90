@@ -317,6 +317,11 @@
       read (iu, "(a)", iostat=eof) line
       tok = ""
       read (line, *, iostat=eof) tok
+      if (n_tokens(line) /= 2 + nion) then
+        write (*,"(a,i0,a,i0,2a)") "salt_road_hru line 3: ", n_tokens(line), " names, expected ", 2 + nion, &
+                                    " ('hru year' + the ion names): ", trim(line)
+        error stop "salt_road_hru: header has the wrong number of names"
+      end if
       if (eof /= 0 .or. trim(tok(1)) /= "hru" .or. trim(tok(2)) /= "year") then
         write (*,"(2a)") "salt_road_hru line 3: expected 'hru year' then the ion names, read: ", trim(line)
         error stop "salt_road_hru: bad header"
@@ -345,6 +350,12 @@
         if (eof /= 0) exit
         iline = iline + 1
         if (len_trim(line) == 0) cycle
+        !! a list-directed read ignores trailing extras, so a row whose columns drifted at the right edge would pass (Lane S)
+        if (n_tokens(line) /= 2 + nion) then
+          write (*,"(a,i0,a,i0,a,i0,2a)") "salt_road_hru line ", iline, ": ", n_tokens(line), " values, expected ", 2 + nion, &
+                                          ": ", trim(line)
+          error stop "salt_road_hru: a row has the wrong number of values"
+        end if
         read (line, *, iostat=eof) ih, iyr, vals
         if (eof /= 0) then
           write (*,"(a,i0,2a)") "salt_road_hru line ", iline, ": unreadable row: ", trim(line)
@@ -444,5 +455,22 @@
       end if
       close (lg)
       end subroutine salt_road_hru_read
+
+      integer function n_tokens(s)
+!!    number of blank- or tab-separated tokens in s
+      character(len=*), intent(in) :: s
+      integer :: i
+      logical :: in_tok
+      n_tokens = 0
+      in_tok = .false.
+      do i = 1, len_trim(s)
+        if (s(i:i) == " " .or. s(i:i) == char(9)) then
+          in_tok = .false.
+        else if (.not. in_tok) then
+          in_tok = .true.
+          n_tokens = n_tokens + 1
+        end if
+      end do
+      end function n_tokens
 
       end module salt_engine_module

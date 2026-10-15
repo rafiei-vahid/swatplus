@@ -286,6 +286,7 @@
       integer :: iroad
       integer :: nmiss
       integer :: nhas
+      integer :: nzero
       integer :: lg
       logical :: i_exist
       character(len=512) :: line
@@ -294,6 +295,7 @@
       logical, dimension(:,:), allocatable :: seen
       real :: a_miss
       real :: a_all
+      real :: a_zero
       real :: f_tot
       real :: s_tot
 
@@ -383,19 +385,35 @@
       nmiss = sp_ob%hru - nhas
       a_all = 0.
       a_miss = 0.
+      a_zero = 0.
+      nzero = 0
       do j = 1, sp_ob%hru
         a_all = a_all + hru(j)%area_ha
         if (.not. rdhru_has(j)) a_miss = a_miss + hru(j)%area_ha
+        !! a builder writes a row for every HRU, zeros included, so rows alone cannot show a class written as zero (Lane SD)
+        if (rdhru_has(j) .and. all(rdhru(:, j, :) == 0.)) then
+          nzero = nzero + 1
+          a_zero = a_zero + hru(j)%area_ha
+        end if
       end do
-      write (9003,"(a,i0,a,i0,a,i0,a,f10.8)") "salt_road_hru: HRUs with a load ", nhas, " of ", sp_ob%hru, &
-                                              "; without a load ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12)
+      write (9003,"(a,i0,a,i0,a,i0,a,f10.8,a,i0,a,f10.8)") "salt_road_hru: HRUs with rows ", nhas, " of ", sp_ob%hru,     &
+            "; without rows ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12), "; with rows but zero load ", nzero,  &
+            ", area share ", a_zero / max(a_all, 1.e-12)
       open (newunit=lg, file="salt_road_hru_log.txt", status="replace", action="write")
-      write (lg,"(a,i0,a,i0,a,i0,a,f10.8)") "salt_road_hru: HRUs with a load ", nhas, " of ", sp_ob%hru, &
-                                            "; without a load ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12)
+      write (lg,"(a,i0,a,i0,a,i0,a,f10.8,a,i0,a,f10.8)") "salt_road_hru: HRUs with rows ", nhas, " of ", sp_ob%hru,       &
+            "; without rows ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12), "; with rows but zero load ", nzero,  &
+            ", area share ", a_zero / max(a_all, 1.e-12)
       k = 0
       do j = 1, sp_ob%hru
         if (.not. rdhru_has(j) .and. k < 50) then
-          write (lg,"(a,i0)") "without a load: hru ", j
+          write (lg,"(a,i0)") "without rows: hru ", j
+          k = k + 1
+        end if
+      end do
+      k = 0
+      do j = 1, sp_ob%hru
+        if (rdhru_has(j) .and. all(rdhru(:, j, :) == 0.) .and. k < 50) then
+          write (lg,"(a,i0)") "zero load: hru ", j
           k = k + 1
         end if
       end do

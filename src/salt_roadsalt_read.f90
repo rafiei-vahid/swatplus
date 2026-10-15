@@ -45,6 +45,10 @@
           error stop "road_timing hru_gauge needs the yearly road-salt form"
         end if
       end if
+      if (road_load_hru_file .and. .not. road_timing_hru_gauge) then
+        write (*,"(a)") "salt_engine.ctl road_load hru_file: it takes E3's timing, so it needs road_timing hru_gauge too"
+        error stop "road_load hru_file needs road_timing hru_gauge"
+      end if
       if (salt_chemistry_off .and. cs_db%num_salts == 0) then
         write (*,"(a)") "salt_engine.ctl salt_chemistry off: the deck has no salt ions"
         error stop "salt_chemistry off needs salt ions"

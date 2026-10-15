@@ -18,11 +18,21 @@
 !!    the precipitation-dissolution package, the cation exchange and the write-back are skipped, so every ion is moved only by
 !!    the fluxes, the minerals keep their fractions and no dissolution is booked. `salt_chemistry on` equals an absent key.
 !!    salt_chem_soil_single (the plant salt-stress estimate) is not affected.
+!!
+!!    road_load hru_file (E1, needs road_timing hru_gauge): each HRU's yearly road salt per ion comes from salt_road_hru (kg/ha;
+!!    line 2 'yr_init num', line 3 'hru year' + the ion names in constituents.cs order, then one row per HRU and year) instead
+!!    of its deposition station's salt_road load; timing stays E3's. An HRU without rows gets zero and is counted.
 
       implicit none
 
       logical :: road_timing_hru_gauge = .false.        !! E3 key set in salt_engine.ctl
       logical :: salt_chemistry_off = .false.           !! E6 key: salt_chemistry off (no equilibrium chemistry, no exchange)
+      logical :: road_load_hru_file = .false.           !! E1 key: road_load hru_file (each HRU's own yearly load, salt_road_hru)
+
+      real, dimension(:,:,:), allocatable :: rdhru      !! E1 (ion, hru, series year) road salt, kg/ha
+      logical, dimension(:), allocatable :: rdhru_has   !! E1 (hru) the file gives this HRU a load
+      integer :: rdhru_yr0 = 0                          !! E1 first calendar year of the file's series
+      integer :: rdhru_num = 0                          !! E1 number of years in the file's series
 
       type road_timing_weights
         real, dimension(:,:), allocatable :: w                  !! (day, road-salt year) fraction of the yearly load
@@ -78,8 +88,16 @@
                                    trim(line)
             error stop "salt_engine.ctl: unknown value"
           end if
+        case ("road_load")
+          if (trim(val) == "hru_file") then
+            road_load_hru_file = .true.
+          else
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown value for road_load (known: hru_file): ", &
+                                   trim(line)
+            error stop "salt_engine.ctl: unknown value"
+          end if
         case default
-          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown key (known: road_timing, salt_chemistry): ", &
+          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown key (known: road_timing, salt_chemistry, road_load): ", &
                                  trim(line)
           error stop "salt_engine.ctl: unknown key"
         end select
@@ -244,5 +262,169 @@
       end do
       error stop "road_timing hru_gauge needs measured precipitation and temperature gauges at every weather station"
       end subroutine salt_road_timing_check
+
+      subroutine salt_road_hru_read
+!!    E1, in salt_hru_init after hyd_connect and hrudb_init (serial): reads salt_road_hru, checks it loudly, and reports the HRUs
+!!    without a load and the file / station ratio per station and simulated year to simulation.out and salt_road_hru_log.txt.
+      use constituent_mass_module, only : cs_db
+      use hydrograph_module, only : ob, sp_ob
+      use hru_module, only : hru
+      use climate_module, only : wst, rdapp_salt, atmodep_cont
+      use time_module, only : time
+
+      integer :: iu
+      integer :: eof
+      integer :: iline
+      integer :: nion
+      integer :: i
+      integer :: j
+      integer :: k
+      integer :: ih
+      integer :: iyr
+      integer :: icl
+      integer :: iadep
+      integer :: iroad
+      integer :: nmiss
+      integer :: nhas
+      integer :: lg
+      logical :: i_exist
+      character(len=512) :: line
+      character(len=16), dimension(:), allocatable :: tok
+      real, dimension(:), allocatable :: vals
+      logical, dimension(:,:), allocatable :: seen
+      real :: a_miss
+      real :: a_all
+      real :: f_tot
+      real :: s_tot
+
+      inquire (file="salt_road_hru", exist=i_exist)
+      if (.not. i_exist) then
+        write (*,"(a)") "salt_engine.ctl road_load hru_file: there is no salt_road_hru file in the run folder"
+        error stop "road_load hru_file needs salt_road_hru"
+      end if
+      nion = cs_db%num_salts
+      allocate (tok(2 + nion))
+      allocate (vals(nion))
+      open (newunit=iu, file="salt_road_hru", status="old", action="read")
+      read (iu, "(a)", iostat=eof) line
+      read (iu, *, iostat=eof) rdhru_yr0, rdhru_num
+      if (eof /= 0 .or. rdhru_num < 1) then
+        write (*,"(a)") "salt_road_hru line 2: expected 'yr_init num' with num >= 1"
+        error stop "salt_road_hru: unreadable series line"
+      end if
+      read (iu, "(a)", iostat=eof) line
+      tok = ""
+      read (line, *, iostat=eof) tok
+      if (eof /= 0 .or. trim(tok(1)) /= "hru" .or. trim(tok(2)) /= "year") then
+        write (*,"(2a)") "salt_road_hru line 3: expected 'hru year' then the ion names, read: ", trim(line)
+        error stop "salt_road_hru: bad header"
+      end if
+      do i = 1, nion
+        if (trim(tok(2 + i)) /= trim(cs_db%salts(i))) then
+          write (*,"(a,i0,5a)") "salt_road_hru line 3: ion ", i, " is '", trim(tok(2 + i)), "', constituents.cs has '", &
+                                trim(cs_db%salts(i)), "'"
+          error stop "salt_road_hru: ion names differ from constituents.cs"
+        end if
+      end do
+      do iyr = time%yrc_start, time%yrc_end
+        if (iyr < rdhru_yr0 .or. iyr > rdhru_yr0 + rdhru_num - 1) then
+          write (*,"(a,i0,a,i0,a,i0)") "salt_road_hru has no year ", iyr, " (simulated); its series covers ", rdhru_yr0, &
+                                       " - ", rdhru_yr0 + rdhru_num - 1
+          error stop "salt_road_hru: a simulated year is outside its series"
+        end if
+      end do
+
+      allocate (rdhru(nion, sp_ob%hru, rdhru_num), source = 0.)
+      allocate (rdhru_has(sp_ob%hru), source = .false.)
+      allocate (seen(sp_ob%hru, rdhru_num), source = .false.)
+      iline = 3
+      do
+        read (iu, "(a)", iostat=eof) line
+        if (eof /= 0) exit
+        iline = iline + 1
+        if (len_trim(line) == 0) cycle
+        read (line, *, iostat=eof) ih, iyr, vals
+        if (eof /= 0) then
+          write (*,"(a,i0,2a)") "salt_road_hru line ", iline, ": unreadable row: ", trim(line)
+          error stop "salt_road_hru: unreadable row"
+        end if
+        if (ih < 1 .or. ih > sp_ob%hru) then
+          write (*,"(a,i0,a,i0,a,i0)") "salt_road_hru line ", iline, ": hru ", ih, " is outside 1 - ", sp_ob%hru
+          error stop "salt_road_hru: hru id out of range"
+        end if
+        if (iyr < rdhru_yr0 .or. iyr > rdhru_yr0 + rdhru_num - 1) then
+          write (*,"(a,i0,a,i0,a)") "salt_road_hru line ", iline, ": year ", iyr, " is outside the series on line 2"
+          error stop "salt_road_hru: year out of range"
+        end if
+        k = iyr - rdhru_yr0 + 1
+        if (seen(ih, k)) then
+          write (*,"(a,i0,a,i0,a,i0)") "salt_road_hru line ", iline, ": hru ", ih, " year ", iyr, " appears twice"
+          error stop "salt_road_hru: duplicated row"
+        end if
+        if (any(vals < 0.)) then
+          write (*,"(a,i0,a)") "salt_road_hru line ", iline, ": a negative load"
+          error stop "salt_road_hru: negative load"
+        end if
+        seen(ih, k) = .true.
+        rdhru_has(ih) = .true.
+        rdhru(:, ih, k) = vals
+      end do
+      close (iu)
+      do j = 1, sp_ob%hru
+        if (rdhru_has(j) .and. .not. all(seen(j, :))) then
+          k = findloc(seen(j, :), .false., dim=1)
+          write (*,"(a,i0,a,i0)") "salt_road_hru: hru ", j, " has rows but none for year ", rdhru_yr0 + k - 1
+          error stop "salt_road_hru: an HRU lacks a year of the series"
+        end if
+      end do
+
+      !! report: the HRUs without a load, and the file / station Cl ratio per station and simulated year
+      nhas = count(rdhru_has)
+      nmiss = sp_ob%hru - nhas
+      a_all = 0.
+      a_miss = 0.
+      do j = 1, sp_ob%hru
+        a_all = a_all + hru(j)%area_ha
+        if (.not. rdhru_has(j)) a_miss = a_miss + hru(j)%area_ha
+      end do
+      write (9003,"(a,i0,a,i0,a,i0,a,f10.8)") "salt_road_hru: HRUs with a load ", nhas, " of ", sp_ob%hru, &
+                                              "; without a load ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12)
+      open (newunit=lg, file="salt_road_hru_log.txt", status="replace", action="write")
+      write (lg,"(a,i0,a,i0,a,i0,a,f10.8)") "salt_road_hru: HRUs with a load ", nhas, " of ", sp_ob%hru, &
+                                            "; without a load ", nmiss, ", area share ", a_miss / max(a_all, 1.e-12)
+      k = 0
+      do j = 1, sp_ob%hru
+        if (.not. rdhru_has(j) .and. k < 50) then
+          write (lg,"(a,i0)") "without a load: hru ", j
+          k = k + 1
+        end if
+      end do
+      icl = 0
+      do i = 1, nion
+        if (trim(cs_db%salts(i)) == "cl") icl = i
+      end do
+      if (icl == 0) then
+        write (9003,"(a)") "salt_road_hru: no 'cl' ion in constituents.cs, so no file / station ratio is reported"
+      else
+        do iadep = 1, atmodep_cont%num_sta
+          do iyr = time%yrc_start, time%yrc_end
+            iroad = iyr - atmodep_cont%yr_init + 1
+            k = iyr - rdhru_yr0 + 1
+            f_tot = 0.
+            s_tot = 0.
+            do j = 1, sp_ob%hru
+              if (wst(ob(hru(j)%obj_no)%wst)%wco%atmodep /= iadep) cycle
+              f_tot = f_tot + rdhru(icl, j, k) * hru(j)%area_ha
+              s_tot = s_tot + rdapp_salt(iadep)%salt(icl)%roadyr(iroad) * hru(j)%area_ha
+            end do
+            if (s_tot > 0.) then
+              write (9003,"(a,i0,1x,i0,1x,es14.7)") "salt_road_hru ratio ", iadep, iyr, f_tot / s_tot
+              write (lg,"(a,i0,1x,i0,1x,es14.7)") "salt_road_hru ratio ", iadep, iyr, f_tot / s_tot
+            end if
+          end do
+        end do
+      end if
+      close (lg)
+      end subroutine salt_road_hru_read
 
       end module salt_engine_module

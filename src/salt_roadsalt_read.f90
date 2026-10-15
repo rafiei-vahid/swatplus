@@ -8,6 +8,7 @@
       use maximum_data_module
       use constituent_mass_module
       use salt_engine_module
+!$    use omp_lib
       
       implicit none
       
@@ -29,6 +30,7 @@
       real :: day_temp
       real :: year_precip
       real :: day_fraction
+      integer :: n_omp                !none       |OpenMP threads this run will use (1 without OpenMP)
            
       eof = 0
 
@@ -93,6 +95,16 @@
       if (salt_chemistry_off .and. cs_db%num_salts == 0) then
         write (*,"(a)") "salt_engine.ctl salt_chemistry off: the deck has no salt ions"
         error stop "salt_chemistry off needs salt ions"
+      end if
+      !! E-TS: the salt chemistry keeps its scratch arrays and index counters in salt_data_module (and the saved Sol_*_p arrays
+      !! of salt_chem_hru), shared by every OpenMP thread, so a run with salt ions, the chemistry on and more than one thread stops
+      !! here instead of racing (it crashed on 3 of 3 runs at 4 threads). Without OpenMP the sentinel line compiles out: 1 thread.
+      n_omp = 1
+!$    n_omp = omp_get_max_threads()
+      if (cs_db%num_salts > 0 .and. .not. salt_chemistry_off .and. n_omp > 1) then
+        write (*,"(a,i0,a)") "salt chemistry is on with ", n_omp, " OpenMP threads, and it is not thread-safe: " // &
+          "run with OMP_NUM_THREADS=1, or set 'salt_chemistry off' in salt_engine.ctl"
+        error stop "salt chemistry needs OMP_NUM_THREADS=1"
       end if
 
       !only proceed if there are salt ions in the simulation

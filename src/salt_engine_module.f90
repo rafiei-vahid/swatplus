@@ -13,10 +13,16 @@
 !!    A day with any of its three values at -99 is missing and never qualifies for Q or C. Only the simulated days of a year are
 !!    used (the engine holds no record before the first simulated day), so a partial year receives its whole load inside its
 !!    simulated days (a convention). The road-salt year is taken from the calendar, not from atmodep_cont%ts.
+!!
+!!    salt_chemistry off (E6): salt_chem_hru and salt_chem_aqu keep only their negative-mass clamp and the concentration refresh;
+!!    the precipitation-dissolution package, the cation exchange and the write-back are skipped, so every ion is moved only by
+!!    the fluxes, the minerals keep their fractions and no dissolution is booked. `salt_chemistry on` equals an absent key.
+!!    salt_chem_soil_single (the plant salt-stress estimate) is not affected.
 
       implicit none
 
       logical :: road_timing_hru_gauge = .false.        !! E3 key set in salt_engine.ctl
+      logical :: salt_chemistry_off = .false.           !! E6 key: salt_chemistry off (no equilibrium chemistry, no exchange)
 
       type road_timing_weights
         real, dimension(:,:), allocatable :: w                  !! (day, road-salt year) fraction of the yearly load
@@ -64,8 +70,17 @@
                                    trim(line)
             error stop "salt_engine.ctl: unknown value"
           end if
+        case ("salt_chemistry")
+          if (trim(val) == "off") then
+            salt_chemistry_off = .true.
+          else if (trim(val) /= "on") then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown value for salt_chemistry (known: off, on): ", &
+                                   trim(line)
+            error stop "salt_engine.ctl: unknown value"
+          end if
         case default
-          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown key (known: road_timing): ", trim(line)
+          write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown key (known: road_timing, salt_chemistry): ", &
+                                 trim(line)
           error stop "salt_engine.ctl: unknown key"
         end select
       end do

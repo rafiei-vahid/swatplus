@@ -28,6 +28,7 @@
       use hydrograph_module, only : ob,icmd
       use salt_module
       use salt_aquifer
+      use salt_engine_module, only : salt_chemistry_off
       
       implicit none
       
@@ -90,6 +91,20 @@
         
       !get concentration of salt ions in the aquifer
       gw_volume = (aqu_d(iaq)%stor/1000.)*(ob(icmd)%area_ha*10000.) !m3 of groundwater
+      !! salt_engine.ctl salt_chemistry off (E6): only the clamp and the concentration refresh of the loop below run; no
+      !! chemistry, no exchange, no write-back, the minerals keep their fractions, nothing is dissolved
+      if (salt_chemistry_off) then
+        do m = 1, cs_db%num_salts
+          if (cs_aqu(iaq)%salt(m) < 0.) cs_aqu(iaq)%salt(m) = 0.
+          if (gw_volume > 0.) then
+            cs_aqu(iaq)%saltc(m) = (cs_aqu(iaq)%salt(m) * 1000.) / gw_volume
+          else
+            cs_aqu(iaq)%saltc(m) = 0.
+          end if
+        end do
+        asaltb_d(iaq)%salt(1)%diss = 0.
+        return
+      end if
       do m=1,cs_db%num_salts
         if(cs_aqu(iaq)%salt(m).lt.0) then
           cs_aqu(iaq)%salt(m) = 0.

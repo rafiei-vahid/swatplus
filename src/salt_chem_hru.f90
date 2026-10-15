@@ -27,6 +27,7 @@
       use salt_data_module
       use salt_module
       use time_module
+      use salt_engine_module, only : salt_chemistry_off
 
       implicit none
       
@@ -83,6 +84,25 @@
 
       !area of the HRU in m2
       hru_area_m2 = hru(j)%area_ha * 10000.
+
+      !! salt_engine.ctl salt_chemistry off (E6): only the clamp and the concentration refresh of the loop below run, per layer;
+      !! no precipitation-dissolution, no exchange, no write-back, the minerals keep their fractions, nothing is dissolved
+      if (salt_chemistry_off) then
+        do jj = 1, soil(j)%nly
+          water_volume = (soil(j)%phys(jj)%st/1000.) * hru_area_m2
+          do m = 1, cs_db%num_salts
+            if (cs_soil(j)%ly(jj)%salt(m) < 0.) cs_soil(j)%ly(jj)%salt(m) = 0.
+            salt_mass_kg = cs_soil(j)%ly(jj)%salt(m) * hru(j)%area_ha
+            if (water_volume > 0.) then
+              cs_soil(j)%ly(jj)%saltc(m) = (salt_mass_kg * 1000.) / water_volume
+            else
+              cs_soil(j)%ly(jj)%saltc(m) = 0.
+            end if
+          end do
+        end do
+        hsaltb_d(j)%salt(1)%diss = 0.
+        return
+      end if
 
       !loop through the soil layers
       mass_before = 0.

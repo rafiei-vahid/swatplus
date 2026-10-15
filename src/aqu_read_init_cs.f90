@@ -7,6 +7,7 @@
       use aqu_pesticide_module
       use hydrograph_module
       use constituent_mass_module
+      use salt_engine_module, only : aqu_hold_c0, aqu_c0, aqu_c0_set
       
       implicit none      
       
@@ -34,6 +35,11 @@
       eof = 0
       imax = 0
             
+      !E5 (aquifer_salt hold_initial): each aquifer's C0 is recorded below, where its initial salt is set
+      if (aqu_hold_c0) then
+        allocate (aqu_c0(cs_db%num_salts, sp_ob%aqu), source = 0.)
+        allocate (aqu_c0_set(sp_ob%aqu), source = .false.)
+      end if
       !read initial.aqu_cs
       inquire (file="initial.aqu_cs",exist=i_exist)
       if(i_exist) then
@@ -117,7 +123,9 @@
               do isalt = 1,cs_db%num_salts
                 cs_aqu(iaq)%saltc(isalt) = salt_aqu_ini(ics)%conc(isalt) !g/m3 (mg/L)
                 cs_aqu(iaq)%salt(isalt) = (salt_aqu_ini(ics)%conc(isalt)*gw_volume) / 1000. !g/m3 --> kg
+                if (aqu_hold_c0) aqu_c0(isalt, iaq) = salt_aqu_ini(ics)%conc(isalt)
               enddo
+              if (aqu_hold_c0) aqu_c0_set(iaq) = .true.
               ! loop for salt mineral fractions
               do isalt = 1,5
                 cs_aqu(iaq)%salt_min(isalt) = salt_aqu_ini(ics)%frac(isalt)
@@ -147,6 +155,14 @@
         end do
       
       endif !check for file
+      if (aqu_hold_c0) then
+        do iaq = 1, sp_ob%aqu
+          if (.not. aqu_c0_set(iaq)) then
+            write (*, "(a,i0,a)") "aquifer_salt hold_initial: aquifer ", iaq, " has no initial salt record (initial.aqu_cs, salt_aqu.ini)"
+            error stop "aquifer_salt hold_initial: an aquifer has no initial salt record"
+          end if
+        end do
+      end if
           
       return
       end subroutine aqu_read_init_cs      

@@ -9,7 +9,7 @@
      use salt_module
      use salt_aquifer
      use output_path_module
-     use salt_engine_module, only : n_e2, n_e2b, e2_hdr_hru, e2_hdr_bsn
+     use salt_engine_module, only : n_e2, n_e2b, e2_hdr_hru, e2_hdr_bsn, n_e5, n_e5b, e5_hdr_aqu, e5_hdr_bsn
      
      implicit none 
 
@@ -56,8 +56,10 @@
        write(5080,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer'
        if (n_e2b > 0) write(5080,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
        if (n_e2b > 0) write(5080,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
+       if (n_e5b > 0) write(5080,*) 'rchout_kg:    kg      E5 recharge salt booked out of the system  (soil --> outside)'
+       if (n_e5b > 0) write(5080,*) 'hold_kg:      kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
        write(5080,*)
-       write(5080,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
+       write(5080,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b), (e5_hdr_bsn(ie2), ie2 = 1, n_e5b)
      endif
      
      !basin - monthly
@@ -100,8 +102,10 @@
        write(5082,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer        (averaged over month)'
        if (n_e2b > 0) write(5082,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
        if (n_e2b > 0) write(5082,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
+       if (n_e5b > 0) write(5082,*) 'rchout_kg:    kg      E5 recharge salt booked out of the system  (soil --> outside)'
+       if (n_e5b > 0) write(5082,*) 'hold_kg:      kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
        write(5082,*)
-       write(5082,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
+       write(5082,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b), (e5_hdr_bsn(ie2), ie2 = 1, n_e5b)
      endif
      
      !basin - yearly
@@ -144,8 +148,10 @@
        write(5084,*) 'aqumn_kg:     kg      total salt mineral mass in aquifer        (averaged over year)'
        if (n_e2b > 0) write(5084,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
        if (n_e2b > 0) write(5084,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
+       if (n_e5b > 0) write(5084,*) 'rchout_kg:    kg      E5 recharge salt booked out of the system  (soil --> outside)'
+       if (n_e5b > 0) write(5084,*) 'hold_kg:      kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
        write(5084,*)
-       write(5084,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
+       write(5084,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b), (e5_hdr_bsn(ie2), ie2 = 1, n_e5b)
      endif
      
      !basin - ave annual
@@ -188,8 +194,10 @@
        write(5086,*) 'aqumn_kg:     kg/yr   total salt mineral mass in aquifer        (averaged over years)'
        if (n_e2b > 0) write(5086,*) 'impst_kg:     kg      E2 road salt held on impervious area (store)'
        if (n_e2b > 0) write(5086,*) 'impwo_kg:     kg      E2 road salt washed off the store (before the lag)'
+       if (n_e5b > 0) write(5086,*) 'rchout_kg:    kg      E5 recharge salt booked out of the system  (soil --> outside)'
+       if (n_e5b > 0) write(5086,*) 'hold_kg:      kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
        write(5086,*)
-       write(5086,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b)
+       write(5086,*) saltb_hdr, (e2_hdr_bsn(ie2), ie2 = 1, n_e2b), (e5_hdr_bsn(ie2), ie2 = 1, n_e5b)
      endif
      
      !hru - daily -------------------------------------------------------------------------------------------------------------------------
@@ -379,8 +387,10 @@
          write(5060,*) 'mass:         kg      salt mass stored in aquifer'
          write(5060,*) 'conc:         g/m3    salt concentration in groundwater'
          write(5060,*) 'dssl:         kg      salt mass dissolved from aquifer minerals (mineral --> aquifer)'
+         if (n_e5 > 0) write(5060,*) 'rchout:       kg      E5 recharge salt booked out (not added to the aquifer)'
+         if (n_e5 > 0) write(5060,*) 'hold:         kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
          write(5060,*)
-         write(5060,*) salt_hdr_aqu
+         write(5060,*) salt_hdr_aqu, (e5_hdr_aqu(ie2), ie2 = 1, 2 * n_e5)
          if (pco%csvout == "y") then
            call open_output_file(5061, "aquifer_salt_day.csv", 2000)
            write (5061,*) bsn%name, prog
@@ -409,8 +419,10 @@
          write(5062,*) 'mass:         kg      salt mass stored in aquifer               (averaged over month)'
          write(5062,*) 'conc:         g/m3    salt concentration in groundwater         (averaged over month)'
          write(5062,*) 'dssl:         kg      salt mass dissolved from aquifer minerals (mineral --> aquifer)'
+         if (n_e5 > 0) write(5062,*) 'rchout:       kg      E5 recharge salt booked out (not added to the aquifer)'
+         if (n_e5 > 0) write(5062,*) 'hold:         kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
          write(5062,*)
-         write(5062,*) salt_hdr_aqu
+         write(5062,*) salt_hdr_aqu, (e5_hdr_aqu(ie2), ie2 = 1, 2 * n_e5)
          if (pco%csvout == "y") then
            call open_output_file(5063, "aquifer_salt_mon.csv", 2000)
            write (5063,*) bsn%name, prog
@@ -439,8 +451,10 @@
          write(5064,*) 'mass:         kg      salt mass stored in aquifer               (averaged over year)'
          write(5064,*) 'conc:         g/m3    salt concentration in groundwater         (averaged over year)'
          write(5064,*) 'dssl:         kg      salt mass dissolved from aquifer minerals (mineral --> aquifer)'
+         if (n_e5 > 0) write(5064,*) 'rchout:       kg      E5 recharge salt booked out (not added to the aquifer)'
+         if (n_e5 > 0) write(5064,*) 'hold:         kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
          write(5064,*)
-         write(5064,*) salt_hdr_aqu
+         write(5064,*) salt_hdr_aqu, (e5_hdr_aqu(ie2), ie2 = 1, 2 * n_e5)
          if (pco%csvout == "y") then
            call open_output_file(5065, "aquifer_salt_yr.csv", 2000)
            write (5065,*) bsn%name, prog
@@ -469,8 +483,10 @@
          write(5066,*) 'mass:         kg      salt mass stored in aquifer               (averaged over years)'
          write(5066,*) 'conc:         g/m3    salt concentration in groundwater         (averaged over years)'
          write(5066,*) 'dssl:         kg/yr   salt mass dissolved from aquifer minerals (mineral --> aquifer)'
+         if (n_e5 > 0) write(5066,*) 'rchout:       kg      E5 recharge salt booked out (not added to the aquifer)'
+         if (n_e5 > 0) write(5066,*) 'hold:         kg      E5 salt set to hold the aquifer at C0 (+ in, - out)'
          write(5066,*)
-         write(5066,*) salt_hdr_aqu
+         write(5066,*) salt_hdr_aqu, (e5_hdr_aqu(ie2), ie2 = 1, 2 * n_e5)
          if (pco%csvout == "y") then
            call open_output_file(5067, "aquifer_salt_aa.csv", 2000)
            write (5067,*) bsn%name, prog

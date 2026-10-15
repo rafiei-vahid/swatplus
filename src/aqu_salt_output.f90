@@ -6,6 +6,7 @@
       use hydrograph_module, only : ob, sp_ob1
       use salt_aquifer
       use constituent_mass_module
+      use salt_engine_module, only : n_e5
       
       implicit none
       
@@ -30,6 +31,10 @@
         asaltb_m(iaq)%salt(isalt)%conc = asaltb_m(iaq)%salt(isalt)%conc + asaltb_d(iaq)%salt(isalt)%conc
       enddo
       asaltb_m(iaq)%salt(1)%diss = asaltb_m(iaq)%salt(1)%diss + asaltb_d(iaq)%salt(1)%diss
+      do isalt = 1, n_e5   !E5: summed like rchrg
+        asaltb_m(iaq)%salt(isalt)%rchout = asaltb_m(iaq)%salt(isalt)%rchout + asaltb_d(iaq)%salt(isalt)%rchout
+        asaltb_m(iaq)%salt(isalt)%hold = asaltb_m(iaq)%salt(isalt)%hold + asaltb_d(iaq)%salt(isalt)%hold
+      enddo
       
       !daily print
       if (pco%salt_aqu%d == "y") then
@@ -41,7 +46,8 @@
                          (asaltb_d(iaq)%salt(isalt)%div,isalt=1,cs_db%num_salts), &
                          (asaltb_d(iaq)%salt(isalt)%mass,isalt=1,cs_db%num_salts), &
                          (asaltb_d(iaq)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                          asaltb_d(iaq)%salt(1)%diss
+                          asaltb_d(iaq)%salt(1)%diss, &
+                         (asaltb_d(iaq)%salt(isalt)%rchout,isalt=1,n_e5), (asaltb_d(iaq)%salt(isalt)%hold,isalt=1,n_e5)
         if (pco%csvout == "y") then
           write (5061,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, iaq, ob(iob)%gis_id, & 
                                                                             (asaltb_d(iaq)%salt(isalt)%saltgw,isalt=1,cs_db%num_salts), &
@@ -69,6 +75,10 @@
           asaltb_y(iaq)%salt(isalt)%conc = asaltb_y(iaq)%salt(isalt)%conc + asaltb_m(iaq)%salt(isalt)%conc
         enddo
         asaltb_y(iaq)%salt(1)%diss = asaltb_y(iaq)%salt(1)%diss + asaltb_m(iaq)%salt(1)%diss
+        do isalt = 1, n_e5
+          asaltb_y(iaq)%salt(isalt)%rchout = asaltb_y(iaq)%salt(isalt)%rchout + asaltb_m(iaq)%salt(isalt)%rchout
+          asaltb_y(iaq)%salt(isalt)%hold = asaltb_y(iaq)%salt(isalt)%hold + asaltb_m(iaq)%salt(isalt)%hold
+        enddo
         const = float (ndays(time%mo + 1) - ndays(time%mo))
         do isalt=1,cs_db%num_salts !average mass and concentration
           asaltb_m(iaq)%salt(isalt)%mass = asaltb_m(iaq)%salt(isalt)%mass / const
@@ -83,7 +93,8 @@
                            (asaltb_m(iaq)%salt(isalt)%div,isalt=1,cs_db%num_salts), &
                            (asaltb_m(iaq)%salt(isalt)%mass,isalt=1,cs_db%num_salts), &
                            (asaltb_m(iaq)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                            asaltb_m(iaq)%salt(1)%diss
+                            asaltb_m(iaq)%salt(1)%diss, &
+                         (asaltb_m(iaq)%salt(isalt)%rchout,isalt=1,n_e5), (asaltb_m(iaq)%salt(isalt)%hold,isalt=1,n_e5)
           if (pco%csvout == "y") then
             write (5063,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, iaq, ob(iob)%gis_id, & 
                                           (asaltb_m(iaq)%salt(isalt)%saltgw,isalt=1,cs_db%num_salts), &
@@ -100,6 +111,8 @@
         do isalt = 1, cs_db%num_salts
           asaltb_m(iaq)%salt(isalt)%saltgw = 0.
           asaltb_m(iaq)%salt(isalt)%rchrg = 0.
+          asaltb_m(iaq)%salt(isalt)%rchout = 0.
+          asaltb_m(iaq)%salt(isalt)%hold = 0.
           asaltb_m(iaq)%salt(isalt)%seep = 0.
           asaltb_m(iaq)%salt(isalt)%irr = 0.
           asaltb_m(iaq)%salt(isalt)%div = 0.
@@ -122,6 +135,10 @@
           asaltb_a(iaq)%salt(isalt)%conc = asaltb_a(iaq)%salt(isalt)%conc + asaltb_y(iaq)%salt(isalt)%conc
         enddo
         asaltb_a(iaq)%salt(1)%diss = asaltb_a(iaq)%salt(1)%diss + asaltb_y(iaq)%salt(1)%diss
+        do isalt = 1, n_e5
+          asaltb_a(iaq)%salt(isalt)%rchout = asaltb_a(iaq)%salt(isalt)%rchout + asaltb_y(iaq)%salt(isalt)%rchout
+          asaltb_a(iaq)%salt(isalt)%hold = asaltb_a(iaq)%salt(isalt)%hold + asaltb_y(iaq)%salt(isalt)%hold
+        enddo
         const = time%day_end_yr
         do isalt=1,cs_db%num_salts !average mass concentration
           asaltb_y(iaq)%salt(isalt)%mass = asaltb_y(iaq)%salt(isalt)%mass / const
@@ -136,7 +153,8 @@
                            (asaltb_y(iaq)%salt(isalt)%div,isalt=1,cs_db%num_salts), &
                            (asaltb_y(iaq)%salt(isalt)%mass,isalt=1,cs_db%num_salts), &
                            (asaltb_y(iaq)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                            asaltb_y(iaq)%salt(1)%diss
+                            asaltb_y(iaq)%salt(1)%diss, &
+                         (asaltb_y(iaq)%salt(isalt)%rchout,isalt=1,n_e5), (asaltb_y(iaq)%salt(isalt)%hold,isalt=1,n_e5)
           if (pco%csvout == "y") then
             write (5065,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, iaq, ob(iob)%gis_id, & 
                                           (asaltb_y(iaq)%salt(isalt)%saltgw,isalt=1,cs_db%num_salts), &
@@ -153,6 +171,8 @@
         do isalt = 1, cs_db%num_salts
           asaltb_y(iaq)%salt(isalt)%saltgw = 0.
           asaltb_y(iaq)%salt(isalt)%rchrg = 0.
+          asaltb_y(iaq)%salt(isalt)%rchout = 0.
+          asaltb_y(iaq)%salt(isalt)%hold = 0.
           asaltb_y(iaq)%salt(isalt)%seep = 0.
           asaltb_y(iaq)%salt(isalt)%irr = 0.
           asaltb_y(iaq)%salt(isalt)%div = 0.
@@ -167,6 +187,8 @@
         !calculate average annual values
         do isalt = 1, cs_db%num_salts
           asaltb_a(iaq)%salt(isalt)%rchrg = asaltb_a(iaq)%salt(isalt)%rchrg / time%nbyr
+          asaltb_a(iaq)%salt(isalt)%rchout = asaltb_a(iaq)%salt(isalt)%rchout / time%nbyr
+          asaltb_a(iaq)%salt(isalt)%hold = asaltb_a(iaq)%salt(isalt)%hold / time%nbyr
           asaltb_a(iaq)%salt(isalt)%seep = asaltb_a(iaq)%salt(isalt)%seep / time%nbyr
           asaltb_a(iaq)%salt(isalt)%saltgw = asaltb_a(iaq)%salt(isalt)%saltgw / time%nbyr
           asaltb_a(iaq)%salt(isalt)%irr = asaltb_a(iaq)%salt(isalt)%irr / time%nbyr
@@ -182,7 +204,8 @@
                          (asaltb_a(iaq)%salt(isalt)%div,isalt=1,cs_db%num_salts), &
                          (asaltb_a(iaq)%salt(isalt)%mass,isalt=1,cs_db%num_salts), &
                          (asaltb_a(iaq)%salt(isalt)%conc,isalt=1,cs_db%num_salts), &
-                          asaltb_a(iaq)%salt(1)%diss
+                          asaltb_a(iaq)%salt(1)%diss, &
+                         (asaltb_a(iaq)%salt(isalt)%rchout,isalt=1,n_e5), (asaltb_a(iaq)%salt(isalt)%hold,isalt=1,n_e5)
         if (pco%csvout == "y") then
           write (5067,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, iaq, ob(iob)%gis_id, & 
                                         (asaltb_a(iaq)%salt(isalt)%saltgw,isalt=1,cs_db%num_salts), &

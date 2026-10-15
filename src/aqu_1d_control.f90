@@ -12,6 +12,7 @@
       use salt_aquifer
       use cs_aquifer
       use ch_pesticide_module
+      use salt_engine_module, only : aqu_hold_c0
       
       implicit none
       
@@ -52,6 +53,9 @@
       real :: cs_discharge !rtb cs
       real :: cs_seep !rtb cs
       integer :: m !rtb salt
+      real :: h_a !kg  |E5: mass set before discharge
+      real :: h_b !kg  |E5: mass set after seepage
+      external :: salt_aqu_hold
       integer :: ics !rtb cs
       
       !! set pointers to aquifer database and weather station
@@ -160,13 +164,18 @@
       !compute salt recharge into the aquifer
       do m=1,cs_db%num_salts
         salt_recharge = obcs(icmd)%hin(1)%salt(m) !kg
-        cs_aqu(iaq)%salt(m) = cs_aqu(iaq)%salt(m) + salt_recharge !kg
+        if (aqu_hold_c0) then   !E5: recharge booked out of the system, not added
+          asaltb_d(iaq)%salt(m)%rchout = salt_recharge
+        else
+          cs_aqu(iaq)%salt(m) = cs_aqu(iaq)%salt(m) + salt_recharge !kg
+        end if
         asaltb_d(iaq)%salt(m)%rchrg = salt_recharge
       enddo
       !compute groundwater salt loading and seepage
       do m=1,cs_db%num_salts
         !calculate new concentration of salt ion in groundwater
         gw_volume = (aqu_d(iaq)%stor/1000.) * (ob(icmd)%area_ha*10000.) !m3 of groundwater
+        if (aqu_hold_c0) call salt_aqu_hold (iaq, m, gw_volume, h_a)   !E5: C0 x V before discharge and seepage
         if(gw_volume.gt.0) then
           cs_aqu(iaq)%saltc(m) = (cs_aqu(iaq)%salt(m) * 1000.) / gw_volume !g/m3 = mg/L
         else
@@ -194,6 +203,10 @@
         cs_aqu(iaq)%salt(m) = cs_aqu(iaq)%salt(m) - salt_seep !kg (update salt storage)
         asaltb_d(iaq)%salt(m)%seep = salt_seep !kg (store for daily output)
         obcs(icmd)%hd(2)%salt(m) = asaltb_d(iaq)%salt(m)%seep
+        if (aqu_hold_c0) then   !E5: C0 x V again after them; hold = both settings
+          call salt_aqu_hold (iaq, m, gw_volume, h_b)
+          asaltb_d(iaq)%salt(m)%hold = h_a + h_b
+        end if
         !update salt ion concentration in groundwater        
         if(gw_volume.gt.0) then
           cs_aqu(iaq)%saltc(m) = (cs_aqu(iaq)%salt(m) * 1000.) / gw_volume !g/m3 = mg/L

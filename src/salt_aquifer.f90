@@ -13,6 +13,8 @@
         real :: div = 0.             !! |kg       |salt ion mass removed via diversion
         real :: mass = 0.            !! |kg       !salt ion mass in aquifer
         real :: conc = 0.            !! |g/m3     |salt ion mass concentration in groundwater
+        real :: rchout = 0.          !! |kg       |E5: recharge booked out of the system (aquifer_salt hold_initial)
+        real :: hold = 0.            !! |kg       |E5: mass set to hold C0 (+ adds salt, - removes it)
       end type salt_balance_aqu
       
       type object_salt_balance_aqu

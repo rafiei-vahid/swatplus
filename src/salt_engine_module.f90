@@ -31,6 +31,10 @@
 !!
 !!    road_washoff_scale m (E2.4, needs road_washoff impervious): the store's share becomes min(1, m x frac_dc_imp), m a real in
 !!    [0, 2]; without the key m = 1, which is E2 itself.
+!!
+!!    aquifer_salt hold_initial (E5): each aquifer's salt concentration stays at its initial value C0. Recharge salt is booked out
+!!    (rchout) instead of added; the mass is set to C0 x V before discharge and seepage and again after them, the two settings
+!!    printed as a signed 'hold'. Columns rchout_<ion>, hold_<ion> (aquifer files) and rchout_kg, hold_kg (basin) only with the key.
 
       implicit none
 
@@ -56,6 +60,19 @@
       real, dimension(2) :: impb_mo = 0.
       real, dimension(2) :: impb_yr = 0.
       real, dimension(2) :: impb_aa = 0.
+
+      logical :: aqu_hold_c0 = .false.                  !! E5 key: aquifer_salt hold_initial
+      integer :: aqu_hold_lines = 0                     !! E5 aquifer_salt lines (more than one stops)
+      real, dimension(:,:), allocatable :: aqu_c0       !! E5 (ion, aquifer) initial concentration, g/m3
+      logical, dimension(:), allocatable :: aqu_c0_set  !! E5 (aquifer) C0 recorded from its initial salt record
+      integer :: n_e5 = 0                               !! E5 ions per extra aquifer column group (0 without the key)
+      integer :: n_e5b = 0                              !! E5 extra basin columns (0 without the key, else 2)
+      character(len=16), dimension(16) :: e5_hdr_aqu = ""  !! E5 aquifer header names: rchout_<ion> then hold_<ion>
+      character(len=16), dimension(2) :: e5_hdr_bsn = (/"       rchout_kg", "         hold_kg"/)
+      real, dimension(2) :: hldb = 0.                   !! E5 basin, day: rchout (kg), hold (kg)
+      real, dimension(2) :: hldb_mo = 0.
+      real, dimension(2) :: hldb_yr = 0.
+      real, dimension(2) :: hldb_aa = 0.
 
       type road_timing_weights
         real, dimension(:,:), allocatable :: w                  !! (day, road-salt year) fraction of the yearly load
@@ -147,9 +164,23 @@
             write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": road_washoff_scale outside [0, 2]: ", trim(line)
             error stop "salt_engine.ctl: road_washoff_scale outside [0, 2]"
           end if
+        case ("aquifer_salt")
+          aqu_hold_lines = aqu_hold_lines + 1
+          if (aqu_hold_lines > 1) then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": aquifer_salt given twice: ", trim(line)
+            error stop "salt_engine.ctl: aquifer_salt given twice"
+          end if
+          if (trim(val) == "hold_initial") then
+            aqu_hold_c0 = .true.
+          else
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": unknown value for aquifer_salt (known: hold_initial): ", &
+                                   trim(line)
+            error stop "salt_engine.ctl: unknown value"
+          end if
         case default
           write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline,                                                        &
-                                 ": unknown key (known: road_timing, salt_chemistry, road_load, road_washoff, road_washoff_scale): ", &
+                                 ": unknown key (known: road_timing, salt_chemistry, road_load, road_washoff, road_washoff_scale, " // &
+                                 "aquifer_salt): ", &
                                  trim(line)
           error stop "salt_engine.ctl: unknown key"
         end select

@@ -74,6 +74,22 @@
           e2_hdr_hru(n_e2 + ie2) = "  impw_" // trim(cs_db%salts(ie2))
         end do
       end if
+      if (aqu_hold_c0) then
+        if (bsn_cc%gwflow == 1) then
+          write (*,"(a)") "salt_engine.ctl aquifer_salt hold_initial: the gwflow aquifer is a different module, not covered"
+          error stop "aquifer_salt hold_initial: gwflow is not covered"
+        end if
+        if (cs_db%num_salts < 1 .or. cs_db%num_salts > 8) then
+          write (*,"(a,i0)") "salt_engine.ctl aquifer_salt hold_initial: salt ions must number 1 to 8, the deck has ", cs_db%num_salts
+          error stop "aquifer_salt hold_initial needs 1 to 8 salt ions"
+        end if
+        n_e5 = cs_db%num_salts
+        n_e5b = 2
+        do ie2 = 1, n_e5
+          e5_hdr_aqu(ie2) = "  rchout_" // trim(cs_db%salts(ie2))
+          e5_hdr_aqu(n_e5 + ie2) = "  hold_" // trim(cs_db%salts(ie2))
+        end do
+      end if
       if (salt_chemistry_off .and. cs_db%num_salts == 0) then
         write (*,"(a)") "salt_engine.ctl salt_chemistry off: the deck has no salt ions"
         error stop "salt_chemistry off needs salt ions"

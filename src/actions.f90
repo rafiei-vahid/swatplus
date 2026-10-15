@@ -154,14 +154,14 @@
                 !set organics and constituents from irr.ops ! irrig(j)%water =  cs_irr(j) = 
                 if (pco%mgtout == "y") then
                   write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIGATE", phubase(j),  &
-                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, pl_mass(j)%abg_rsd_tot%m, &
+                      log_phuacc(j, ipl), soil(j)%sw,log_plmass(j, ipl), pl_mass(j)%abg_rsd_tot%m, &
                       sol_sumno3(j), sol_sumsolp(j), irrig(j)%applied
                 end if
               else
                 !! set demand for irrigation from channel, reservoir or aquifer
                 if (pco%mgtout == "y") then
                   write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIG_trn", phubase(j), &
-                      pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%abg_rsd_tot%m, &
+                      log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl), pl_mass(j)%abg_rsd_tot%m, &
                       sol_sumno3(j), sol_sumsolp(j), irrop_db(irrop)%amt_mm
                 end if
               end if
@@ -349,7 +349,7 @@
             else
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "IRRIGATE", phubase(j),  &
-                    pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%abg_rsd_tot, &
+                    log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl), pl_mass(j)%abg_rsd_tot, &
                     sol_sumno3(j), sol_sumsolp(j), irrig(j)%applied
               end if
             endif
@@ -375,7 +375,7 @@
                 call pl_fert_wet (ifrt, frt_kg)
                 if (pco%mgtout == "y") then
                   write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, " FERT-WET", &
-                    phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
+                    phubase(j), log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl),           &
                     pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
                     fertorgn, fertsolp, fertorgp
                 endif
@@ -383,7 +383,7 @@
                 call pl_fert (ifrt, frt_kg, ifertop)
                 if (pco%mgtout == "y") then
                   write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, "    FERT ", &
-                    phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
+                    phubase(j), log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl),           &
                     pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
                     fertorgn, fertsolp, fertorgp
                 endif
@@ -409,7 +409,7 @@
               call cs_fert(j,ifrt,frt_kg,ifertop) !rtb cs
               if (pco%mgtout == "y") then
                 write (2612,*) j, time%yrc, time%mo, time%day_mo, mgt%op_char, " MANURE ", &
-                  phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,           &
+                  phubase(j), log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl),           &
                   pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), frt_kg, fertno3, fertnh3,         &
                   fertorgn, fertsolp, fertorgp
               endif
@@ -440,7 +440,7 @@
             
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, tilldb(idtill)%tillnm, "    TILLAGE",    &
-                    phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m,        &
+                    phubase(j), log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl),        &
                     pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), tilldb(idtill)%effmix
               end if
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
@@ -763,7 +763,7 @@
 
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%option, "    PEST ",        &
-                 phubase(j), pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m,           &
+                 phubase(j), log_phuacc(j, ipl), soil(j)%sw,log_plmass(j, ipl),           &
                  pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), pest_kg
               endif
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
@@ -898,7 +898,7 @@
               
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, tilldb(idtill)%tillnm, "  DRAIN_CONTROL",    &
-                    phubase(j), pcom(j)%plcur(1)%phuacc, soil(j)%sw, pl_mass(j)%tot(1)%m,        &
+                    phubase(j), log_phuacc(j, 1), soil(j)%sw, log_plmass(j, 1),        &
                     pl_mass(j)%abg_rsd_tot%m, sol_sumno3(j), sol_sumsolp(j), hru(j)%lumv%sdr_dep
               end if
             end if
@@ -1257,7 +1257,7 @@
               ipl = 1
               if (pco%mgtout == "y") then
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "    BURN", phubase(j),    &
-                    pcom(j)%plcur(ipl)%phuacc, soil(j)%sw,pl_mass(j)%tot(ipl)%m, pl_mass(j)%abg_rsd_tot%m,   &
+                    log_phuacc(j, ipl), soil(j)%sw,log_plmass(j, ipl), pl_mass(j)%abg_rsd_tot%m,   &
                     sol_sumno3(j), sol_sumsolp(j)
               end if
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
@@ -1275,7 +1275,7 @@
               if (pco%mgtout == "y") then
                 ipl = 1
                 write (2612, *) j, time%yrc, time%mo, time%day_mo, d_tbl%act(iac)%name, "    CNUP", phubase(j),    &
-                  pcom(j)%plcur(ipl)%phuacc, soil(j)%sw, pl_mass(j)%tot(ipl)%m, pl_mass(j)%abg_rsd_tot%m,       &
+                  log_phuacc(j, ipl), soil(j)%sw, log_plmass(j, ipl), pl_mass(j)%abg_rsd_tot%m,       &
                   sol_sumno3(j), sol_sumsolp(j), cn_prev, cn2(j)
               end if
             
@@ -1310,4 +1310,20 @@
       end do
 
       return
+      contains
+
+      !! plant ipl's accumulated heat units and total mass for the management log; 0 when the HRU has no such plant
+      !! (an HRU without a plant community has none of the plant arrays allocated)
+      real function log_phuacc (jj, ipl_log)
+        integer, intent (in) :: jj, ipl_log
+        log_phuacc = 0.
+        if (ipl_log >= 1 .and. ipl_log <= pcom(jj)%npl) log_phuacc = pcom(jj)%plcur(ipl_log)%phuacc
+      end function log_phuacc
+
+      real function log_plmass (jj, ipl_log)
+        integer, intent (in) :: jj, ipl_log
+        log_plmass = 0.
+        if (ipl_log >= 1 .and. ipl_log <= pcom(jj)%npl) log_plmass = pl_mass(jj)%tot(ipl_log)%m
+      end function log_plmass
+
       end subroutine actions

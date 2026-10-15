@@ -18,7 +18,8 @@
       use salt_module
       use constituent_mass_module
       use time_module, only : time
-      use salt_engine_module, only : road_timing_hru_gauge, rdw, road_load_hru_file, rdhru, rdhru_yr0, road_washoff_imp, rdimp
+      use salt_engine_module, only : road_timing_hru_gauge, rdw, road_load_hru_file, rdhru, rdhru_yr0, road_washoff_imp, rdimp,                         &
+                                     road_washoff_m
       use urban_data_module, only : urbdb
       
       implicit none
@@ -47,7 +48,7 @@
         iyr_road = time%yrc - atmodep_cont%yr_init + 1
         fdc = 0.
         if (road_washoff_imp .and. hru(j)%luse%urb_lu > 0) then
-          fdc = urbdb(hru(j)%luse%urb_lu)%fcimp
+          fdc = min(1., road_washoff_m * urbdb(hru(j)%luse%urb_lu)%fcimp)
         end if
         if (road_load_hru_file) then
           !! road_load hru_file (E1): this HRU's own load for the year (zero when the file gives it none), same timing

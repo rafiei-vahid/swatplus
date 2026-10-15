@@ -28,6 +28,9 @@
 !!    hru_urban washes urban solids off, the same fraction 1 - Exp(-xx) of the store washes into urbqsalt (build-up/wash-off),
 !!    or the whole store on a USGS-regression runoff day. The store and the washed mass are printed as extra columns of the
 !!    HRU and basin salt files only with the key.
+!!
+!!    road_washoff_scale m (E2.4, needs road_washoff impervious): the store's share becomes min(1, m x frac_dc_imp), m a real in
+!!    [0, 2]; without the key m = 1, which is E2 itself.
 
       implicit none
 
@@ -42,6 +45,8 @@
 
       logical :: road_washoff_imp = .false.             !! E2 key: road_washoff impervious
       integer :: road_washoff_lines = 0                 !! E2 road_washoff lines in salt_engine.ctl (more than one stops)
+      real :: road_washoff_m = 1.                       !! E2.4 road_washoff_scale m (1 without the key)
+      integer :: road_washoff_scale_lines = 0           !! E2.4 road_washoff_scale lines (more than one stops)
       real, dimension(:,:), allocatable :: rdimp        !! E2 (ion, hru) road salt on directly connected impervious area, kg/ha
       integer :: n_e2 = 0                               !! E2 ions printed per extra HRU column group (0 without the key)
       integer :: n_e2b = 0                              !! E2 extra basin columns (0 without the key, else 2)
@@ -127,9 +132,24 @@
                                    trim(line)
             error stop "salt_engine.ctl: unknown value"
           end if
+        case ("road_washoff_scale")
+          road_washoff_scale_lines = road_washoff_scale_lines + 1
+          if (road_washoff_scale_lines > 1) then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": road_washoff_scale given twice: ", trim(line)
+            error stop "salt_engine.ctl: road_washoff_scale given twice"
+          end if
+          read (val, *, iostat=eof) road_washoff_m
+          if (eof /= 0) then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": road_washoff_scale is not a number: ", trim(line)
+            error stop "salt_engine.ctl: road_washoff_scale is not a number"
+          end if
+          if (road_washoff_m < 0. .or. road_washoff_m > 2.) then
+            write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline, ": road_washoff_scale outside [0, 2]: ", trim(line)
+            error stop "salt_engine.ctl: road_washoff_scale outside [0, 2]"
+          end if
         case default
           write (*, "(a,i0,2a)") "salt_engine.ctl line ", iline,                                                        &
-                                 ": unknown key (known: road_timing, salt_chemistry, road_load, road_washoff): ", &
+                                 ": unknown key (known: road_timing, salt_chemistry, road_load, road_washoff, road_washoff_scale): ", &
                                  trim(line)
           error stop "salt_engine.ctl: unknown key"
         end select

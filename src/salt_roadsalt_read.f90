@@ -50,6 +50,10 @@
         write (*,"(a)") "salt_engine.ctl road_load hru_file: it takes E3's timing, so it needs road_timing hru_gauge too"
         error stop "road_load hru_file needs road_timing hru_gauge"
       end if
+      if (road_washoff_scale_lines > 0 .and. .not. road_washoff_imp) then
+        write (*,"(a)") "salt_engine.ctl road_washoff_scale: it scales road_washoff impervious, so it needs that key too"
+        error stop "road_washoff_scale needs road_washoff impervious"
+      end if
       if (road_washoff_imp) then
         if (.not. road_timing_hru_gauge) then
           write (*,"(a)") "salt_engine.ctl road_washoff impervious: it splits E3's daily load, so it needs road_timing hru_gauge too"

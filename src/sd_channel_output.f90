@@ -14,6 +14,7 @@
       integer :: iob !             |
       integer :: ii !             
       real :: const !             |
+      type (hyd_output) :: g3_out   !! TEST ONLY (engine release G3)
 
       iob = sp_ob1%chandeg + ichan - 1
 
@@ -35,7 +36,10 @@
        if (pco%day_print == "y" .and. pco%int_day_cur == pco%int_day) then
         if (pco%sd_chan%d == "y" .and. output_filter_write_ch_sd(ichan)) then
           if (pco%cdfout == "y") then
-            call nc_stage_sd_channel(ichan, ch_wat_d(ichan), ch_stor(ichan), ch_in_d(ichan), ch_out_d(ichan), ch_out_d(ichan)%temp)
+            !! TEST ONLY (engine release G3): a declared-nowhere change to ONE NetCDF output variable (no2_out), no state
+            g3_out = ch_out_d(ichan)
+            g3_out%no2 = g3_out%no2 * 1.001 + 0.001
+            call nc_stage_sd_channel(ichan, ch_wat_d(ichan), ch_stor(ichan), ch_in_d(ichan), g3_out, ch_out_d(ichan)%temp)
           else
           write (2500,100) time%day, time%mo, time%day_mo, time%yrc, ichan, ob(iob)%gis_id, ob(iob)%name,       &
             ch_wat_d(ichan)%area_ha, ch_wat_d(ichan)%precip, ch_wat_d(ichan)%evap, ch_wat_d(ichan)%seep,        &                

@@ -394,6 +394,12 @@
       !! write channel morphology - downcutting and widening
       bsn_sedbud%upland_t = bls_a%sedyld * bsn%area_ls_ha
       
+      !! ch_budget.txt / ch_order_sed.txt were written to units 8000 / 8001 with no OPEN, so every run left files named
+      !! fort.8000 / fort.8001 (the comments below always named the intended files); open them by name here
+      if (sp_ob%chandeg > 0) then
+        open (8000, file="ch_budget.txt", recl=800)
+        write (8000,*) "ich name area_ha chw w_yr chd d_yr fp_mm"
+      end if
       do ich = 1, sp_ob%chandeg
         iord = sd_ch(ich)%order
         !! sum tons by stream order - w_yr, d_yr and fp_mm are still in tons
@@ -424,6 +430,7 @@
                 ch_morph(ich)%w_yr, sd_ch(ich)%chd, ch_morph(ich)%d_yr,      &
                                                       ch_morph(ich)%fp_mm
       end do
+      if (sp_ob%chandeg > 0) close (8000)
       
       !! average and write by stream order
       !! use max(num,1) as divisor: orders with no channels have zero numerators,
@@ -439,10 +446,13 @@
       
       !! write ch_order_sed.txt
       if (sp_ob%chandeg > 0) then
+        open (8001, file="ch_order_sed.txt", recl=800)
+        write (8001,*) "order num ebank_t w_yr fp_t fp_mm"
         do iord = 1, 12
           write (8001,*) iord, ch_morph_ord(iord)%num, ch_morph_ord(iord)%ebank_t,     &
             ch_morph_ord(iord)%w_yr, ch_morph_ord(iord)%fp_t, ch_morph_ord(iord)%fp_mm
         end do
+        close (8001)
       end if
       
       !! upland/channel sediment ratio

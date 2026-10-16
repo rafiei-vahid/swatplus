@@ -15,7 +15,8 @@
                                    nc_stage_hru_pw, nc_stage_hru_wb_mon, nc_stage_hru_nb_mon, &
                                    nc_stage_hru_ls_mon, nc_stage_hru_pw_mon,                  &
                                    nc_stage_hru_wb_yr, nc_stage_hru_nb_yr,                    &
-                                   nc_stage_hru_ls_yr, nc_stage_hru_pw_yr, nc_stage_hru_wb_aa
+                                   nc_stage_hru_ls_yr, nc_stage_hru_pw_yr, nc_stage_hru_wb_aa,   &
+                                   nc_stage_hru_nb_aa, nc_stage_hru_ls_aa, nc_stage_hru_pw_aa
       
       implicit none
       
@@ -105,10 +106,11 @@
             end if
           end if
           if (pco%pw_hru%d == "y") then
+            !! set before the NetCDF / text branch, so both outputs print the same record (the text branch alone set it)
+            hpw_d(j)%bm_max = hpw_d(j)%bioms
             if (pco%cdfout == "y") then
               call nc_stage_hru_pw(j, hpw_d(j))
             else
-            hpw_d(j)%bm_max = hpw_d(j)%bioms
             write (2040,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_d(j),                  & 
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather day 
               if (pco%csvout == "y") then 
@@ -179,11 +181,13 @@
            end if
            
            if (pco%pw_hru%m == "y") then
+             !! month-end plant N and P, set before the NetCDF / text branch (the text branch alone set them, so NetCDF printed
+             !! the monthly mean of nplnt and a zero pplnt)
+             hpw_m(j)%nplnt = pl_mass(j)%tot_com%n
+             hpw_m(j)%pplnt = pl_mass(j)%tot_com%p
              if (pco%cdfout == "y") then
                call nc_stage_hru_pw_mon(j, hpw_m(j))
              else
-             hpw_m(j)%nplnt = pl_mass(j)%tot_com%n
-             hpw_m(j)%pplnt = pl_mass(j)%tot_com%p
              write (2041,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_m(j),         &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather mon
                if (pco%csvout == "y") then 
@@ -266,11 +270,12 @@
            end if
            
            if (pco%pw_hru%y == "y") then
+             !! year-end plant N and P, set before the NetCDF / text branch (as monthly above)
+             hpw_y(j)%nplnt = pl_mass(j)%tot_com%n
+             hpw_y(j)%pplnt = pl_mass(j)%tot_com%p
              if (pco%cdfout == "y") then
                call nc_stage_hru_pw_yr(j, hpw_y(j))
              else
-             hpw_y(j)%nplnt = pl_mass(j)%tot_com%n
-             hpw_y(j)%pplnt = pl_mass(j)%tot_com%p
              write (2042,101) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_y(j),        &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather yr             
                if (pco%csvout == "y") then 
@@ -321,24 +326,34 @@
         
          if (time%end_sim == 1 .and. pco%nb_hru%a == "y") then 
            hnb_a(j) = hnb_a(j) / time%yrs_prt
+           !! NetCDF / text branch, as hru_wb's average-annual block (this block had none: it wrote text to an unopened unit in
+           !! NetCDF mode and never staged hru_nb_aa)
+           if (pco%cdfout == "y") then
+             call nc_stage_hru_nb_aa(j, hnb_a(j))
+           else
            write (2023,104) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hnb_a(j),        &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops      !! nutrient bal ann
            if (pco%csvout == "y") then 
                write (2027,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, &
                                                                         hnb_a(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops
                end if
+           end if
              hnb_a(j) = hnbz
          end if
         
          if (time%end_sim == 1 .and. pco%ls_hru%a == "y") then
            hls_a(j) = hls_a(j) / time%yrs_prt 
            percn_aa = hpw_a(j)%percn / time%yrs_prt
+           if (pco%cdfout == "y") then
+             call nc_stage_hru_ls_aa(j, hls_a(j), percn_aa)
+           else
            write (2033,107) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hls_a(j),        &
                                                                           lum(ilu)%plant_cov, lum(ilu)%mgt_ops, percn_aa       !! losses ann
              if (pco%csvout == "y") then 
                write (2037,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, &
                                                                         hls_a(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops, percn_aa 
              end if
+           end if
              hls_a(j) = hlsz
          end if
         
@@ -348,12 +363,16 @@
            hpw_a(j)%nplnt = pl_mass(j)%tot_com%n
            hpw_a(j)%pplnt = pl_mass(j)%tot_com%p
            hpw_a(j)%bm_max = bm_max_a   ! Restore bm_max_a
+           if (pco%cdfout == "y") then
+             call nc_stage_hru_pw_aa(j, hpw_a(j))
+           else
            write (2043,102) time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name, hpw_a(j),           &
                                                                         lum(ilu)%plant_cov, lum(ilu)%mgt_ops  !! plant weather ann
              if (pco%csvout == "y") then 
                write (2047,'(*(G0.6,:","))') time%day, time%mo, time%day_mo, time%yrc, j, ob(iob)%gis_id, ob(iob)%name,    &
                                                               hpw_a(j), lum(ilu)%plant_cov, lum(ilu)%mgt_ops  
              end if
+           end if
              hru(j)%strsa = hpw_a(j)%strsa
              hpw_a(j) = hpwz
          end if

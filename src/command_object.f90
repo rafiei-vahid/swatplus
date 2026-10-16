@@ -67,6 +67,10 @@
       real :: sumflo
       integer, intent(in) :: ic
 
+      !! Q1281: iob is assigned only in the incoming-hydrograph loop but read by the constituent branch of the
+      !! "dr" case, so a delivery-ratio object with no inflows read it undefined. Reset per call (upstream's 0).
+      iob = 0
+
       icmd = ic
 
         !! allocate water for transfers that don't include a channel as a source
@@ -367,7 +371,14 @@
           case ("dr")   ! delivery ratios
             ob(icmd)%hd(1) = ob(icmd)%hin ** dr(ob(icmd)%props) ! ** is an intrinsic function to multiply 
             if (cs_db%num_tot > 0) then
-              idr = ob(iob)%props
+              !! Q1281 follow-up: iob is the last incoming object, and 0 when the dr object has no inflows
+              !! (ob(0) is out of bounds). With no inflows hin was zeroed above, so the dr object's own props
+              !! give the same zero result in bounds. With inflows the last inflow's props are used, as upstream.
+              if (iob > 0) then
+                idr = ob(iob)%props
+              else
+                idr = ob(icmd)%props
+              end if
               
               call constit_hyd_mult (icmd, idr)
             end if

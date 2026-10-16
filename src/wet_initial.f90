@@ -20,6 +20,7 @@
       integer :: init_om
       integer :: init !           |
       integer :: iweir  !           |
+      logical :: weir_ok              !           |a weir.res row with height > 0 is in use (zero-height rows are ignored)
       integer :: icon !           |
       integer :: isalt !           |salt ion counter
       real :: x1 !           |
@@ -34,6 +35,10 @@
       integer :: ics !none       |counter
       integer :: isstor !none       |counter
   
+      !! Q1281: iprop is assigned only when the HRU's surf_stor name matches a wetland.wet entry, but the
+      !! initial-concentration lookup reads wet_dat(iprop) regardless. Reset per call (upstream's 0).
+      iprop = 0
+
       iweir = wet_ob(iihru)%iweir
         
       !! check if hru can store surface water
@@ -135,7 +140,13 @@
         wet_ob(iihru)%psa = wet_hyd(iihru)%psa * hru(iihru)%area_ha 
         wet_ob(iihru)%esa = wet_hyd(iihru)%esa * hru(iihru)%area_ha 
         !! set initial weir height to principal depth - m
-        if (db_mx%res_weir > 0.and.wet_ob(iihru)%iweir>0) then !if available, read from weir.res Jaehak 2022
+        !! a weir.res row with height <= 0 is not a weir: SWAT+ Editor writes one such row by default, and using it
+        !! would set pvol = 0 for every wetland. Such wetlands keep pvol and weir height from pdep (else branch).
+        weir_ok = .false.
+        if (db_mx%res_weir > 0 .and. wet_ob(iihru)%iweir > 0) then
+          if (wet_ob(iihru)%iweir <= db_mx%res_weir) weir_ok = res_weir(iweir)%h > 0.
+        end if
+        if (weir_ok) then !if available, read from weir.res Jaehak 2022
           wet_ob(iihru)%weir_hgt = res_weir(iweir)%h  !m weir height
           wet_ob(iihru)%weir_wid = res_weir(iweir)%w  !m, weir width
           !update pvol/evol according to weir height for paddy weir discharge. Jaehak 2023
@@ -148,6 +159,10 @@
           wet_ob(iihru)%weir_wid = 2.5  !m
         endif
 
+        !! Q1281 follow-up: iprop stays 0 when the HRU's surf_stor name matches no wetland.wet entry (the
+        !! "not found (wetland.wet)" line above). wet_dat is allocated from 1 when that file exists, so
+        !! skip the initial-concentration lookups in that case; when it does not exist wet_dat(0) is valid.
+        if (iprop >= lbound(wet_dat, 1)) then
         !!set initial n and p concentrations --> (ppm) * (m^3) / 1000 = kg    !! ppm = t/m^3 * 10^6
         init = wet_dat(iprop)%init
         init_om = wet_init(init)%org_min
@@ -195,6 +210,7 @@
             wet_water(iihru)%cs(3) = 0.
           endif
         endif
+        end if
           
         !wet(iihru)%flo = om_init_water(init_om)%flo * wet_ob(iihru)%pvol !Jaehak 2022
         wet_om_init(iihru) = wet(iihru)

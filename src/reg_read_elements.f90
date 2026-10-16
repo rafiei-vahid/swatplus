@@ -31,6 +31,10 @@
       integer :: ihru_tot !             |
       integer :: ilsu !             |
       
+      !! Q1281: ireg indexes region(ireg)%lumc before any loop assigns it. region is allocated (0:mreg), and
+      !! upstream's implicit-SAVE '= 0' (removed by the OpenMP strip) allocated region(0)%lumc; do that per call.
+      ireg = 0
+
       imax = 0
       mcal = 0
       mreg = 0

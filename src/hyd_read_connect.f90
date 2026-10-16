@@ -45,6 +45,11 @@
       integer :: ncs !           |constituent counter
       integer :: aqu_found !           |rtb gwflow
       
+      !! Q1281: ob1 and ob2 are assigned only when the connect file is read with nspu > 0, but the weather
+      !! crosswalk loop at the end reads both. The OpenMP strip removed their implicit-SAVE '= 0'; reset per call.
+      ob1 = 0
+      ob2 = 0
+
       eof = 0
       imax = 0
       cmd_prev = 0
@@ -334,6 +339,15 @@
       endif
       
       !crosswalk weather station 
+      !! Q1281 follow-up: every caller passes nspu > 0, so ob1 is still 0 here only when the connect file is
+      !! missing or ends before its header line; the crosswalk below would then index ob(0).
+      if (ob1 == 0) then
+        write (*,*) "ERROR: ", trim(con_file), " is missing or ends before its header, but object.cnt has ", &
+                    nspu, " ", trim(obtyp), " objects (Q1281)"
+        write (9001,*) "ERROR: ", trim(con_file), " is missing or ends before its header, but object.cnt has ", &
+                    nspu, " ", trim(obtyp), " objects (Q1281)"
+        error stop
+      end if
       do i = ob1, ob2
         call search (wst_n, db_mx%wst, ob(i)%wst_c, ob(i)%wst)
       end do

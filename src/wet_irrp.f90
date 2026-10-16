@@ -21,6 +21,10 @@
       integer :: i
       real :: rto
       
+      !! Q1281: iob is assigned only when the HRU belongs to a routing unit, but the source search reads ob(iob)
+      !! when irr_isc == 0. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call.
+      iob = 0
+
       j = ihru
       wsa1 = hru(j)%area_ha * 10.
       
@@ -45,6 +49,9 @@
           isrc = hru(j)%irr_isc
         else
           
+          !! Q1281 follow-up: iob is set only when the HRU is in a routing unit. Otherwise irr_src was set to
+          !! 'unlim' and isrc = 0 above, and the search would read ob(0).
+          if (iob > 0) then
           do i = 1, ob(iob)%src_tot
             if (hru(j)%irr_src == ob(iob)%obtyp_out(i)) then !
               isrc = ob(iob)%obtypno_out(i) ! Irrigation source is the current cha/res/aqu that the HRU is linked to in the rout_unit.con if it exists.
@@ -53,6 +60,7 @@
               isrc = 0
             endif
           end do
+          end if
           
         endif
       endif        

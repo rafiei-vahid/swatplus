@@ -29,6 +29,10 @@
       integer :: wb_cell
       real :: group_area
 
+      !! Q1281: in_gw is never assigned, so the gwflow.wbgroups open() below used an undefined unit number.
+      !! 1230 is upstream's initializer (dropped here with its implicit SAVE); assign it per call instead.
+      in_gw = 1230
+
       !initialize groundwater balance ---------------------------------------------------------------------------------------------------------------
       write(out_gw,*)
       write(out_gw,*) '     initialize groundwater balance files and arrays'

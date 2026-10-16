@@ -60,6 +60,14 @@
 !! initialized local => implicit SAVE => shared across threads (see res_hydro.f90)
 !$omp threadprivate(pl_chk)
       
+      !! Q1281: assigned only on some condition branches but read outside them: ipl (phu_plant, empty community),
+      !! iob (phu_base0/precip_cur/precip_next with ob not hru/hlt), ialt (plant_name_gro, plant not in the
+      !! community), targ_val (vol_wet, lim_var not pvol/evol). Reset per call (upstream's values).
+      ipl = 0
+      iob = 0
+      ialt = 0
+      targ_val = 0.
+
       !! swatplus_perf OpenMP: per-thread act_hit scratch, grown to this table's alts.
       if (allocated(act_hit_tl)) then
         if (size(act_hit_tl) < d_tbl%alts) deallocate(act_hit_tl)
@@ -145,7 +153,11 @@
             end if
           end do
             
+          !! Q1281 follow-up: with no plants (npl = 0) every alternative is already "n" above and plcur has no
+          !! valid index, so skip the comparison (cond_real only ever sets "n"). ipl > 0 also covers alts = 0.
+          if (pcom(ob_num)%npl > 0 .and. ipl > 0) then
             call cond_real (ic, pcom(ob_num)%plcur(ipl)%phuacc, d_tbl%cond(ic)%lim_const, idtbl)
+          end if
             
         !potential heat units - base zero
         case ("phu_base0")
@@ -158,9 +170,16 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%phubase0, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: these weather conditions are defined only for hru and hlt objects. For any other
+          !! ob, iob was stale or 0 (ob(0) is out of bounds), so treat the condition as not met.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%phubase0, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                          
         !precip on current day
         case ("precip_cur")
@@ -173,9 +192,15 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%precip, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: hru/hlt only; see phu_base0 above.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%precip, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                                       
         !precip on next day day
         case ("precip_next")
@@ -188,9 +213,15 @@
           if (d_tbl%cond(ic)%ob == "hlt") then
             iob = sp_ob1%hru_lte + ob_num - 1
           end if
-          iwst = ob(iob)%wst
-          
-          call cond_real (ic, wst(iwst)%weat%precip_next, d_tbl%cond(ic)%lim_const, idtbl)
+          !! Q1281 follow-up: hru/hlt only; see phu_base0 above.
+          if (d_tbl%cond(ic)%ob == "hru" .or. d_tbl%cond(ic)%ob == "hlt") then
+            iwst = ob(iob)%wst
+            call cond_real (ic, wst(iwst)%weat%precip_next, d_tbl%cond(ic)%lim_const, idtbl)
+          else
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) /= "-") act_hit_tl(ialt) = "n"
+            end do
+          end if
                       
         !plant growing
         case ("plant_gro")
@@ -217,7 +248,11 @@
           end do
           !plant not in community of ipl = 0
           if (ipl == 0) then
-            act_hit_tl(ialt) = "n"
+            !! Q1281 follow-up: the plant is not in the community, so it is not growing; treat it as the
+            !! gro == "n" case below. This used to write act_hit_tl(ialt) with a stale or zero ialt.
+            do ialt = 1, d_tbl%alts
+              if (d_tbl%alt(ic,ialt) == "=") act_hit_tl(ialt) = "n"
+            end do
           else 
             !if plant is in the community - check to see if it is growing
             do ialt = 1, d_tbl%alts

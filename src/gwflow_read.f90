@@ -195,6 +195,10 @@
       logical, allocatable :: cell_tile_depth_set(:), cell_tile_area_set(:), cell_tile_K_set(:)
 
 
+      !! Q1281: active_cell is assigned only when an active cell lies within min_dist of a boundary cell, but it
+      !! is stored for every boundary cell. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call.
+      active_cell = 0
+
       !write message to screen
       call DATE_AND_TIME (b(1), b(2), b(3), date_time)
       write (*,111) "reading from groundwater file      ", date_time(5), date_time(6), date_time(7)
@@ -499,7 +503,11 @@
       allocate(gw_bound_dist(ncell), source = 0.)
       do i=1,ncell
         if(gw_state(i)%stat == 2) then
-          min_dist = 1000000.
+          !! Q1281 follow-up: 1.0e6 m stood in for "infinity". With no active cell inside it, active_cell kept the
+          !! previous boundary cell's answer, or 0, an out-of-bounds index in gwflow_rech. Search without a cap
+          !! and start each boundary cell at 0 ("none"). The nearest cell is unchanged whenever one is within 1.0e6 m.
+          min_dist = huge(min_dist)
+          active_cell = 0
           do j=1,ncell
             if(gw_state(j)%stat == 1) then
               dist_x = gw_state(i)%xcrd - gw_state(j)%xcrd

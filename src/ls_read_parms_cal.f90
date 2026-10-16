@@ -13,6 +13,10 @@
        integer :: mlsp !none       |end of loop
        integer :: i !none       |counter
        
+       !! Q1281: mlsp sets db_mx%lscal_prms and bounds the read loop even when the file ends before its count line.
+       !! The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+       mlsp = 0
+
        eof = 0
 
       inquire (file=in_chg%wb_parms_sft, exist=i_exist)

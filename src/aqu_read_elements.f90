@@ -26,6 +26,10 @@
       integer :: iaqu !none         |counter
       integer :: ireg !none         |counter
                 
+      !! Q1281: ihru indexes acu_reg(i)%num in the nspu == 0 branch of the region block but is never assigned on
+      !! that path. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+      ihru = 0
+
       mreg = 0
       imax = 0
       mcal = 0
@@ -110,11 +114,14 @@
           acu_reg(i)%num_tot = ielem1
           deallocate (defunit_num)
         else
-          !!all hrus are in region 
-          allocate (acu_reg(i)%num(sp_ob%hru), source = 0)
-          acu_reg(i)%num_tot = sp_ob%hru
+          !!all aquifers are in region
+          !! Q1281 follow-up: this loop is over aquifers but stored into num(ihru), and ihru is not set on this
+          !! path (0, or sp_ob%hru + 1 after the acu_out block): always out of bounds. Store each aquifer number
+          !! at its own index. acu_reg%num is not read anywhere else in the engine.
+          allocate (acu_reg(i)%num(sp_ob%aqu), source = 0)
+          acu_reg(i)%num_tot = sp_ob%aqu
           do iaqu = 1, sp_ob%aqu
-            acu_reg(i)%num(ihru) = iaqu
+            acu_reg(i)%num(iaqu) = iaqu
           end do      
         end if
 

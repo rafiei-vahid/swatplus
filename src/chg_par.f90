@@ -33,6 +33,10 @@
       real :: absmax                                  !maximum change for variable
       real :: amin1                                   !units         |description 
 
+      !! Q1281: the select case below defines the result only for absval/abschg/pctchg/relchg; any other chg_typ
+      !! returned it undefined. Start from the current value (no change); the clamps below still apply.
+      chg_par = val_cur
+
       select case (chg_typ)
 
       case ("absval")

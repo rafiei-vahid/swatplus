@@ -46,6 +46,10 @@
       end type co2_annual
       type (co2_annual) :: co2_inc
       
+      !! Q1281: co2_end is assigned only while the record index is inside co2_yr.dat but read once it runs past
+      !! the end, which a file with gapped years reaches first. The OpenMP strip removed its implicit-SAVE '= 0.'.
+      co2_end = 0.
+
       !! output annual CO2 
       call open_output_file(2222, "co2.out")
       write (2222,*) "         YR    CO2(ppm)"

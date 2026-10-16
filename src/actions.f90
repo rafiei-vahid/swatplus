@@ -108,6 +108,14 @@
 !! initialized locals => implicit SAVE => shared across threads (see res_hydro.f90)
 !$omp threadprivate(action, lu_prev, snow_prev)
 
+      !! Q1281: irrop, ipud, istr and istr1 are assigned only on some action branches but read outside them
+      !! (the irr_demand mgt.out write past the action limit, a puddle matching no puddle.ops name, the grassww and
+      !! structure land-use-change writes). The OpenMP strip removed their implicit-SAVE '= 0'; reset them per call.
+      irrop = 0
+      ipud = 0
+      istr = 0
+      istr1 = 0
+
       do iac = 1, d_tbl%acts
         !! `d_tbl` is threadprivate but it is a POINTER -- privatising it gives each thread its
         !! own pointer, all aimed at the SAME `dtbl_lum(id)`. The plant/harvest branches below
@@ -408,6 +416,8 @@
           case ("plant")
             j = d_tbl%act(iac)%ob_num
             if (j == 0) j = ob_cur
+            
+            if (pcom(j)%dtbl(idtbl)%num_actions(iac) <= Int(d_tbl%act(iac)%const2)) then
                 
             icom = pcom(j)%pcomdb
             pcom(j)%days_plant = 1       !reset days since last planting
@@ -460,6 +470,7 @@
               pcom(j)%dtbl(idtbl)%num_actions(iac) = pcom(j)%dtbl(idtbl)%num_actions(iac) + 1
               pcom(j)%dtbl(idtbl)%days_act(iac) = 1     !reset days since last action
               if (iac > 1) pcom(j)%dtbl(idtbl)%days_act(iac-1) =  0     !reset previous action day counter
+            end if
             
           !harvest only
           case ("harvest")

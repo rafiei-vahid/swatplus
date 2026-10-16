@@ -29,6 +29,10 @@
       real :: mathers_frac              !frac       !The fraction of carbon that is slow humas pool
       real :: tot_mass                  !kg/ha      |total mass of the soil layer
 
+      !! Q1281: with sol_P_model == 1, psp is assigned only for layers with clay > 0 but always clamped and divided
+      !! by. The OpenMP strip removed its implicit-SAVE '= 0.'; reset it per call (upstream's value).
+      psp = 0.
+
       !! suppress unused variable warning
       if (isol < 0) continue
 

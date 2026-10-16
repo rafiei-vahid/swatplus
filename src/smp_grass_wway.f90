@@ -66,6 +66,12 @@
       real :: xrem !              | 
       integer :: k !m^3/s         |Total number of HRUs plus this HRU number
       
+      !! Q1281: rcharea is assigned only when the depth iteration runs (qp_cms > 0), and sf_depth/sf_sed only when
+      !! sf_area > 1.e-6, but they are read when sf_area > 0. The OpenMP strip removed their implicit-SAVE '= 0.'.
+      rcharea = 0.
+      sf_depth = 0.
+      sf_sed = 0.
+
       !!  set variables
       j = ihru
                                 
@@ -118,7 +124,10 @@
           !! Calculate runoff and sediment losses taken from mostly from filter.f
         end if
 
-        if (sf_area > 0.) then 
+        !! Q1281 follow-up: sf_depth and sf_sed are set only when sf_area > 1.e-6 (before its 0.2 scaling), so a
+        !! smaller positive area reached Log(sf_depth) with sf_depth 0 (divide-by-zero under -fpe0). sf_depth > 0
+        !! holds exactly when they were set (surfq > .001 and area > 0 here), so the small-area case removes nothing.
+        if (sf_area > 0. .and. sf_depth > 0.) then 
           !! surq_remove = 75.8 - 10.8 * Log(sf_depth) + 25.9 * Log(sol_k(1,j))
           !! Simpler form derived from vfsmod simulations. r2 = 0.57 Publication pending White and Arnold 2008
           surq_remove = 95.6 - 10.79 * Log(sf_depth) 

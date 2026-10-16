@@ -13,6 +13,10 @@
       logical :: i_exist              !none       |check to determine if file exists
       integer :: iu !none       |counter 
            
+      !! Q1281: imax is assigned only after urban.urb's title and header are read, but db_mx%urban = imax runs
+      !! regardless. The OpenMP strip removed its implicit-SAVE '= 0'; reset it per call (upstream's value).
+      imax = 0
+
       inquire (file=in_parmdb%urban_urb, exist=i_exist)
       if (.not. i_exist .or. in_parmdb%urban_urb == "null") then
           !! no urban database: keep imax defined, since db_mx%urban = imax below

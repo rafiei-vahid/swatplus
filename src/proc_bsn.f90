@@ -2,6 +2,7 @@
 
       use time_module
       use output_path_module
+      use input_file_module, only : cio_basin_two_files, cio_basin_two_files_msg
       
       implicit none
       
@@ -17,6 +18,7 @@
 !!!  open diagnostics.out file to print problems with various files
      call open_output_file(9001, "diagnostics.out", 8000)  !!ext to 8000 recl per email 8/2/21 - Kai-Uwe
      write (9001,*) "DIAGNOSTICS.OUT FILE" 
+     if (cio_basin_two_files) write (9001,'(a)') cio_basin_two_files_msg
 !!!  open drainage areas output file
      call open_output_file(9004, "area_calc.out")
                 

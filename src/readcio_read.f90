@@ -30,14 +30,20 @@
          !! with only "codes.bsn parameters.bsn" made the list-directed read spill onto the
          !! next (CLIMATE) line, shifting every later section -- weather never loaded and the
          !! run died with a bogus bounds error in cli_tmeas. Fall back to the 2-entry form and
-         !! leave carbon_bsn at its default.
+         !! leave carbon_bsn at its default, and say so: a two-file basin line comes from an editor
+         !! older than 4.0.0, which this version does not support. A line with fewer names stops here.
          read (107,'(a)',iostat=eof) line_buffer
          if (eof < 0) exit
          read (line_buffer,*,iostat=eof_basin) name, in_basin%codes_bas, in_basin%parms_bas,  &
                                                in_basin%carbon_bsn
          if (eof_basin /= 0) then
            read (line_buffer,*,iostat=eof_basin) name, in_basin%codes_bas, in_basin%parms_bas
-           if (eof_basin /= 0) exit
+           if (eof_basin /= 0) then
+             write (*,*) "ERROR: the basin line of file.cio could not be read: ", trim(line_buffer)
+             error stop
+           end if
+           cio_basin_two_files = .true.
+           write (*,'(a)') cio_basin_two_files_msg
          end if
          read (107,*,iostat=eof) name, in_cli
          if (eof < 0) exit

@@ -21,6 +21,13 @@
        character(len=25) :: carbon_bsn      = "carbon.bsn"
       end type input_basin
       type (input_basin) :: in_basin
+      !! set by readcio_read when the basin line names two files (written by an editor older than 4.0.0);
+      !! proc_bsn repeats the warning in diagnostics.out, which opens after file.cio is read
+      logical :: cio_basin_two_files = .false.
+      character(len=*), parameter :: cio_basin_two_files_msg =                                          &
+        "WARNING: the basin line of file.cio names two files, not three (no carbon.bsn). Input files "   // &
+        "written by SWAT+ Editor or SWAT+ Toolbox older than 4.0.0 are not supported by this version; "  // &
+        "carbon_bsn keeps its default (carbon.bsn). Rewrite the inputs with version 4.0.0 or later."
               
 !! climate
       type input_cli

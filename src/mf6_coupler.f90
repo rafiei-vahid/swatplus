@@ -3,11 +3,14 @@
       !!  SWAT+ <-> MODFLOW 6 daily two-way coupler (BMI / libmf6.so).
       !!
       !!  Design (see vadose-zone-coupling-gap memory + paper plan):
-      !!    - GWF (flow) is stepped DAILY in lockstep with the SWAT+ day loop
-      !!      (water table / recharge / baseflow are fast and matter daily).
-      !!    - GWT (PFAS transport) is advanced at a coarser (monthly) cadence
-      !!      because the plume moves slowly -- the classic MODFLOW->MT3D/RT3D
-      !!      flow-then-transport split (Bailey's SWAT-MODFLOW-NWT-RT3D).
+      !!    - MF6 is stepped in lockstep with the SWAT+ day loop, once every
+      !!      gwf_cadence days (default 1: daily). Each step is one
+      !!      prepare / do / finalize_time_step on the whole MF6 simulation
+      !!      (mf6_coupler_step).
+      !!    - GWT (PFAS transport), when the simulation holds one, is solved in
+      !!      that same simulation, so it steps with every flow step. There is
+      !!      no separate, coarser transport step: gwt_cadence (mf6.con line 3)
+      !!      is read, defaulted and printed, and steps nothing.
       !!
       !!  Activation: presence of "mf6.con" in the SWAT+ TxtInOut.  This keeps
       !!  the engine backward compatible (bsn_cc is read as one record, so a
@@ -16,8 +19,10 @@
       !!  mf6.con format (free, '!' comments ignored):
       !!    line 1: workspace        relative dir holding mfsim.nam (e.g. ./mf6)
       !!    line 2: gwf_cadence      flow step interval, days     (default 1)
-      !!    line 3: gwt_cadence      transport step interval, days(default 30)
-      !!    line 4: lib path         libmf6.so (default below)    (optional)
+      !!    line 3: gwt_cadence      read and printed only; steps nothing
+      !!                             (transport steps with flow, above)
+      !!    line 4: rch_mult         recharge multiplier          (optional, default 1.0)
+      !!    line 5: lib path         libmf6.so (default below)    (optional)
       !!
       !!  IMPORTANT -- why dlopen() and not link-time -lmf6:
       !!    libmf6.so statically embeds the Intel Fortran runtime, exporting
@@ -40,7 +45,7 @@
       character(len=256) :: mf6_ws = "." !! MF6 workspace (relative to TxtInOut)
       character(len=512) :: mf6_lib = "/data/SWATGenXApp/codes/bin/libmf6.so"
       integer :: gwf_cadence = 1         !! flow step interval (days)
-      integer :: gwt_cadence = 30        !! transport step interval (days)
+      integer :: gwt_cadence = 30        !! mf6.con line 3: read and printed, steps nothing
       integer :: mf6_daycount = 0        !! engine days since coupling start
       real(c_double) :: mf6_tend = 0.0_c_double  !! MF6 end time (days)
 
@@ -226,7 +231,7 @@
       write (*,'(a)')      " MF6 COUPLER: active (daily SWAT+ <-> MODFLOW 6)"
       write (*,'(a,a)')    "   workspace   : ", trim(mf6_ws)
       write (*,'(a,i0,a,i0,a)') "   cadence     : flow=", gwf_cadence, &
-                                " d, transport=", gwt_cadence, " d"
+        " d; transport (if any) steps with flow; mf6.con line 3 (", gwt_cadence, ") is not used"
       write (*,'(a,f10.1,a)')   "   MF6 end time: ", mf6_tend, " days"
 
       !! --- M2: set up the HRU -> MF6 recharge down-coupling (optional) ---
@@ -360,10 +365,11 @@
 
       !! ================================================================
       subroutine mf6_coupler_step
-      !! Advance MF6 one coupling step in lockstep with the SWAT+ day.
-      !! M1: step flow when due and confirm MF6 time advances.
-      !! M2 will push recharge before the flow step; M3 will pull
-      !! baseflow + PFAS after it and trigger transport at gwt_cadence.
+      !! Advance MF6 one coupling step in lockstep with the SWAT+ day, every
+      !! gwf_cadence days: after prepare_time_step push SWAT+ recharge and the
+      !! PFAS source (when mapped), solve the whole simulation (GWF, and GWT if
+      !! present) with do_time_step, then pull baseflow and PFAS discharge
+      !! (when mapped). gwt_cadence plays no part here.
 #if defined(__INTEL_COMPILER) || defined(__INTEL_LLVM_COMPILER)
       use ifport, only : chdir          !! gfortran provides CHDIR as a GNU intrinsic
 #endif

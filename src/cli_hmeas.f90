@@ -111,6 +111,15 @@
        do
          read (108,*,iostat=eof) iyr, istep, hmd(i)%ts(istep,iyrs)
          if (eof < 0) exit
+         !! relative humidity is a fraction (0-1); -99 marks a missing day (generated in climate_control).
+         !! A value above 1 or below 0 used to be clamped silently to 0.01-0.99 after the dew point was computed from it.
+         if (hmd(i)%ts(istep,iyrs) > -97. .and. (hmd(i)%ts(istep,iyrs) < 0. .or. hmd(i)%ts(istep,iyrs) > 1.)) then
+           write (*,*) "ERROR: ", trim(hmd(i)%filename), " year ", iyr, " day ", istep, " relative humidity ",          &
+             hmd(i)%ts(istep,iyrs), " is outside 0-1; it must be a fraction (a value up to 100 is likely percent)"
+           write (9001,*) "ERROR: ", trim(hmd(i)%filename), " year ", iyr, " day ", istep, " relative humidity ",       &
+             hmd(i)%ts(istep,iyrs), " is outside 0-1; it must be a fraction (a value up to 100 is likely percent)"
+           error stop
+         end if
          if (istep == 365 .or. istep == 366) then
            read (108,*,iostat=eof) iyr, istep
            if (eof < 0) exit

@@ -19,6 +19,7 @@
       integer :: imeta = 0            !none       |metabolite counter
       integer :: iparent = 0          !none       |parent counter
       integer :: num_metab = 0        !none       |number of matabolites for each parent
+      logical :: found = .false.      !none       |true when the parent is in pesticide.pes
       
       eof = 0
       imax = 0
@@ -49,10 +50,12 @@
         do iparent = 1, imax
           read (106,*,iostat=eof) parent_name, num_metab
           if (eof < 0) exit
+          found = .false.
            
           !! xwalk with pestdb
           do ip = 1, db_mx%pestparm
             if (parent_name == pestdb(ip)%name) then
+              found = .true.
               allocate (pestcp(ip)%daughter(num_metab))
               pestcp(ip)%num_metab = num_metab
               
@@ -73,6 +76,14 @@
 
             end if
           end do
+
+          !! parent not in pesticide.pes - skip its metabolite lines so the next parent is read from its own line
+          if (.not. found) then
+            write (9001,*) trim(parent_name), " not found (pesticide.pes): its metabolite lines in pest_metabolite.pes are skipped"
+            do imeta = 1, num_metab
+              read (106,*,iostat=eof) titldum
+            end do
+          end if
         end do
         
         exit

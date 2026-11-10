@@ -149,8 +149,8 @@
           tp = urbdb(ulu)%tpconc * sus_sol / 1.e6
           tno3 = urbdb(ulu)%tno3conc * sus_sol / 1.e6
 
-          !! sus_sol * .001 = t/ha
-          sedyld(j) = (.001 * sus_sol) * urbdb(ulu)%fimp +            &
+          !! sus_sol * .001 = t/ha; times area_ha = t per HRU, the unit of sedyld (and of silyld below)
+          sedyld(j) = (.001 * sus_sol * hru(j)%area_ha) * urbdb(ulu)%fimp +   &
                                    sedyld(j) * (1. - urbdb(ulu)%fimp)
 
           !! The sediment loading from urban imprevious area is assumed 

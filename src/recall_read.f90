@@ -129,7 +129,7 @@
         
       !! check if the org mineral has already been used in a previous recall object
       do iprev = 1, irec
-        if (recall_db(irec)%org_min%name == recall_db(irec)%org_min%name) then
+        if (recall_db(iprev)%org_min%name == recall_db(irec)%org_min%name) then
           recall_db(irec)%iorg_min = iprev
           exit
         end if
@@ -221,7 +221,7 @@
         end do    !! read and store data
         
         !! save end year of recall data
-        recall(i)%end_yr = iyr
+        recall(irec)%end_yr = iyr
         close (108)
         
       end if    !! if new org mineral, then read

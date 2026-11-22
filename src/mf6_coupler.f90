@@ -17,7 +17,8 @@
       !!    line 1: workspace        relative dir holding mfsim.nam (e.g. ./mf6)
       !!    line 2: gwf_cadence      flow step interval, days     (default 1)
       !!    line 3: gwt_cadence      transport step interval, days(default 30)
-      !!    line 4: lib path         libmf6.so (default below)    (optional)
+      !!    line 4: rch_mult         recharge multiplier (default 1.0) (optional)
+      !!    line 5: lib path         libmf6.so (default below)    (optional)
       !!
       !!  IMPORTANT -- why dlopen() and not link-time -lmf6:
       !!    libmf6.so statically embeds the Intel Fortran runtime, exporting

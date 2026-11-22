@@ -138,9 +138,20 @@
         aqu_inflo = real(mf6_channel_baseflow(int(ob(icmd)%gis_id)))   !m3/day, +ve=gain
         chsd_d(ich)%aqu_in = aqu_inflo / 86400.
         chsd_d(ich)%aqu_in_mm = aqu_inflo / (10. * ob(icmd)%area_ha)
-        if (ht1%flo > 1.e-6 .and. aqu_inflo > 0.) then
-          rto = aqu_inflo / ht1%flo
-          ob(icmd)%tsin(:) = (1. + rto) * ob(icmd)%tsin(:)
+        if (aqu_inflo > 0.) then
+          if (ht1%flo > 1.e-6) then
+            rto = aqu_inflo / ht1%flo
+            ob(icmd)%tsin(:) = (1. + rto) * ob(icmd)%tsin(:)
+          else
+            !! No upstream inflow to scale. ch_rtmusk routes tsin
+            !! (inflo = tsin(irtstep)/substeps), not ht1%flo, so a gain added
+            !! only to ht1%flo was booked as channel inflow and then lost: no
+            !! outflow, no storage. tsin holds m3 per routing step and sums to
+            !! the day's inflow volume, so the gain is spread evenly over the
+            !! steps. Measured on a one-channel deck with zero upstream inflow
+            !! (2026-11-22): in 1418.69 m3/day, out 0, storage change 0.
+            ob(icmd)%tsin(:) = ob(icmd)%tsin(:) + aqu_inflo / real(size(ob(icmd)%tsin))
+          end if
         end if
         ht1%flo = ht1%flo + aqu_inflo          !! +ve adds baseflow, -ve seepage
         if (ht1%flo < 0.) ht1%flo = 0.

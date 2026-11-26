@@ -198,7 +198,7 @@
           end if
 
           !! verify that water concentration is at or below solubility
-          solmax = pfasdb_sol(jpf) * wtrin
+          solmax = pfasdb_sol(jpf) * wtrin / 1000.   !! kg = mg/L * m3 / 1000 (1 m3 = 1000 L, 1 kg = 1.e6 mg)
           if (solmax < chpfmass * frsol) then
             sedpfmass = sedpfmass + (chpfmass * frsol - solmax)
             chpfmass = chpfmass - (chpfmass * frsol - solmax)

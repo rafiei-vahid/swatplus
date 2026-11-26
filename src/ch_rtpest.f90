@@ -24,13 +24,13 @@
       integer :: ipdb !none                   |sequential pesticide number of daughter pesticide
       integer :: imeta !none                   |pesticide metabolite counter
       real :: mol_wt_rto !ratio                  |molecular weight ratio of duaghter to parent pesticide
-      real :: pstin !mg pst                 |total pesticide transported into reach during time step
+      real :: pstin !kg pst                 |total pesticide transported into reach during time step
       real :: kd !(mg/kg)/(mg/L)         |koc * carbon
       real :: depth !m             |depth of water in reach
-      real :: chpstmass !mg pst        |mass of pesticide in reach
-      real :: sedpstmass !mg pst        |mass of pesticide in bed sediment
+      real :: chpstmass !kg pst        |mass of pesticide in reach
+      real :: sedpstmass !kg pst        |mass of pesticide in bed sediment
       real :: fd2 !units         |description
-      real :: solmax !units         |description
+      real :: solmax !kg pst        |max soluble pesticide in reach water at solubility
       real :: sedcon !g/m^3         |sediment concentration 
       real :: tday !none          |flow duration (fraction of 24 hr)
       real :: por !none          |porosity of bottom sediments
@@ -166,7 +166,7 @@
           end if
 
           !! verify that water concentration is at or below solubility
-          solmax = pestdb(jpst)%solub * wtrin
+          solmax = pestdb(jpst)%solub * wtrin / 1000.   !! kg = mg/L * m3 / 1000 (1 m3 = 1000 L, 1 kg = 1.e6 mg)
           if (solmax < chpstmass * frsol) then
             sedpstmass = sedpstmass + (chpstmass * frsol - solmax)
             chpstmass = chpstmass - (chpstmass * frsol - solmax)

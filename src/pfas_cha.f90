@@ -201,7 +201,8 @@
           solmax = pfasdb_sol(jpf) * wtrin / 1000.   !! kg = mg/L * m3 / 1000 (1 m3 = 1000 L, 1 kg = 1.e6 mg)
           if (solmax < chpfmass * frsol) then
             sedpfmass = sedpfmass + (chpfmass * frsol - solmax)
-            chpfmass = chpfmass - (chpfmass * frsol - solmax)
+            chpfmass = chpfmass * (1. - frsol) + solmax   !! = M - (frsol*M - solmax); this form returns solmax exactly
+            !! at frsol 1, where the subtraction lost up to half an ulp(M) on near-dry reaches (M up to 2.8e5 x solmax)
           end if
 
         else

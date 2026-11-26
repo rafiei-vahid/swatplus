@@ -327,7 +327,9 @@
         if (cs_aqu(iaq)%pest(ipest) >= 1.e-12 .and. flow_mm > 0.) then
           pest_kg =  cs_aqu(iaq)%pest(ipest) * (1. - Exp(-flow_mm / (zdb1 + 1.e-6)))
           conc = pest_kg / flow_mm
-          conc = Min (pestdb(ipest_db)%solub / 100., conc)      ! check solubility
+          !! check solubility: conc is kg/mm over the aquifer, solub is mg/L; 1 mm over 1 ha = 10 m3 = 1.e4 L, so
+          !! kg/mm = solub * 1.e4 * area_ha * 1.e-6 = solub / 100. * area_ha
+          conc = Min (pestdb(ipest_db)%solub / 100. * ob(icmd)%area_ha, conc)
           pest_kg = conc * flow_mm
           if (pest_kg >  cs_aqu(iaq)%pest(ipest)) pest_kg = cs_aqu(iaq)%pest(ipest)
           
